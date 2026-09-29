@@ -1,0 +1,13 @@
+{
+  "_why": "Files listed here may name the shell sanitizer on purpose, because their subject IS the sanitizer. Every entry needs a reason. tools/check_text.py builds the token from pieces so this manifest is the only place the literal ever appears in the repository.",
+  "allowed": [
+    {
+      "path": "tools/text-allowlist.json",
+      "reason": "this manifest"
+    },
+    {
+      "path": "skills/elohim/references/traps.md",
+      "reason": "documents the sanitizer rewrite as one of the six traps"
+    }
+  ]
+}

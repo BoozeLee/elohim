@@ -1,0 +1,7 @@
+{
+  "name": "@elohim/opencode-adapter",
+  "private": true,
+  "type": "module",
+  "description": "ESM marker so the opencode plugin is parsed as a module.",
+  "license": "MIT"
+}

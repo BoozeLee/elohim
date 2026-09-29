@@ -1,0 +1,45 @@
+{
+  "measurements": [
+    {
+      "id": "collatz_step_multiplier_is_constant",
+      "claim": "the per-step Collatz multiplier is constant along the trace, so the product of the steps is a conserved quantity",
+      "path": "collatz.min_step_multiplier",
+      "value": 3.0000672902227308,
+      "tolerance": 1e-12,
+      "contrast": 0.1999327097772694
+    },
+    {
+      "id": "collatz_ratio_is_exact_power_of_3",
+      "claim": "the idealised trace ratio 3**odd_steps / 2**halvings is an exact power of 3, which would make it conserved",
+      "path": "collatz.ratio_to_nearest_pow3",
+      "value": 4.666283238361249e-06,
+      "tolerance": 1e-09,
+      "contrast": 4.666283238361249e-06
+    },
+    {
+      "id": "odd_step_correction_is_not_one",
+      "claim": "the idealisation 3n+1 = 3n costs nothing, so the trace carries no accumulated error from it",
+      "path": "collatz.odd_step_correction",
+      "value": 1.223640663034494,
+      "tolerance": 1e-12,
+      "contrast": 0.22364066303449404
+    },
+    {
+      "id": "seed_is_divisible_by_many_primes",
+      "claim": "the ghost seed is divisible by many small primes, so its factorisation is structural rather than incidental",
+      "path": "seed.primes_below_200_hit",
+      "value": 1,
+      "tolerance": 0,
+      "contrast": 1
+    },
+    {
+      "id": "seed_valuation_two_is_high",
+      "claim": "the seed carries an unusually large power of 2, which is what a deliberately chosen seed would look like",
+      "path": "seed.valuation_2",
+      "value": 3,
+      "tolerance": 0,
+      "contrast": 3.0
+    }
+  ],
+  "updated": "2026-09-29"
+}

@@ -1,0 +1,37 @@
+{
+  "label": "INVARIANT HUNTER",
+  "note": "Seeded from measurements the ELOHIM instrument produces at runtime. Every other skill in this repo starts empty and discovers its own facts.",
+  "instrument": {
+    "path": "instrument/invariant_hunter.py",
+    "sha256": "10a206f34b00ee76ee7e8a2e3b307aef0f6920839a4cfac98ed9ab4d92776bfd",
+    "bytes": 11853
+  },
+  "facts": [
+    {
+      "id": "collatz_is_not_conserved",
+      "claim": "the idealised Collatz trace ratio is not an exact power of 3, so the map has no conserved quantity on this trace",
+      "path": "collatz.conserved",
+      "path_keys": ["collatz", "conserved"],
+      "expect": false,
+      "origin": "seeded from the ELOHIM instrument, the verdict is computed from the residual and never written by hand"
+    },
+    {
+      "id": "collatz_step_multiplier_varies",
+      "claim": "the per-odd-step multiplier runs from 3.0000672902227308 to 3.2000000000000004, so it is not constant",
+      "path": "collatz.min_step_multiplier",
+      "path_keys": ["collatz", "min_step_multiplier"],
+      "expect": 3.0000672902227308,
+      "tolerance": 1e-06,
+      "origin": "seeded from the ELOHIM instrument, section I of the shard"
+    },
+    {
+      "id": "seed_is_not_structural",
+      "claim": "the ghost seed is divisible by 2 to exactly the third power, which is the expected sketch for a random 63-bit integer rather than a structure",
+      "path": "seed.valuation_2",
+      "path_keys": ["seed", "valuation_2"],
+      "expect": 3,
+      "tolerance": 0,
+      "origin": "seeded from the ELOHIM instrument, section VI of the shard"
+    }
+  ]
+}

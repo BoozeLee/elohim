@@ -1,0 +1,18 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "elohim",
+  "version": "1.0.0",
+  "description": "A reproducible numerical-instrument skill: measures exotic mathematics, pins every claim to a checksum, and fails loudly when a measurement drifts.",
+  "author": {
+    "name": "BoozeLee"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mathematics",
+    "numerical-verification",
+    "pisot",
+    "continued-fractions",
+    "reproducibility",
+    "invariant-ledger"
+  ]
+}

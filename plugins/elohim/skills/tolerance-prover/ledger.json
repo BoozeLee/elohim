@@ -1,0 +1,201 @@
+{
+  "label": "TOLERANCE PROVER",
+  "note": "This ledger started empty. Every fact below was measured by this skill's own instrument, re-derived by scripts/discover.py through a different root finder and a different propagation, and promoted on purpose from backlog.json. Three of the twenty-six measurements are left unpromoted with the reason written beside them in backlog.json. The digits the skill is built to distrust are not here: no crossover precision, no budget slack, no starved maximum and no starved argmax is pinned, because each of them was measured twice and the two routes disagreed. What is pinned instead is the set of statements that survived the disagreement.",
+  "instrument": {
+    "path": "instrument/tolerance_prover.py",
+    "sha256": "2182c01ccce2ac5106f570a6c7bb9354c5b489968c8ddaf79dcde132711caf5a",
+    "bytes": 33152
+  },
+  "facts": [
+    {
+      "id": "tribonacci_max_ratio",
+      "claim": "over n <= 200 at the 109 working digits the budget formula asks for, the tribonacci Pisot ratio |lambda**n - round(lambda**n)| / |alpha|**n peaks at 1.999974821665813, so the bound of 2 is approached rather than comfortably respected",
+      "path": "tribonacci.max_ratio",
+      "expect": 1.999974821665813,
+      "tolerance": 1e-12,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "tribonacci_argmax",
+      "claim": "the tribonacci maximum over n <= 200 is attained at n = 192, so the worst case is one specific term of the scan and not a spread average",
+      "path": "tribonacci.argmax",
+      "expect": 192,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "tribonacci_deficit",
+      "claim": "the tribonacci maximum sits 2.5178334186914952e-05 below the bound of 2, which is 1.3e-05 of the bound itself, so a tolerance written as 2 carries no margin in it",
+      "path": "tribonacci.deficit",
+      "expect": 2.5178334186914952e-05,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "plastic_max_ratio",
+      "claim": "over n <= 200 at the 66 working digits the budget formula asks for, the plastic Pisot ratio |lambda**n - round(lambda**n)| / |alpha|**n peaks at 1.9999995588370636, so the bound of 2 is approached rather than comfortably respected",
+      "path": "plastic.max_ratio",
+      "expect": 1.9999995588370636,
+      "tolerance": 1e-12,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "plastic_argmax",
+      "claim": "the plastic maximum over n <= 200 is attained at n = 183, so the worst case is one specific term of the scan and not a spread average",
+      "path": "plastic.argmax",
+      "expect": 183,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "plastic_deficit",
+      "claim": "the plastic maximum sits 4.411629364042824e-07 below the bound of 2, which is 2.2e-07 of the bound itself, so a tolerance written as 2 carries no margin in it",
+      "path": "plastic.deficit",
+      "expect": 4.411629364042824e-07,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "plastic_budget",
+      "claim": "the working precision a scan over n <= 200 needs for the plastic constant is 66 digits, from n_max * (log10(lambda) - log10(abs_alpha)) + 30",
+      "path": "specification.plastic.budget",
+      "expect": 66,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "tribonacci_modulus_identity_is_exact",
+      "claim": "the modulus of the tribonacci conjugate pair equals sqrt(1/lambda) to within the working precision, so the two routes to it cannot disagree",
+      "path": "specification.tribonacci.modulus_discrepancy",
+      "expect": 0.0,
+      "tolerance": 1e-15,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "plastic_modulus_identity_is_exact",
+      "claim": "the modulus of the plastic conjugate pair equals sqrt(1/lambda) to within the working precision, so the two routes to it cannot disagree",
+      "path": "specification.plastic.modulus_discrepancy",
+      "expect": 0.0,
+      "tolerance": 1e-15,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "bound_is_attained",
+      "claim": "the bound of 2 is attained at none of the 9 ceilings probed, so it is a supremum of the ratio over n rather than a value the ratio takes",
+      "path": "verdict.bound_is_attained",
+      "expect": false,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "maximum_is_monotone_in_n_max",
+      "claim": "the measured maximum never falls as the ceiling rises, for either base, so the growth ladder climbs to a supremum instead of sawtoothing",
+      "path": "verdict.maximum_is_monotone_in_n_max",
+      "expect": true,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "tribonacci_argmax_is_final",
+      "claim": "the tribonacci argmax at n <= 200 is not the worst case at a higher ceiling: by n <= 3200 it has moved to n = 1881, so the pinned n is a property of the scanned window",
+      "path": "verdict.tribonacci_argmax_is_final",
+      "expect": false,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "plastic_argmax_is_final",
+      "claim": "the plastic argmax at n <= 200 has not moved off n = 183 at any of the 9 rungs up to n <= 3200, so for that base the pinned n is not an artefact of the window",
+      "path": "verdict.plastic_argmax_is_final",
+      "expect": true,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "argmaxes_differ_at_the_ceiling",
+      "claim": "at a ceiling of n <= 3200 the two bases peak at different n, so a shared argmax across the two of them would have been a coincidence of the window",
+      "path": "verdict.argmaxes_differ_at_the_ceiling",
+      "expect": true,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "tribonacci_deficit_shrink",
+      "claim": "raising the ceiling from n <= 200 to n <= 3200 shrinks the tribonacci deficit by a factor of 4933, which is what approaching a supremum looks like",
+      "path": "growth.deficit_shrink.tribonacci",
+      "expect": 4933.371587202164,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "crossover_is_route_dependent",
+      "claim": "for both bases the lowest working precision that respects the bound is lower on the residual route than on the power route, so the crossover is a property of the arithmetic rather than of the sequence and no single number for it belongs in a ledger",
+      "path": "verdict.crossover_is_route_dependent",
+      "expect": true,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "holding_set_is_contiguous",
+      "claim": "the set of working precisions that respect the bound is not a single interval, because the plastic residual route respects the bound at 39 while 40 digits break it, so a scan that treats the crossover as a threshold is wrong even where the threshold itself is right",
+      "path": "verdict.holding_set_is_contiguous",
+      "expect": false,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "isolated_holding_cells",
+      "claim": "the only working precision that respects the bound while a higher one breaks it is 39 on the plastic residual route, and every other probed precision on every route behaves as a threshold would predict",
+      "path": "verdict.isolated_holding_cells",
+      "expect": [
+        [
+          "plastic",
+          "residual",
+          39
+        ]
+      ],
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "budget_is_sufficient",
+      "claim": "on both routes for both bases the highest working precision that still breaks the bound lies below the budget, so the budget is sufficient for the scan it sizes and the claim survives the route change",
+      "path": "verdict.budget_is_sufficient",
+      "expect": true,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "starved_max_ratio_is_pinnable",
+      "claim": "the digits of the maximum measured on a starved budget are not stable enough to pin as a ledger fact, because the working precision has to be right and not merely roughly right: on both routes the maximum moves by a large factor when three more digits are added, and the routes disagree with each other by many orders of magnitude on the same budget",
+      "path": "verdict.starved_max_ratio_is_pinnable",
+      "expect": false,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "starved_peak_movement_is_route_dependent",
+      "claim": "whether the starved argmax moves when the budget moves is answered differently by the two routes, so the peak is a fingerprint of the rounding rather than a property of the sequence",
+      "path": "verdict.starved_peak_movement_is_route_dependent",
+      "expect": true,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "tribonacci_trace_holds_from",
+      "claim": "the nearest integer to tribonacci lambda**n equals the integer trace of the roots for every n from 4 up and fails to at 2 of the 200 terms, so at those n the scan is not measuring the Pisot error at all",
+      "path": "trace.tribonacci.trace_holds_from",
+      "expect": 4,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "plastic_trace_holds_from",
+      "claim": "the nearest integer to plastic lambda**n equals the integer trace of the roots for every n from 10 up and fails to at 6 of the 200 terms, so at those n the scan is not measuring the Pisot error at all",
+      "path": "trace.plastic.trace_holds_from",
+      "expect": 10,
+      "tolerance": 0,
+      "origin": "promoted from backlog on 2026-09-30"
+    }
+  ]
+}
