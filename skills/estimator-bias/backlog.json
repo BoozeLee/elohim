@@ -1,0 +1,179 @@
+{
+  "measurements": [
+    {
+      "id": "exact_decay_base",
+      "claim": "the decay base of the tribonacci Pisot error is 0.7373527057603276, proved by deflating the minimal polynomial and not estimated",
+      "path": "exact.base",
+      "value": 0.7373527057603276,
+      "tolerance": 1e-15,
+      "contrast": 0.0
+    },
+    {
+      "id": "trace_holds_from_n",
+      "claim": "the nearest integer to lambda**n equals the trace of the three roots for every n from 4 up, and fails to do so at n = 1 and n = 3, where the conjugate term is still above one half",
+      "path": "exact.trace_holds_from",
+      "value": 4,
+      "tolerance": 0,
+      "contrast": 2.0
+    },
+    {
+      "id": "fitted_base_n_le_40",
+      "claim": "a least-squares fit of the natural logarithm of the Pisot error on n, over n <= 40, returns 0.7470861243292907 against the exact base: a gap of 9.7e-03, which is 1.3 percent and shows in the second significant figure of the rate",
+      "path": "fits.n_le_40.base",
+      "value": 0.7470861243292907,
+      "tolerance": 1e-09,
+      "contrast": 0.009733418568963037
+    },
+    {
+      "id": "fitted_base_n_le_200",
+      "claim": "the same fit over n <= 200 returns 0.7376706109730894, so the gap falls to 3.2e-04 once the range is five times longer, a factor of 31 down",
+      "path": "fits.n_le_200.base",
+      "value": 0.7376706109730894,
+      "tolerance": 1e-09,
+      "contrast": 0.00031790521276175987
+    },
+    {
+      "id": "fitted_base_n_le_400",
+      "claim": "the same fit over n <= 400 returns 0.737500724118270, a gap of 1.5e-04, which is a factor of 66 smaller than the short-range gap",
+      "path": "fits.n_le_400.base",
+      "value": 0.73750072411827,
+      "tolerance": 1e-09,
+      "contrast": 0.00014801835794231444
+    },
+    {
+      "id": "bias_n_le_40",
+      "claim": "the fitted base over n <= 40 exceeds the provable base by 0.009733418568963, which is 1.3 times the fit's own standard error on the slope",
+      "path": "fits.n_le_40.bias",
+      "value": 0.009733418568963037,
+      "tolerance": 1e-09,
+      "contrast": 0.009733418568963037
+    },
+    {
+      "id": "bias_n_le_200",
+      "claim": "the fitted base over n <= 200 exceeds the provable base by 3.2e-04, which is 0.39 times the fit's own standard error and so not detectable from the fit at all",
+      "path": "fits.n_le_200.bias",
+      "value": 0.00031790521276175987,
+      "tolerance": 1e-09,
+      "contrast": 0.00031790521276175987
+    },
+    {
+      "id": "bias_n_le_400",
+      "claim": "the fitted base over n <= 400 exceeds the provable base by 1.5e-04, 0.52 standard errors of the fit's own slope",
+      "path": "fits.n_le_400.bias",
+      "value": 0.00014801835794231444,
+      "tolerance": 1e-09,
+      "contrast": 0.00014801835794231444
+    },
+    {
+      "id": "bias_n_le_1000",
+      "claim": "the fitted base over n <= 1000 exceeds the provable base by 2.6e-05, 38 times below the 1e-03 threshold the verdict uses, so whether the estimator counts as unbiased is a property of the range",
+      "path": "wide.bias",
+      "value": 2.644214092961672e-05,
+      "tolerance": 1e-09,
+      "contrast": 2.644214092961672e-05
+    },
+    {
+      "id": "bias_from_pisot_start_n_le_40",
+      "claim": "restarting the same fit at n = 4, where every term really is a Pisot error, cuts the short-range bias from 9.7e-03 to 3.6e-03, so about 63 percent of it came from the two terms that were not Pisot errors",
+      "path": "fits_from_pisot.n_le_40.bias",
+      "value": 0.0036406942503333095,
+      "tolerance": 1e-09,
+      "contrast": 0.0036406942503333095
+    },
+    {
+      "id": "residual_rms_n_le_40",
+      "claim": "the log-linear fit leaves an RMS residual of 0.74 nats over n <= 40, so the Pisot error is not a pure exponential and a single slope cannot describe it",
+      "path": "fits.n_le_40.residual_rms",
+      "value": 0.7386703340804587,
+      "tolerance": 1e-09,
+      "contrast": 0.7386703340804587
+    },
+    {
+      "id": "bias_in_standard_errors_n_le_40",
+      "claim": "the short-range gap is 1.26 standard errors of the fit's own slope, so the fit is measurably wrong and outside its error bar at the same time, and the z falls to 0.39 by n <= 200",
+      "path": "fits.n_le_40.bias_in_standard_errors",
+      "value": 1.2633220113671702,
+      "tolerance": 1e-09,
+      "contrast": 1.0
+    },
+    {
+      "id": "fit_is_unbiased",
+      "claim": "the fit is not unbiased over the three ranges probed: at least one returns a base further than 1e-03 from the provable one, and the threshold verdict flips back to unbiased once the short range is left out",
+      "path": "verdict.fit_is_unbiased",
+      "value": false,
+      "tolerance": null,
+      "contrast": 0.009733418568963037
+    },
+    {
+      "id": "bias_changes_sign",
+      "claim": "the fitted base falls below the provable one for 44 of the 398 ranges between n <= 3 and n <= 400, so the bias is not a systematic overestimate and its sign is a property of where the fit stopped",
+      "path": "verdict.bias_changes_sign",
+      "value": true,
+      "tolerance": null,
+      "contrast": 44.0
+    },
+    {
+      "id": "err_400_is_zero_at_starved_budget",
+      "claim": "at 90 working digits the 400-term error is exactly zero and 64 of the 400 terms have no fractional part left to measure, so the wide fit is not formable and the budget formula's 188 digits is a requirement rather than a comfort",
+      "path": "starved.err_400_is_zero",
+      "value": true,
+      "tolerance": null,
+      "contrast": 64.0
+    },
+    {
+      "id": "modulus_identity_is_exact",
+      "claim": "the modulus of the conjugate pair equals sqrt(1/lambda) exactly, so the two routes to the decay base can never disagree",
+      "path": "exact.modulus_discrepancy",
+      "value": 0.0,
+      "tolerance": 1e-15,
+      "contrast": 0.0,
+      "unpromoted_because": "this is Vieta's theorem restated.  The precision-budget skill already promotes that identity on its own ledger, and pinning it twice pins arithmetic rather than a property of this system"
+    },
+    {
+      "id": "two_precisions_agree_to_the_last_bit",
+      "claim": "the fitted base over n <= 400 computed at 200 working digits and at 260 is bit-identical, so the gap is not rounding noise",
+      "path": "stability.drift",
+      "value": 0.0,
+      "tolerance": 0,
+      "contrast": 0.0,
+      "unpromoted_because": "the measured value is exactly 0.0 because both passes land on the same double, which is a fact about the arithmetic rather than about the sequence.  The stability claim lives in the trap suite, where it is re-derived with code of its own instead of pinned here"
+    },
+    {
+      "id": "budget_digits_for_n_400",
+      "claim": "the working precision a scan over n <= 400 needs is 188 digits, from n_max * (log10(lambda) - log10(|alpha|)) + 30",
+      "path": "starved.budget_for_400",
+      "value": 188,
+      "tolerance": 0,
+      "contrast": 188.0,
+      "unpromoted_because": "a formula evaluated on its own inputs is a fact of arithmetic, and the digit budget is already a promoted fact of the precision-budget skill. Restating it here would pin the same number twice under two owners"
+    },
+    {
+      "id": "worst_short_range_bias",
+      "claim": "the most biased range in the whole scan is n <= 4, where the fitted base is 0.548 away from the provable one",
+      "path": "scan.largest_abs_bias",
+      "value": 0.5477056928286498,
+      "tolerance": 1e-09,
+      "contrast": 0.5477056928286498,
+      "unpromoted_because": "an extreme over a scan is not a stable measurement: the winning range moves the moment the scan window moves, so pinning the figure pins the window rather than the system.  The count of sign changes is promoted instead, and it does not have a single point of failure"
+    },
+    {
+      "id": "exact_slope_in_nats_per_step",
+      "claim": "the exact decay rate in natural-log form is -0.30463 nats per step of n",
+      "path": "exact.base_in_nats",
+      "value": -0.30468893171800315,
+      "tolerance": 1e-12,
+      "contrast": 0.30468893171800315,
+      "unpromoted_because": "the same promoted number passed through a logarithm.  The ledger pins the base, and a fact that only re-expresses a pinned fact adds no independent evidence"
+    },
+    {
+      "id": "prefix_share_of_short_bias",
+      "claim": "about 63 percent of the short-range bias is contributed by the two terms that are not Pisot errors",
+      "path": "prefix_share_of_short_bias",
+      "value": 0.6259593456771297,
+      "tolerance": 1e-09,
+      "contrast": 0.63,
+      "unpromoted_because": "a ratio of two numbers the ledger already pins.  Both of them are facts; their quotient is arithmetic, and the sentence that matters is already carried by the bias fact itself"
+    }
+  ],
+  "updated": "2026-09-29"
+}

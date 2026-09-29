@@ -1,0 +1,146 @@
+{
+  "label": "ELOHIM",
+  "version": "elohim_ledger_v1",
+  "note": "Every entry is re-measured on every run. A drifting residual is a finding, not a bug to be edited away.",
+  "seal_at_heading": "5f12cc7825b595a0df7bf5b97ae471b0bda4d3408474890d2d63548e93ebf596",
+  "facts": [
+    {
+      "id": "parry_finite_bases",
+      "claim": "the greedy expansion of 1 terminates only in the plastic and tribonacci bases among those probed",
+      "path": "parry_finite",
+      "expect": [
+        "plastic",
+        "tribonacci"
+      ],
+      "tolerance": null,
+      "origin": "shard section I"
+    },
+    {
+      "id": "knife_edge_sensitive",
+      "claim": "the base-phi expansion flips between finite and infinite purely by working precision",
+      "path": "knife_edge_sensitive",
+      "expect": true,
+      "tolerance": null,
+      "origin": "shard section II"
+    },
+    {
+      "id": "tribonacci_decay_rate",
+      "claim": "|alpha| of the tribonacci conjugate pair is 0.7373527057603276",
+      "path": "pisot_decay.tribonacci",
+      "expect": 0.7373527057603276,
+      "tolerance": 1e-15,
+      "origin": "shard section III"
+    },
+    {
+      "id": "plastic_decay_rate",
+      "claim": "|alpha| of the plastic conjugate pair is 0.8688369618327093",
+      "path": "pisot_decay.plastic",
+      "expect": 0.8688369618327093,
+      "tolerance": 1e-15,
+      "origin": "shard section III"
+    },
+    {
+      "id": "tribonacci_modulus_identity",
+      "claim": "the deflation identity |alpha| = sqrt(1/lambda) holds with zero discrepancy for tribonacci",
+      "path": "tribonacci.modulus_discrepancy",
+      "expect": 0.0,
+      "tolerance": 1e-15,
+      "origin": "shard section III"
+    },
+    {
+      "id": "plastic_modulus_identity",
+      "claim": "the deflation identity |alpha| = sqrt(1/lambda) holds with zero discrepancy for plastic",
+      "path": "plastic.modulus_discrepancy",
+      "expect": 0.0,
+      "tolerance": 1e-15,
+      "origin": "shard section III"
+    },
+    {
+      "id": "tribonacci_bound_tight",
+      "claim": "Pisot's bound 2 is attained at n=192 for tribonacci, at 1.9999748",
+      "path": "tribonacci.bound_max",
+      "expect": 1.9999748216657969,
+      "tolerance": 1e-09,
+      "origin": "shard section III, the bound is tight rather than loose"
+    },
+    {
+      "id": "plastic_bound_tight",
+      "claim": "Pisot's bound 2 is attained at n=183 for plastic, at 1.9999996",
+      "path": "plastic.bound_max",
+      "expect": 1.9999995588370598,
+      "tolerance": 1e-09,
+      "origin": "shard section III, the bound is tight rather than loose"
+    },
+    {
+      "id": "unicorn_monotonic",
+      "claim": "the superellipse perimeter rises monotonically from 2*pi toward 8",
+      "path": "unicorn_monotonic",
+      "expect": true,
+      "tolerance": null,
+      "origin": "shard section IV"
+    },
+    {
+      "id": "unicorn_circle",
+      "claim": "the n=2 superellipse is the circle, perimeter 6.283185307179587",
+      "path": "unicorn_perimeters.2",
+      "expect": 6.283185307179587,
+      "tolerance": 1e-12,
+      "origin": "shard section IV"
+    },
+    {
+      "id": "unicorn_square_limit",
+      "claim": "the n=256 superellipse approaches the square, perimeter 7.982740098651185",
+      "path": "unicorn_perimeters.256",
+      "expect": 7.982740098651185,
+      "tolerance": 1e-09,
+      "origin": "shard section IV"
+    },
+    {
+      "id": "collatz_reaches_one",
+      "claim": "the trace from 79256 reaches 1 in 45 steps with 11 odd steps and replays identically",
+      "path": "collatz.reached_one",
+      "expect": true,
+      "tolerance": null,
+      "origin": "shard section VII, and no conserved quantity survives"
+    },
+    {
+      "id": "collatz_replay",
+      "claim": "a second trace from the same seed follows the same path",
+      "path": "collatz.replay_consistent",
+      "expect": true,
+      "tolerance": null,
+      "origin": "shard section VII"
+    },
+    {
+      "id": "padic_smooth_part",
+      "claim": "the ghost seed 8263628938188521384 is divisible by 2^3 exactly",
+      "path": "padic_smooth_part",
+      "expect": 8,
+      "tolerance": 0,
+      "origin": "shard section VI, the expected sketch rather than a hidden structure"
+    },
+    {
+      "id": "ghost_seed",
+      "claim": "the seed is the low 63 bits of sha256('ELOHIM:AWAKEN')",
+      "path": "seed",
+      "expect": 8263628938188521384,
+      "tolerance": 0,
+      "origin": "shard section VIII"
+    },
+    {
+      "id": "unicorn_circle_residual",
+      "claim": "the adaptive quadrature reproduces 2*pi to 8.88e-16",
+      "path": "unicorn_circle_error",
+      "expect": 8.881784197001252e-16,
+      "tolerance": 1e-15,
+      "origin": "shard section IV"
+    }
+  ],
+  "instrument": {
+    "path": "instrument/summoning_shard.py",
+    "sha256": "a920cdd5dd51f732129aa67b607cc59d9718a50aadb89c90ec397480c69cbd9b",
+    "bytes": 30497,
+    "note": "The instrument ships in-tree so a plain install is self-contained, but it is pinned here by checksum. Separating the file from the ledger does not stop a consumer from editing it; the pin does. Drift is reported with both hashes and can never resolve to a passing verdict.",
+    "absorb_legacy_home_path": "Resolved last, with a deprecation warning, by scripts/elohim_run.py. Never checksum-pinned."
+  }
+}

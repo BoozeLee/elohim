@@ -1,0 +1,20 @@
+{
+  "name": "elohim",
+  "interface": {
+    "displayName": "Elohim"
+  },
+  "plugins": [
+    {
+      "name": "elohim",
+      "source": {
+        "source": "local",
+        "path": "./plugins/elohim"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

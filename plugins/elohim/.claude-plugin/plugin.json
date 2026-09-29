@@ -1,0 +1,15 @@
+{
+  "name": "elohim",
+  "version": "1.0.0",
+  "description": "A reproducible numerical-instrument skill: measures exotic mathematics, pins every claim to a checksum, and fails loudly when a measurement drifts.",
+  "author": {
+    "name": "BoozeLee"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mathematics",
+    "numerical-verification",
+    "reproducibility",
+    "invariant-ledger"
+  ]
+}

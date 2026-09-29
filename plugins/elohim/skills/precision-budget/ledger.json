@@ -1,0 +1,86 @@
+{
+  "label": "PRECISION BUDGET",
+  "note": "This ledger started empty. Every fact below was measured by this skill's own instrument, read out of the backlog, and promoted on purpose; nothing here was copied from a plan, a paper or a sibling skill. The digit budget is a claim that can fail, so its sufficiency is measured rather than assumed, and the starved figure is deliberately not pinned because it is noise.",
+  "instrument": {
+    "path": "instrument/precision_budget.py",
+    "sha256": "2baf65bb2c043bc52fb423c9d08c6beb1458b13d8e37c145b6c62d445fbce4a5",
+    "bytes": 23807
+  },
+  "facts": [
+    {
+      "id": "budget_for_n_200",
+      "claim": "the scan over n <= 200 fits inside the working precision the budget formula asks for",
+      "path": "budget.n_200",
+      "expect": 109,
+      "tolerance": 0.0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "budget_for_n_400",
+      "claim": "the scan over n <= 400 fits inside the working precision the budget formula asks for",
+      "path": "budget.n_400",
+      "expect": 188,
+      "tolerance": 0.0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "budget_is_not_minimal",
+      "claim": "the formula's digit count is not minimal; the budget carries slack digits beyond the last precision that still breaks the bound, so the formula is a safe over-estimate rather than a tight requirement",
+      "path": "bound.slack_digits",
+      "expect": 26,
+      "tolerance": 0.0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "bound_breaks_below_the_crossover",
+      "claim": "Pisot's bound is violated at every probed working precision below the crossover and holds at every one above it, so the crossover is the highest precision that still fails",
+      "path": "bound.crossover_precision",
+      "expect": 83,
+      "tolerance": 0.0,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "bound_is_attained_not_slack",
+      "claim": "Pisot's constant 2 is not a safe margin; the arithmetic attains it to within a few parts in 100 million, so the bound is essentially tight rather than slack",
+      "path": "bound.at_budget.max_ratio",
+      "expect": 1.999974821665813,
+      "tolerance": 1e-12,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "knife_edge_is_not_one_base_only",
+      "claim": "the knife edge is not a curiosity of phi; no algebraic base expands 1 the same way at every working precision, so every base flips somewhere in the sweep",
+      "path": "knife_edge.stable_bases",
+      "expect": [],
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "phi_terminates_at_some_precisions",
+      "claim": "the greedy expansion of 1 in base phi terminates at some working precisions and not at others, so the terminating set is a strict subset of the sweep",
+      "path": "knife_edge.phi_terminated_at",
+      "expect": [
+        50,
+        80
+      ],
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "modulus_identity_is_exact",
+      "claim": "the modulus of the conjugate pair equals sqrt(1/lambda) exactly, so the two routes can never disagree",
+      "path": "abs_alpha.modulus_discrepancy",
+      "expect": 0.0,
+      "tolerance": 1e-15,
+      "origin": "promoted from backlog on 2026-09-30"
+    },
+    {
+      "id": "starved_digits_are_pinnable",
+      "claim": "the digits of the maximum measured on a starved budget are not stable enough to pin as a ledger fact, because the working precision has to be right and not merely roughly right",
+      "path": "verdict.starved_digits_are_pinnable",
+      "expect": false,
+      "tolerance": null,
+      "origin": "promoted from backlog on 2026-09-30"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "name": "elohim",
+  "owner": {
+    "name": "BoozeLee"
+  },
+  "plugins": [
+    {
+      "name": "elohim",
+      "source": "./plugins/elohim",
+      "description": "A reproducible numerical-instrument skill: measures exotic mathematics, pins every claim to a checksum, and fails loudly when a measurement drifts."
+    }
+  ]
+}

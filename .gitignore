@@ -1,0 +1,18 @@
+# generated gate output -- includes the instrument's own out/ directory
+skills/*/out/
+skills/*/instrument/out/
+plugins/*/skills/*/out/
+plugins/*/skills/*/instrument/out/
+harness/out/
+
+# python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+
+# node
+node_modules/
+
+# scratch used by the test harness
+_probe_scratch.py

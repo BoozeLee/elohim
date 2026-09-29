@@ -1,0 +1,33 @@
+{
+  "name": "elohim",
+  "version": "1.0.0",
+  "description": "A reproducible numerical-instrument skill: measures exotic mathematics, pins every claim to a checksum, and fails loudly when a measurement drifts.",
+  "author": {
+    "name": "BoozeLee"
+  },
+  "license": "MIT",
+  "keywords": [
+    "mathematics",
+    "numerical-verification",
+    "reproducibility",
+    "invariant-ledger"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Elohim",
+    "shortDescription": "Reproducible exotic-mathematics instrument with a checksum-pinned claim ledger.",
+    "longDescription": "Runs a stdlib-only Python instrument that measures Parry numbers, Pisot decay signatures, superellipse perimeters, log-star behaviour, a p-adic ladder and a Collatz trace. Every published claim is pinned in a JSON ledger with a tolerance and a residual, the instrument itself is sha256-pinned so the goalposts cannot be moved silently, and a hygiene lint refuses any source file containing a name that command-line log sanitisers rewrite.",
+    "developerName": "BoozeLee",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Run the ELOHIM gate and tell me what changed.",
+      "Verify these mathematical claims with ELOHIM before I ship them.",
+      "Use ELOHIM to turn this numerical assumption into a pinned, testable fact."
+    ],
+    "brandColor": "#6EEE79"
+  }
+}

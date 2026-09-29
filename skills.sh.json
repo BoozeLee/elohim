@@ -1,0 +1,35 @@
+{
+  "$comment": "Index grouping for the skills.sh ecosystem.  Auto-indexers crawl skills/*/SKILL.md in a public repository.  Each entry below groups one skill on a single page.",
+  "skills": [
+    {
+      "name": "elohim",
+      "path": "skills/elohim",
+      "description": "Checksum-pinned numerical-instrument gate: 16 pinned facts, 6 independent trap re-derivations, a source hygiene lint, and a proven tamper test."
+    },
+    {
+      "name": "elohim-harness",
+      "path": "skills/elohim-harness",
+      "description": "The shared gate, not a fact-pinning skill. It holds no ledger and no instrument of its own and has 0 pinned facts and 0 traps to report. It runs the pin, fact, trap and hygiene gates against any skill directory named by --skill-dir, so the other five entries in this index each need no gate code of their own. Every count in every other entry was measured by this harness."
+    },
+    {
+      "name": "estimator-bias",
+      "path": "skills/estimator-bias",
+      "description": "15 pinned facts, 7 independent trap re-derivations. Deflates a cubic to prove a Pisot decay rate exactly, fits the same rate from the data, and reports the gap over four ranges in units of the fit's own standard error."
+    },
+    {
+      "name": "invariant-hunter",
+      "path": "skills/invariant-hunter",
+      "description": "3 pinned facts, 5 independent trap re-derivations. An honest negative: it measures a claimed Collatz conserved quantity and a derived ghost seed and returns the measurement that shows neither is structure."
+    },
+    {
+      "name": "precision-budget",
+      "path": "skills/precision-budget",
+      "description": "9 pinned facts, 6 independent trap re-derivations. Derives the working-digit budget for a Pisot bound from the formula, then measures whether it is sufficient and shows the same quantity collapsing on a starved budget."
+    },
+    {
+      "name": "tolerance-prover",
+      "path": "skills/tolerance-prover",
+      "description": "23 pinned facts, 7 independent trap re-derivations. Measures the tightness of the Pisot bound 2 for the tribonacci and plastic constants and establishes that it is a supremum no finite n attains."
+    }
+  ]
+}
