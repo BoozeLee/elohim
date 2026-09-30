@@ -11,6 +11,42 @@ version.
 - CI on every push and pull request, on Python 3.10 (the floor `install.sh`
   declares) and 3.14, running the text lint, the mirror check, and the full
   gate suite.
+- **`reproducibility`** — 6 facts, 7 traps, the sixth instrumented skill. It
+  runs each of the five sibling instruments, reads back the seal each one
+  recorded, and classifies the shard by the Python version that produced it.
+  Four instruments produce a byte-identical shard across the whole pinned
+  range; `estimator-bias` splits into exactly two classes at CPython 3.12,
+  where `sum()` became a Neumaier compensated summation. Both classes still
+  reproduce their own ledger's pinned values, which is why one pin can serve
+  two shard classes.
+- **Per-trap seal independence** — every trap is re-measured with the
+  instrument checksum disabled, so a trap that only holds *because* the gate is
+  sealed can no longer pass as evidence.
+- **The index cannot drift from the tree again.** A new case in
+  `tests/test_all.py` fails when any directory under `skills/` holding a
+  `SKILL.md` is absent from `skills.sh.json`. Until this existed, a skill
+  could ship gated and unlisted, and nothing would say so.
+- `tools/submit.py` gained three derived checks and a tri-state value, so
+  `?` now means "could not be determined here" rather than "nobody wrote this
+  check".
+
+### Fixed
+- **The README claimed the skills were "discoverable by the agent-skill
+  indexes that crawl public repositories".** They were not listed anywhere,
+  and nobody had measured it. `skills.sh/BoozeLee/elohim/SKILL.md` returns a
+  41,077-byte soft-404 against 553,688 bytes for a genuinely indexed
+  repository. A `200` proves nothing there, because the page is rendered
+  client-side; the claim is now stated with its evidence and marked unproven.
+- **`skills.sh.json` said the other `five` entries needed no gate code of
+  their own, while six shipped skills existed.** Corrected to the real count
+  when the seventh entry was added.
+- **`tools/submit.py` printed two `?` lines that were hardcoded string
+  literals**, not checks. The module docstring claimed visibility was verified
+  offline against the local git configuration; no such code existed. Every
+  entry is now derived. "The branch is pushed" is answerable from the local
+  git database and is a real gate that can go red; repository visibility lives
+  on GitHub's servers, so it needs the network and honestly stays `?`
+  without it.
 
 ## [0.1.0] — 2026-09-30
 
