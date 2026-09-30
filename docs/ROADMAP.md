@@ -115,10 +115,17 @@ the seconds are a measurement, not a fact.
 
 ### A2. Mutation survival as a first-class, repeatable measurement
 **Why:** finding 3.
-**Do:** promote `mutate.py` from a scratch script to `tools/mutate.py`, with
-the mutation operators declared in data rather than code, `--sample N` and
-`--seed`, and a JSON report. CI runs it at N=20 per skill on a schedule, not
-every push, because it is slow.
+**Do:** build the mutator with the mutation operators declared in data rather than
+code, `--sample N` and `--seed`, and a JSON report. Then **measure before
+building**: run N=200 and N=2000, commit the report, and let the kill criterion
+below decide whether the mutator ever becomes `tools/mutate.py` or earns CI at
+N=20 per skill on a schedule. The original wording of this item was "promote
+`mutate.py` from a scratch script to `tools/mutate.py`". **No `mutate.py` exists
+in this tree** — a filesystem search for `mutate*.py` returns nothing, so the
+mutator was never committed and this item is a from-scratch build. The 0-of-200
+baseline the kill criterion reasons from cannot be reproduced from this
+repository, which means the saturation question is unanswerable today rather than
+answered. That is why the measurement comes first.
 **Decided by:** the report is committed, and a regression in survival rate turns
 CI red.
 **Kill:** if the surviving rate is 0 at N=200 and stays 0 at N=2000, the
@@ -280,6 +287,26 @@ shipped skills is 31.2 s wall-clock, and the whole `tests/test_all.py` battery
 fell from roughly 90 s to 41 s, because the clean case now makes one aggregate
 call instead of six per-skill ones.
 
+**The 31.2 s above was measured on a contended machine, and the first draft of
+that sentence did not say so.** Re-measured later the same day: 12 runs across
+three conditions — a warm tree, a tree with every `skills/*/out` wiped, and a
+pristine `git archive` export of `main` — landed between 17.23 s and 18.38 s, and
+the 41 s figure reproduced at 39.8 s to 40.3 s. Under deliberate contention, 11
+CPU-burning subprocesses on 12 cores, the same `--all` ran at a 32.46 s mean with
+a 28.18 s to 35.14 s spread, so 31.2 s sits inside that band at a ratio of 0.96.
+The number is real and was never a fabricated figure. What it was missing was the
+condition that produces it, which is what makes a pin unusable: a reader who
+cannot reconstruct the conditions cannot re-derive the number, and a measurement
+that cannot be re-derived is an anecdote with a decimal point. **The uncontended
+figure for `--all` on this machine is about 17.5 s.** The 41 s battery figure is
+uncontended and reproducible as written.
+
+Two things this correction is not. It does not replace 31.2 s with 17.5 s in the
+line above; that line is a record of what was measured, and rewriting it would be
+the exact defect this repository exists to prevent. And it does not make a
+contended measurement worthless — it names the condition, which is the only thing
+that was missing.
+
 **The test was the last thing to see the new code, and it had been the thing
 policing it.** The clean case looped the harness one skill at a time, so the
 repository's own multi-skill path was the single thing no gate exercised — the
@@ -328,13 +355,43 @@ the API cannot do it. Then `FUNDING.yml` becomes live and the claim in
 
 ### D3. Release the tree that is public
 **Why:** `CHANGELOG.md` links `[0.1.0]` to a releases/tag URL that 404s.
-**Status:** the tag `v0.1.0` exists, but only locally — `git ls-remote --tags
-origin` returns nothing and `gh release list` is empty, so a visitor still gets
-the 404 this item exists to fix. The original instruction, to tag `7dd8915`, is
-unfollowable: that commit is off the branch since a rebase, and the tag now
-points at `f95f96e`.
-**Do:** push the tag, publish the release, and confirm the link resolves.
-**Decided by:** the tag exists on the remote and the release page renders.
+**Status: shipped.** The release is published at
+`https://github.com/BoozeLee/elohim/releases/tag/v0.1.0`, `isDraft: false`,
+`isPrerelease: false`, and both that URL and `tree/v0.1.0` return HTTP 200. The
+`[0.1.0]` link definition in `CHANGELOG.md` line 116 points at that exact URL,
+so the 404 this item exists to fix is gone. The original instruction, to tag
+`7dd8915`, was unfollowable: that commit is off the branch since a rebase.
+
+The tag did not simply need pushing. Its annotation was a **measurement with no
+referent**: it quoted 72 facts across 7 skills, 52 pinned values, 57 mirror files
+and 146 text files, and none of those figures describe any commit in this
+repository — 72 and 52 are the current tree, 57 and 146 sit between the current
+tree and its parent, and "7 skills" counts the shared harness, which has no
+ledger and so contributes no facts. It was withdrawn and rewritten rather than
+reconciled, because a figure that names no tree cannot be made true by picking a
+different tree.
+**Do:** move the tag to `6231e88`, push it, publish the release, and confirm the
+link resolves. **Do not publish `v0.1.0` where it points.** The tag dereferences
+to `f95f96e`, and `git log --diff-filter=A -- skills/reproducibility/SKILL.md`
+returns exactly `f95f96e`: the tagged commit is the very commit that introduced
+the sixth instrumented skill. The `[0.1.0]` body inside that commit reads "Five
+ledger-backed skills on one shared harness, 66 pinned facts and 31 independently
+re-derived traps", so the tag and its own release note disagree on the first
+thing a visitor reads. `6231e88` is the commit immediately before it, and a
+pristine `git archive` export of it measured 5 ledger-bearing skills, **66 facts,
+31 traps**, `ALL_SKILLS_PASS` at rc 0 — the body is exactly true of that tree.
+The count is 5 and not 6 because `skills/elohim-harness` ships a `SKILL.md` but
+has never had a `ledger.json`; it is the shared gate, not a fact-pinning skill.
+
+The alternative was to correct the `[0.1.0]` body to 6 / 72 / 38 and keep the tag
+where it is. That was rejected on this project's own rule: it edits a dated
+measurement, and it would assert that 0.1.0 shipped six instruments when the
+commit that introduced the sixth is the commit being tagged. Moving the tag edits
+nothing — `[Unreleased]` already carries the sixth skill and everything since
+`C1`, so every number in `CHANGELOG.md` becomes true of the tree it describes
+with zero edits to the changelog.
+**Decided by:** the tag exists on the remote, points at `6231e88`, and the release
+page renders.
 
 ---
 
@@ -375,13 +432,40 @@ is shipped: `--all`, `--fail-under` and a versioned `schema` key, with the clean
 case delegating to it instead of looping six per-skill invocations that proved
 nothing about the aggregate.
 
-What is left is three items and none of them is code. `D2` needs a human in a
-browser with a 2FA code and cannot be automated at all. `D3` is a push and a
-release page, and the release page needs a person to confirm it renders. `A2`
-and `C2` and `C3` are real work with no blocker, and the honest order after D1 is
-`C2` then `C3`: both are extensions of `C1`, which is the check that prevents
-this project's worst failure mode from recurring silently, and the cheapest way
-to extend a working tool is while its author still remembers why it is shaped
-that way. `A2` is deliberately last of the three — its own kill criterion says a
-0 % survival rate at N=2000 means it should stop earning runner time, and a tool
-with a standing kill criterion is not one to build first.
+What is left is five items: `D2`, `D3`, `A2`, `C2` and `C3`. Three of them are
+code. An earlier draft of this paragraph said "three items and none of them is
+code" and then described five, two of which it called real work in the same
+breath — a count in prose that the paragraph itself contradicted, in the
+document that orders every item below it. `D2` needs a human in a browser with a
+2FA code and cannot be automated at all. `D3` is a push and a release page, and
+the release page needs a person to confirm it renders.
+
+The order after D1 is `A2`, and it changed from the order this file used to give.
+That earlier order was `C2` then `C3`, on the grounds that the cheapest way to
+extend a working tool is while its author still remembers why it is shaped that
+way. **That reason does not hold here.** This repository is written by agents
+whose context does not survive a session boundary, so "while its author still
+remembers" is a window that is closed by construction. Sentiment about the author
+is not a durable argument; mechanism is.
+
+The mechanism that survives points the other way, and it is A2's own words. `A2`
+says the instrument saturates if the surviving rate is 0 at N=200 and stays 0 at
+N=2000, and a tool with a standing kill criterion is not one to build first. So
+`A2` runs **measurement before tool**: build the mutator, run N=200 and N=2000,
+and let the kill criterion decide whether it ever becomes `tools/mutate.py` or a
+CI gate at all. This ordering was chosen deliberately against the item's own
+written sequence, and the reason is recorded because it will look wrong later.
+
+One measured fact changed that decision. `A2` describes promoting `mutate.py`
+from a scratch script. **No `mutate.py` exists in this tree.** The mutator was
+never committed, so `A2` is a from-scratch build, and the 0-of-200 baseline its
+kill criterion reasons from cannot be reproduced from this repository — the
+saturation question is currently unanswerable, not answered. Building the tool
+first would have produced a working runner guarding a question nobody has asked.
+
+`C2` and `C3` are still worth doing, and they are now the weaker pair of the
+three. Both extend `C1`, which already gates every claim against every pinned
+value on every run. What they add is a promotion path, and the value of a
+promotion path is proportional to how often facts get promoted. At 72 facts with
+no growth, that number is near zero. That is a weaker position than "the author
+remembers", and it is a measurable one.
