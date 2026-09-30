@@ -4,15 +4,15 @@ Every item below names the measurement that decides it. An item without a
 pinnable number is a preference, not a task. Nothing here is scheduled against a
 week that has not been agreed.
 
-Status: **2026-09-30**, tree at `37c6b34` plus the A3 working change, all six
-instrumented skills green, public at `github.com/BoozeLee/elohim`, CI green on
-Python 3.10, 3.12 and 3.14. A1 is shipped; the measurement it was going to pin
-killed the pin. B1 is shipped; the measurement it was going to pin found a
-second, differently-shaped thing — a real interpreter boundary — so B1 pins two
-named classes and fails on a third instead of pretending there is one. A3 is
-shipped, and its measurement went the other way from the item's framing: 25 of
-38 traps are provably independent of the checksum, and 77 % of all tampers are
-caught by nothing but the sha256.
+Status: **2026-09-30**, all six instrumented skills green, public and pushed
+at `github.com/BoozeLee/elohim`, CI green on Python 3.10, 3.12 and 3.14. A1 is
+shipped; the measurement it was going to pin killed the pin. B1 is shipped;
+the measurement it was going to pin found a second, differently-shaped thing —
+a real interpreter boundary — so B1 pins two named classes and fails on a
+third instead of pretending there is one. A3 is shipped, and its measurement
+went the other way from the item's framing: 25 of 38 traps are provably
+independent of the checksum, and 77 % of all tampers are caught by nothing but
+the sha256.
 
 ---
 
@@ -22,16 +22,21 @@ Measured, not asserted:
 
 | claim | measurement |
 |---|---|
-| facts promoted | 66 across 5 skills |
-| traps re-derived independently | 31 |
-| instrument checksums pinned | 5, all PASS |
+| facts promoted | 72 across 6 instrumented skills |
+| traps re-derived independently | 38 |
+| instrument checksums pinned | 6, all PASS |
 | interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** |
-| instrument source pins identical across all of them | **yes, 5/5 byte-for-byte** |
+| instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** |
 | recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** |
 | sampled mutations of instrument code | 200 |
 | mutations that passed the gate | **0** |
 | apparent survivors that were actually timeouts | 1 (mechanism understood) |
 | shipped ledgers whose prose contradicted their pins | 1 (`precision-budget`, fixed) |
+| shard leaves swept twice, once with the seal forged and once left stale | **522, across 6 skills** |
+| traps measured to fire without the checksum | **25 of 38** |
+| traps that are the checksum | 5, exactly the 5 seal checks |
+| tampers caught by a seal-independent trap | **118 of 522 (22.6 %)** |
+| tampers caught by nothing but the sha256 | **404 of 522 (77.4 %)** |
 | tools in the repo that are not stdlib-only | 0 |
 
 The strongest result is the interpreter matrix, and it needed correcting before
@@ -277,9 +282,13 @@ the API cannot do it. Then `FUNDING.yml` becomes live and the claim in
 
 ### D3. Release the tree that is public
 **Why:** `CHANGELOG.md` links `[0.1.0]` to a releases/tag URL that 404s.
-**Do:** tag `v0.1.0` at `7dd8915`, publish the release, and confirm the link
-resolves.
-**Decided by:** the tag exists and the release page renders.
+**Status:** the tag `v0.1.0` exists, but only locally — `git ls-remote --tags
+origin` returns nothing and `gh release list` is empty, so a visitor still gets
+the 404 this item exists to fix. The original instruction, to tag `7dd8915`, is
+unfollowable: that commit is off the branch since a rebase, and the tag now
+points at `f95f96e`.
+**Do:** push the tag, publish the release, and confirm the link resolves.
+**Decided by:** the tag exists on the remote and the release page renders.
 
 ---
 
@@ -296,6 +305,11 @@ resolves.
   stated reason to diverge.
 - **Adversarial security.** The pin is integrity by visibility. Making it
   tamper-proof against a consistent hostile edit is a different project.
+- **A commit sha in this file.** A sha names a tree, and a rebase renames that
+  tree without changing a byte of it. This status line carried one and was wrong
+  three times in a single session — two rebases and a push, none of which altered
+  a line of code. The gate is the standing state; a sha is a snapshot of a name,
+  and a snapshot is not a measurement.
 
 ## The order, and why
 
