@@ -20,17 +20,29 @@ Measured, not asserted:
 | traps re-derived independently | 31 |
 | instrument checksums pinned | 5, all PASS |
 | interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** |
-| pin drift hashes identical across all of them | **yes, 5/5 byte-for-byte** |
+| instrument source pins identical across all of them | **yes, 5/5 byte-for-byte** |
+| recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** |
 | sampled mutations of instrument code | 200 |
 | mutations that passed the gate | **0** |
 | apparent survivors that were actually timeouts | 1 (mechanism understood) |
 | shipped ledgers whose prose contradicted their pins | 1 (`precision-budget`, fixed) |
 | tools in the repo that are not stdlib-only | 0 |
 
-The strongest result is the interpreter matrix. A 4-year span of CPython
-produces byte-identical checksums and byte-identical tamper-drift hashes, so the
-pinned values are measuring the mathematics and not the interpreter. That is
-the claim the whole project rests on, and until now it was untested.
+The strongest result is the interpreter matrix, and it needed correcting before
+it could be called one. A 4-year span of CPython produces byte-identical
+**instrument source** pins, so the gate is reading the same code everywhere.
+It does **not** produce byte-identical recorded seals everywhere: `estimator_bias`
+splits into exactly two classes, `06631f4cb544` on 3.10.20 and 3.11.9 and
+`8163ec2d879a` on 3.12.13, 3.13.13 and 3.14.5, while `elohim`,
+`invariant-hunter`, `precision-budget` and `tolerance-prover` hold one identical
+class each. The cause is measured, not guessed — CPython 3.12 switched `sum()`
+to Neumaier compensated summation, so `sum([0.1] * 10)` is `0.9999999999999999`
+on 3.10 and 3.11 and `1.0` on 3.12 and later, which moves `estimator_bias`'s
+bias figures at the ~1e-13 relative level. In both classes the seal
+self-check holds and all 25 gate runs pass, because the ledger's tolerances
+absorb a shift that size. The pinned values are therefore measuring the
+mathematics through a small measured interpreter-induced offset, and the size
+of that offset is now the thing B1 pins.
 
 ## The three findings that shaped this roadmap
 
