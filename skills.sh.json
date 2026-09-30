@@ -9,7 +9,7 @@
     {
       "name": "elohim-harness",
       "path": "skills/elohim-harness",
-      "description": "The shared gate, not a fact-pinning skill. It holds no ledger and no instrument of its own and has 0 pinned facts and 0 traps to report. It runs the pin, fact, trap and hygiene gates against any skill directory named by --skill-dir, so the other five entries in this index each need no gate code of their own. Every count in every other entry was measured by this harness."
+      "description": "The shared gate, not a fact-pinning skill. It holds no ledger and no instrument of its own and has 0 pinned facts and 0 traps to report. It runs the pin, fact, trap and hygiene gates against any skill directory named by --skill-dir, so the other six entries in this index each need no gate code of their own. Every count in every other entry was measured by this harness."
     },
     {
       "name": "estimator-bias",
@@ -25,6 +25,11 @@
       "name": "precision-budget",
       "path": "skills/precision-budget",
       "description": "9 pinned facts, 6 independent trap re-derivations. Derives the working-digit budget for a Pisot bound from the formula, then measures whether it is sufficient and shows the same quantity collapsing on a starved budget."
+    },
+    {
+      "name": "reproducibility",
+      "path": "skills/reproducibility",
+      "description": "6 pinned facts, 7 independent trap re-derivations. The tripwire, not a sixth measurement: it runs every sibling instrument and classifies the shard each one produced by the Python version that produced it, then fails when a shard lands outside the pinned table. The honest negative it carries is that the byte-identical-across-the-matrix claim was false for exactly one instrument, because CPython 3.12 made sum() a Neumaier compensated summation."
     },
     {
       "name": "tolerance-prover",
