@@ -1,0 +1,33 @@
+{
+  "_comment": [
+    "Numbers a claim states that the gate does not verify, and why each is allowed.",
+    "This file is the only place a prose figure may escape binding, so every",
+    "entry is a human decision reviewed in a diff rather than a rule that fired",
+    "by accident. Two kinds of entry appear here, and the difference matters.",
+    "A DERIVED entry is an arithmetic relationship between two pinned values:",
+    "the computation is written out so one multiplication can be checked by eye.",
+    "A reason beginning UNVERIFIED: is a finding, not a permission -- the claim",
+    "asserts a measurement and no gate pins it. Each is a candidate for a new",
+    "ledger fact, and the count is printed on every run of claim_binding.py so a",
+    "green check cannot hide the debt."
+  ],
+  "exemptions": {
+    "unicorn_square_limit:256": "the superellipse exponent, the shape being studied rather than a measurement of it; n=256 is a dimension of the family the fact describes",
+    "collatz_reaches_one:79256": "UNVERIFIED: the Collatz start value, and this fact's expect is a boolean, so no figure of the trajectory is pinned; the start value is the one number a reader most wants verified",
+    "collatz_reaches_one:45": "UNVERIFIED: the step count, unpinned for the same reason as the start value",
+    "collatz_reaches_one:11": "UNVERIFIED: the odd-step count, unpinned for the same reason as the start value",
+    "bias_in_standard_errors_n_le_40:0.39": "UNVERIFIED: the z at n <= 200; the short-range z is pinned at 1.2633220113671702 but the value the claim says it falls to is not a fact of its own",
+    "fit_is_unbiased:1e-03": "the verdict's own 1e-03 threshold, a constant of the fit_is_unbiased test written as 'further than 1e-03 from' rather than named; the same constant is declared structural where a claim calls it a threshold",
+    "bias_changes_sign:44": "UNVERIFIED: how many of the 398 ranges returned a base below the provable one, unpinned; the fact pins only that the sign changes, and the count is what makes the sign change legible",
+    "collatz_step_multiplier_varies:3.2000000000000004": "UNVERIFIED: the upper end of the multiplier range, asserted at seventeen digits with nothing verifying it; only the lower end 3.0000672902227308 is pinned. This is the defect class this check exists for, written into its own ledger",
+    "tribonacci_argmax_is_final:1881": "UNVERIFIED: where the tribonacci argmax lands at the wider ceiling n <= 3200, unpinned; the fact pins that the pinned argmax is not final, which is the claim's point, and leaves the replacement unmeasured",
+    "fitted_base_n_le_200:31": "DERIVED: 0.009733418568963037 / 0.00031790521276175987 = 30.617, which is 31 at the two figures the claim writes; both operands are pinned, as bias_n_le_40 and bias_n_le_200",
+    "bias_n_le_1000:38": "DERIVED: 1e-3 / 2.644214092961672e-05 = 37.818, which is 38 at the two figures the claim writes; the bias is pinned and the 1e-3 threshold is the verdict's own constant",
+    "bias_from_pisot_start_n_le_40:63": "DERIVED: 1 - 0.0036406942503333095 / 0.009733418568963037 = 0.62596, which is 63 percent at the two figures the claim writes; both operands are pinned",
+    "tribonacci_deficit:1.3e-05": "DERIVED: 2.5178334186914952e-05 / 1.999974821665813 = 1.2589e-05, which is 1.3e-05 at the two figures the claim writes; both operands are pinned",
+    "plastic_deficit:2.2e-07": "DERIVED: 4.411629364042824e-07 / 1.9999995588370636 = 2.2058e-07, which is 2.2e-07 at the two figures the claim writes; both operands are pinned",
+    "bias_n_le_200:0.39": "UNVERIFIED: stated as 0.39 times the fit's own standard error, but the standard error of the n <= 200 fit is not a pinned value, so the factor has no derivation this check or a reader can check",
+    "bias_n_le_400:0.52": "UNVERIFIED: stated as 0.52 standard errors of the fit's own slope, and for the same reason as the n <= 200 figure the standard error is not pinned",
+    "err_400_is_zero_at_starved_budget:64": "UNVERIFIED: how many of the 400 terms have no fractional part left is not a pinned value; the fact pins only that the wide fit is not formable at that budget"
+  }
+}

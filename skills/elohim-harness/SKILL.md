@@ -1,6 +1,6 @@
 ---
 name: elohim-harness
-description: This skill should be used when an instrument's recorded measurements must be re-verified rather than trusted — "run the gate", "did the numbers drift", "pin the checksum", "is the instrument modified", "add a fact to the ledger", "measure instead of asserting", "build a skill with a verified ledger". Runs four gates (checksum pin, fact ledger, independent trap re-derivations, source hygiene) against any instrument directory and refuses to return PASS unless all four hold. Stdlib-only Python 3.10+; no network; no build step.
+description: This skill should be used when an instrument's recorded measurements must be re-verified rather than trusted — "run the gate", "did the numbers drift", "pin the checksum", "is the instrument modified", "add a fact to the ledger", "measure instead of asserting", "build a skill with a verified ledger". Runs five gates (checksum pin, fact ledger, independent trap re-derivations, source hygiene, claim binding) against any instrument directory and refuses to return PASS unless all five hold. Stdlib-only Python 3.10+; no network; no build step.
 license: MIT
 compatibility: Python 3.10 or newer, standard library only. No network access, no build step, no third-party packages. Runs on Linux, macOS and Windows.
 metadata:
@@ -34,10 +34,10 @@ python3 scripts/harness_run.py --skill-dir ../elohim --json
 | `--list-backlog` | print unpromoted measurements |
 | `--promote ID:PATH[:TOL]` | pin a backlog measurement as a ledger fact |
 
-Exit `0` when all four gates hold, `1` when one fails, `2` when the skill or
+Exit `0` when all five gates hold, `1` when one fails, `2` when the skill or
 its instrument cannot be located.
 
-## The four gates
+## The five gates
 
 **pin** — the ledger pins the instrument's sha256 and byte count. Holding the
 instrument beside its ledger fixes only *which* code runs; the pin is what
@@ -57,6 +57,23 @@ instrument's own helpers.
 `log` identifier (a token command-line log sanitizers rewrite) and for network
 imports. A gate that reaches the network is not reproducible; a gate whose
 source can be silently rewritten is not a gate.
+
+**claim binding** — `scripts/claim_binding.py` extracts every number out of
+every claim sentence and requires each one to be classifiable: a rendering of
+some value the gate actually verifies, part of a formula or a scan window, or
+declared in `claim_binding_exemptions.json` with a written reason. A number
+that is none of the three fails. The other four gates measure the ledger; this
+one reads the sentence beside the number, which is where the worst defect this
+project shipped lived — prose asserting the opposite of its own pins while
+every gate reported green, found by a human reading output. An unaccounted
+number is therefore a failure and not a warning: a claim nobody can bind to a
+measurement is a claim nothing checks.
+
+This gate is the one that cannot be scoped to a single skill, because a claim
+may legitimately cite a figure pinned in a sibling. The harness passes the
+skills directory down, so the candidate universe is every ledger beside the
+skill, in a checkout (`<root>/skills/...`) and in an installed flat tree
+(`<root>/<skill>/...`) alike.
 
 ## Required skill layout
 
@@ -108,6 +125,8 @@ this harness beside it.
 
 | path | role |
 |---|---|
-| `scripts/harness_run.py` | the four gates, the report, the CLI |
+| `scripts/harness_run.py` | the five gates, the report, the CLI |
 | `scripts/check_hygiene.py` | source lint, shared by every consumer |
+| `scripts/claim_binding.py` | binds claim-sentence numbers to pinned values |
+| `scripts/claim_binding_exemptions.json` | declared exemptions, each with a reason |
 | `references/contract.md` | the JSON contracts a skill must satisfy |

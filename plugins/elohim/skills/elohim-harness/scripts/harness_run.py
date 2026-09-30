@@ -1,21 +1,28 @@
 #!/usr/bin/env python3
 """ELOHIM harness: the reusable half of a checksum-pinned instrument gate.
 
-Given a skill directory this runs the same four gates for any instrument:
+Given a skill directory this runs the same five gates for any instrument:
 
     pin       the ledger pins the instrument sha256; an edit is visible
     ledger     every recorded fact still measures what it measured
     traps      the skill's own independent re-derivations still hold
     hygiene    the shipped sources carry no network import and no
                shell-filter-brittle identifier
+    claim      every number a claim sentence asserts is bound to a value
+               some gate pins
 
-A verdict is PASS only when all four hold.  Anything else is FAIL.
+A verdict is PASS only when all five hold.  Anything else is FAIL.
 
 The harness holds none of the mathematics.  It reads <skill>/ledger.json,
-runs <skill>/instrument/, calls <skill>/scripts/check_traps.py and
-<skill>/scripts/discover.py.  Two skills therefore share one gate
-implementation instead of forking it, which is the only way a fix to the
-gate reaches every consumer at once.
+runs <skill>/instrument/, calls <skill>/scripts/check_traps.py,
+<skill>/scripts/discover.py and this directory's claim_binding.py.  Two skills
+therefore share one gate implementation instead of forking it, which is the
+only way a fix to the gate reaches every consumer at once.
+
+Claim binding is the one gate that cannot be scoped to a single skill: a claim
+may legitimately cite a number pinned in a sibling, so the candidate universe
+is every ledger beside the skill and the check is run once, with the skills root
+passed down.
 
 Usage:
     harness_run.py --skill-dir PATH             verify everything
@@ -24,7 +31,7 @@ Usage:
     harness_run.py --skill-dir PATH --list-backlog
     harness_run.py --skill-dir PATH --promote ID:PATH[:TOL]
 
-Exit 0 = all four gates held.
+Exit 0 = all five gates held.
 Exit 1 = a gate failed.
 Exit 2 = the skill or its instrument could not be located.
 """
@@ -42,6 +49,7 @@ from pathlib import Path
 
 HARNESS_ROOT = Path(__file__).resolve().parent.parent
 HYGIENE_SUITE = HARNESS_ROOT / "scripts" / "check_hygiene.py"
+CLAIM_BINDING_SUITE = HARNESS_ROOT / "scripts" / "claim_binding.py"
 
 LEGACY_INSTRUMENT = Path.home() / "elohim" / "summoning_shard.py"
 LEGACY_WARNING = (
@@ -250,6 +258,33 @@ def run_hygiene(skill: Skill) -> dict:
     return payload
 
 
+def run_claim_binding(skill: Skill) -> dict:
+    """Require every number a claim sentence asserts to be bound to a pinned value.
+
+    The other four gates measure the ledger; this one reads the sentence beside
+    the number. The worst defect this project shipped was prose asserting the
+    opposite of its own pins while every gate reported green, caught by a human
+    reading output, so a number no gate pins is a failure and not a warning.
+
+    The root passed down is the skills directory, which is what makes the
+    candidate universe complete: a claim may cite a figure pinned in a sibling
+    skill, and a check that could only see its own skill would call that a
+    false positive. ``collect`` accepts a checkout (``<root>/skills/...``) and an
+    installed flat tree (``<root>/<skill>/...``) alike, so the same call is right
+    in both.
+    """
+    payload = run_script(
+        CLAIM_BINDING_SUITE,
+        ["--root", str(skill.root.parent), "--json"],
+        "claim binding",
+        timeout=120,
+    )
+    if "error" in payload and "failures" not in payload:
+        return {"ok": False, "failures": [], "error": payload["error"]}
+    payload.setdefault("failures", [])
+    return payload
+
+
 def write_report(skill: Skill, payload: dict) -> None:
     skill.out_dir.mkdir(parents=True, exist_ok=True)
     lines = [
@@ -259,6 +294,8 @@ def write_report(skill: Skill, payload: dict) -> None:
         f"- instrument pin: **{payload['instrument_pin']['status']}** "
         f"`{payload['instrument_pin']['actual_sha256'][:16]}`",
         f"- hygiene: **{'clean' if payload['hygiene'].get('ok') else 'FINDINGS'}**",
+        f"- claim binding: **{'bound' if payload['claim_binding'].get('ok') else 'UNBOUND'}** "
+        f"({len(payload['claim_binding'].get('failures', []))} unbound number(s))",
         f"- verdict: **{payload['verdict']}**", "",
         "## Facts", "",
         "| fact | status | residual | measurement |", "|---|---|---|---|",
@@ -294,13 +331,20 @@ def print_human(skill: Skill, payload: dict) -> None:
     held = [t for t in traps if t.get("pass")]
     regressed = [t for t in traps if not t.get("pass")]
     drifted = [f for f in payload["facts"] if f["status"] != "verified"]
+    claims = payload["claim_binding"]
+    unbound = claims.get("failures", [])
     print(
         f"facts {len(payload['facts']) - len(drifted)}/{len(payload['facts'])} verified, "
         f"traps {len(held)}/{len(traps)} hold, "
-        f"hygiene {0 if payload['hygiene'].get('ok') else len(bad)} findings"
+        f"hygiene {0 if payload['hygiene'].get('ok') else len(bad)} findings, "
+        f"claims {0 if claims.get('ok') else len(unbound)} unbound"
     )
     for item in bad:
         print(f"  HYGIENE: {item.get('file')} {item.get('kind')} {item.get('detail')}")
+    for item in unbound:
+        print(f"  UNBOUND: {item.get('fact')} {item.get('problem')}")
+    if claims.get("error"):
+        print(f"  UNBOUND: claim binding could not run: {claims['error']}")
     for fact in drifted:
         print(f"  DRIFTED: {fact['id']} - {fact['detail']}")
     for trap in regressed:
@@ -404,11 +448,13 @@ def main() -> int:
     facts = verify_facts(shard, ledger)
     traps = run_traps(skill)
     hygiene = run_hygiene(skill)
+    claims = run_claim_binding(skill)
     drifted = [f for f in facts if f["status"] != "verified"]
     ok = (
         not drifted
         and traps.get("ok")
         and hygiene.get("ok")
+        and claims.get("ok")
         and pin["status"] in {"PASS", "unpinned"}
     )
     payload = {
@@ -421,6 +467,7 @@ def main() -> int:
         "facts": facts,
         "traps": traps.get("traps", []),
         "hygiene": hygiene,
+        "claim_binding": claims,
         "seal": shard.get("seal"),
         "stdout_tail": stdout[-2000:],
     }

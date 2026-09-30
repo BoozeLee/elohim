@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Loop every skill under skills/ through four cases and print one verdict.
+"""Loop every skill under skills/ through five cases and print one verdict.
 
     mirror     the adapter plugin holds a byte-identical copy of each skill
     text       no shipped file carries a word a shell filter rewrote
@@ -7,8 +7,10 @@
                never seen this repository, with no environment help
     tampered   a comment appended to an instrument that still parses perfectly
                is caught by the checksum, so the goalposts cannot move silently
+    claim      every number a claim sentence asserts is bound to a value some
+               gate pins, and the check binding it can still fail
 
-``ALL_SKILLS_PASS`` is printed only when all four hold.
+``ALL_SKILLS_PASS`` is printed only when all five hold.
 
 One gate serves every skill: the shared harness, invoked as
 ``harness_run.py --skill-dir <skill>``.  Nothing here knows a skill's file
@@ -266,7 +268,7 @@ def case_clean() -> bool:
 
 
 # --------------------------------------------------------------------------
-# the other three cases
+# the other four cases
 
 
 def case_tampered() -> bool:
@@ -301,12 +303,49 @@ def case_text() -> bool:
     return result.returncode == 0
 
 
+def case_claim_binding() -> bool:
+    """Every number a claim asserts must be bound to a pinned value.
+
+    The check ships in the harness, because that is the only directory a
+    distribution keeps: a gate that lives in tools/ or docs/ and is wired here
+    is a gate that runs in the repository and nowhere else, which is the same
+    silent-green defect it was written to prevent.
+
+    Both halves are run. The check alone proves the tree is clean today; the
+    selftest proves the check can still fail, since the defect it exists for was
+    caught by a human reading output, not by any gate turning red.
+    """
+    ok = True
+    for label, script in (
+        ("check", REPO_ROOT / "skills" / "elohim-harness" / "scripts" / "claim_binding.py"),
+        ("selftest", REPO_ROOT / "tools" / "claim_binding_selftest.py"),
+    ):
+        if not script.is_file():
+            print(f"claim     FAIL  {label} script is absent: {script}")
+            ok = False
+            continue
+        result = run([sys.executable, str(script), *(["--root", "."] if label == "check" else [])], cwd=REPO_ROOT)
+        output = (result.stdout + result.stderr).strip()
+        # Exit code and the suite's own verdict must agree, as elsewhere: a
+        # suite that exits zero while reporting failure has still failed.
+        wants = "claim_binding: OK" if label == "check" else "SELFTEST PASS"
+        passed = result.returncode == 0 and wants in result.stdout
+        tail = next((line for line in result.stdout.splitlines() if line.startswith(wants)), output.splitlines()[-1] if output else "")
+        print(f"claim     {label:<9} exit {result.returncode}  {tail}")
+        if not passed:
+            ok = False
+            for line in output.splitlines()[-6:]:
+                print(f"          {line}")
+    return ok
+
+
 def main() -> int:
     cases = [
         ("mirror", case_mirror),
         ("text", case_text),
         ("clean", case_clean),
         ("tampered", case_tampered),
+        ("claim", case_claim_binding),
     ]
     failures = []
     for name, func in cases:

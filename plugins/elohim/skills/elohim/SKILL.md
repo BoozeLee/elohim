@@ -40,7 +40,7 @@ python3 scripts/elohim_run.py --list-backlog # read the unpromoted measurements
 python3 scripts/elohim_run.py --promote ID:PATH[:TOL]  # pin one as a fact
 ```
 
-## The four gates
+## The five gates
 
 1. **The instrument pin.** `ledger.json` records the SHA-256 and byte count of
    `instrument/summoning_shard.py`. Every run recomputes both. Separating the
@@ -58,6 +58,14 @@ python3 scripts/elohim_run.py --promote ID:PATH[:TOL]  # pin one as a fact
    and fails on any identifier that a shell sanitizer can rewrite, plus any
    network or async import. A standard-library-only, offline skill should say so
    in a way that cannot rot.
+5. **Claim binding.** The first four gates measure the ledger; this one reads
+   the sentence beside the number. Every figure in every claim must be a
+   rendering of a value something pins, part of a formula or a scan window, or
+   declared in `claim_binding_exemptions.json` with a reason. The worst defect
+   this project shipped was prose asserting the opposite of its own pins while
+   every gate above reported green, and a human reading the output found it, so
+   a number no gate pins is a failure and not a warning: a claim nobody can
+   bind to a measurement is a claim nothing checks.
 
 ## How the instrument is found
 
@@ -124,6 +132,7 @@ to say which.
 | `scripts/elohim_run.py` | The gate. Runs the instrument, then the ledger, traps and hygiene. |
 | `scripts/check_traps.py` | Six independently re-derived failure modes. |
 | `scripts/check_hygiene.py` | Tokeniser lint for sanitizer-brittle names and network imports. |
+| `../elohim-harness/scripts/claim_binding.py` | Binds every number in a claim to a pinned value. |
 | `references/traps.md` | The six failures and how each looked from the outside. |
 | `references/mathematics.md` | The measured constants, identities and bounds. |
 | `references/applications.md` | Worked mapping from a measured fact to a deterministic rule. |
