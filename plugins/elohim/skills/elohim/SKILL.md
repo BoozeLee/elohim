@@ -150,7 +150,7 @@ two numbers, not the repository total.
 
 ## Before modifying this skill
 
-Run the gate and keep the output. Then run `tests/test_portability.py` from the
+Run the gate and keep the output. Then run `tests/test_all.py` from the
 repository root, which additionally proves the mirror is byte-identical, that a
 clean copy passes in a fresh temporary directory, and that a one-line comment
 appended to a copy of the instrument is caught by the pin. A change that keeps

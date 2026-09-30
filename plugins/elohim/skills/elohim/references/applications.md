@@ -26,20 +26,9 @@ lore already described a lattice void and a machine that decides whether you get
 out. The shard supplies the actual mathematics for that description, which is
 why three of its facts became mechanics rather than decoration.
 
-Target: `~/Bakery-street-project/voidshatterecho`. Web build is the shipped
-game; `godot/` is an approved greybox slice, not a port. `AGENTS.md` rule 6
-mandates Godot 4 GDScript only, and a technical director in the roster whose
-job is to stop an unapproved port.
-
-The game's lore already described a lattice void and a machine that decides
-whether you get out. The shard supplies the actual mathematics for that
-description, which is why three of its facts became mechanics rather than
-decoration.
-
-Target: `~/Bakery-street-project/voidshatterecho`. Web build is the shipped
-game; `godot/` is an approved greybox slice, not a port. `AGENTS.md` rule 6
-mandates Godot 4 GDScript only, and a technical director in the roster whose
-job is to stop an unapproved port.
+Target: an existing game project rather than a greenfield one. The web build is
+the shipped artefact; a second engine slice is an approved greybox, not a port,
+and a reviewer whose job is to stop an unapproved port.
 
 ## Pisot bound: a real lattice instead of a coin flip
 
