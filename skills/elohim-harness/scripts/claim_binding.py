@@ -1,0 +1,404 @@
+#!/usr/bin/env python3
+"""Bind the numbers in a ledger claim to values the gate actually verifies.
+
+A gate that verifies a value does not verify the sentence describing it. The
+worst defect this project has shipped was a ledger whose prose asserted the
+opposite of its own pinned numbers while every gate reported green, and it was
+caught by a human reading the output. This check owns that failure mode.
+
+The first draft required *every* number in a claim to be a rendering of its
+own fact's ``expect``, and produced 29 failures on 66 healthy facts. All 29
+were the rule being wrong, not the ledgers: a claim may legitimately cite a
+sibling fact ("at the 109 working digits the budget formula asks for" -- 109
+is pinned in another skill), a ratio of a pinned value ("1.3e-05 of the bound
+itself"), or a structural constant that is a standard being measured against,
+not a measurement ("the bound of 2").
+
+So the check is inverted. Every number in a claim must be *classifiable*:
+
+  bound       a rendering of some gate-verified ``expect`` in the ledger set
+  structural  part of a formula or a scan window, matched by a named pattern
+  declared    listed in the sibling claim_binding_exemptions.json with a reason
+
+A number that is none of the three fails. That is the property worth having:
+nobody can add a figure to a claim and leave it unaccounted for, and anyone
+who claims a number cites a pinned value is checked against that value. What
+this cannot catch is a claim citing the *wrong* pinned value when two
+candidates are plausible; that still needs a reader.
+"""
+
+from __future__ import annotations
+
+import argparse
+import functools
+import json
+import re
+import sys
+from pathlib import Path
+from typing import Any
+
+# A number in prose, with an optional exponent in any of the notations the
+# ledgers use (1e-03, 8.88e-16, 1.3e-05, and 2^3 for powers).
+_NUM = re.compile(
+    r"""(?<![\w.])
+        (?P<mant>\d+\.\d*|\.\d+|\d+)
+        (?:\s*(?:[Ee]|\*\*|\*|x|×)\s*(?:\^)?\s*(?P<exp>[+-]?\d+))?
+    """,
+    re.VERBOSE,
+)
+
+# Numbers that are part of a formula, a window, or a dimension of the problem
+# rather than a measurement. Each is a measurement *context*, not a result.
+STRUCTURAL: list[tuple[str, re.Pattern[str], str]] = [
+    (
+        "formula-operand",
+        re.compile(r"\d+\s*(?:\*\*|\*|/)\s*\S|\S\s*/\s*\d+|\d+\s*\^|\+\s*\d+\b"),
+        "operand of a written formula such as 1/lambda, 2*pi, lambda**n or a +30 offset",
+    ),
+    (
+        "scan-window",
+        re.compile(r"\bn\s*(?:<=|>=|<|>|\u2264|\u2265)\s*\d+"),
+        "the scanned ceiling, a dimension of the experiment and not its result",
+    ),
+    (
+        "digit-width",
+        re.compile(r"\d+\s*(?:working\s+)?digits?\b"),
+        "a working-precision level, the width of the experiment rather than a result",
+    ),
+    (
+        "range-count",
+        re.compile(r"\d+\s*ranges?\b"),
+        "how many windows the scan swept, the size of the experiment rather than a result",
+    ),
+    (
+        "threshold",
+        re.compile(r"\d+(?:\.\d+)?(?:[eE][+-]?\d+)?\s*threshold"),
+        "a threshold the verdict tests against, defined in the instrument rather than measured",
+    ),
+    (
+        "ceiling-count",
+        re.compile(r"\d+\s*(?:ceilings?|rungs?|levels?)\b"),
+        "how many ceiling levels the scan stepped through, the size of the experiment rather than a result",
+    ),
+    (
+        "term-count",
+        re.compile(r"\d+[- ]terms?\b"),
+        "how many terms the scan summed, the size of the experiment rather than a result",
+    ),
+    (
+        "bit-width",
+        re.compile(r"\d+[- ]bit"),
+        "the width of the integer under study, fixed by the definition",
+    ),
+    (
+        "order-of-magnitude",
+        re.compile(r"\b(?:in|out of)\s+\d+\s*(?:thousand|million|billion)\b"),
+        "a parts-in phrase naming an order of magnitude, not a measured figure",
+    ),
+    (
+        "power-of-two",
+        re.compile(r"2\^(\d+)"),
+        "an exponent in a 2-adic valuation, not a measured magnitude",
+    ),
+]
+
+_STRUCTURAL_ANY = [(n, p, r) for n, p, r in STRUCTURAL]
+#: How far either side of a number the structural patterns are allowed to see.
+#: A formula operand at the end of a written expression sits outside a tight
+#: window, and a window that is too narrow to see it is a rule that never fires.
+_WINDOW = 24
+
+
+def _is_structural(m: re.Match[str], claim: str) -> tuple[bool, str]:
+    """Whether the number matched at ``m`` is a measurement's context.
+
+    Two rules here, both learned by watching the rules not fire and then fire on
+    the wrong number. The window is taken around the *match*, not around the
+    first occurrence of the same digits in the claim, so a claim mentioning 2
+    three times gets three contexts. And the pattern must *contain* the number:
+    a plain window let "at 90 working digits the 400-term error" excuse the 90
+    because a ``400-term`` pattern sat 20 characters away, which excuses a
+    measurement because of its neighbour.
+    """
+    lo = max(0, m.start() - _WINDOW)
+    window = claim[lo : m.end() + _WINDOW]
+    off = m.start() - lo
+    for name, pat, reason in _STRUCTURAL_ANY:
+        for hit in pat.finditer(window):
+            if hit.start() <= off < hit.end():
+                return True, f"{name}: {reason}"
+    return False, ""
+
+
+def _as_float(literal: str) -> float | None:
+    t = literal.strip().replace(" ", "")
+    t = t.replace("E", "e").replace("**", "e").replace("*", "e")
+    t = t.replace("x", "e").replace("×", "e").replace("^", "")
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def _rel(a: float, b: float) -> float:
+    return abs(a) if b == 0.0 else abs(a - b) / abs(b)
+
+
+def _rounded_to(value: float, sig: int) -> float:
+    return float(f"{value:.{sig - 1}e}")
+
+
+def _cite_universe(expect: Any) -> list[float]:
+    """Flatten one expected value into the numbers a claim may cite."""
+    out: list[float] = []
+
+    def walk(v: Any) -> None:
+        if isinstance(v, bool):
+            return
+        if isinstance(v, (int, float)):
+            out.append(float(v))
+        elif isinstance(v, str):
+            f = _as_float(v)
+            if f is not None:
+                out.append(f)
+        elif isinstance(v, (list, tuple)):
+            for i in v:
+                walk(i)
+        elif isinstance(v, dict):
+            for i in v.values():
+                walk(i)
+
+    walk(expect)
+    return out
+
+
+SIGFIGS = tuple(range(1, 18))
+
+
+def _ndigits(literal: str) -> int:
+    """Significant digits as *written* in a claim's number literal.
+
+    The width of the literal is how much the claim is asserting, so it is also
+    the narrowest reading the number may be matched with: a claim writing
+    seventeen digits is not citing a pinned value at one digit, and letting it
+    was what admitted 50% relative error through a one-significant-figure
+    rounding.
+    """
+    mant = literal.strip().split("e")[0].split("E")[0]
+    digits = mant.replace(".", "").replace(",", "").lstrip("0")
+    return max(1, len(digits))
+
+
+def _tol(sig: int) -> float:
+    """Relative error correct rounding to `sig` figures can carry."""
+    return 0.5 * 10.0 ** (1 - sig) * 1.0001
+
+
+@functools.lru_cache(maxsize=64)
+def _pool(candidates: tuple[float, ...], local: tuple[float, ...]) -> tuple[float, ...]:
+    """The numbers one claim may cite: everything pinned, plus its own figures.
+
+    This pool is deliberately the *only* candidate set, and nothing derived from
+    it is ever added. Every derived family tried here -- integer multiples,
+    quotients, differences -- grew the candidate set until it was a shredder: 46
+    pinned values give 2,116 quotients, 43 pool members give 1,849, and a
+    two-significant-figure claim tolerates 5% on each, at which point an
+    unrelated 0.3939 stands in for an asserted 0.39, 0.7373/80 for a gap of
+    9.2e-03, and the tribonacci deficit over the plastic decay rate for 2.9e-05.
+    A claim's arithmetic is written out in the sibling
+    claim_binding_exemptions.json instead, where a reader can check one
+    multiplication by eye.
+    """
+    return tuple(c for c in dict.fromkeys(candidates + local))
+
+
+@functools.lru_cache(maxsize=64)
+def _renderings(candidates: tuple[float, ...], lo: int) -> dict[float, str]:
+    """Map each candidate to the coarsest rendering a claim may match it at.
+
+    A claim citing a value at `ndigits` figures is asserting that the value
+    *is* the pinned value rounded to that many figures, so a match is a dict
+    probe on the correctly rounded form -- not a tolerance band, which is what
+    turned a check into decoration.
+    """
+    out: dict[float, str] = {}
+    for c in candidates:
+        for sig in range(lo, SIGFIGS[-1] + 1):
+            out.setdefault(_rounded_to(c, sig), f"rendered to {sig} significant figures")
+    return out
+
+
+def _binds(
+    value: float,
+    universe: list[float],
+    ndigits: int = 1,
+    local: tuple[float, ...] = (),
+) -> tuple[bool, str]:
+    """Whether a claim's number is a rendering of something the pool holds."""
+    for u in universe:
+        if _rel(value, u) == 0.0:
+            return True, "exact"
+    lo = max(1, ndigits)
+    pool = _pool(tuple(universe), tuple(v for v in local if _rel(v, value) != 0.0))
+    renders = _renderings(pool, lo)
+    hit = renders.get(value)
+    if hit is not None:
+        return True, f"a pinned value {hit}"
+    # A literal written at full double precision can land one rounding step
+    # away from the formatted form of the same value.
+    whisker = _tol(SIGFIGS[-1])
+    for r, how in renders.items():
+        if _rel(value, r) <= whisker:
+            return True, f"a pinned value {how}"
+    return False, ""
+
+
+#: Marker on an exemption reason that is a finding, not a permission. A claim
+#: asserting a measurement that no gate pins is the defect this check exists for;
+#: letting it into a green run unlabelled is how the check becomes decoration.
+UNVERIFIED = "UNVERIFIED:"
+
+
+def _declared(exemptions: dict[str, str], fact_id: str, literal: str) -> str | None:
+    return exemptions.get(f"{fact_id}:{literal}") or exemptions.get(literal)
+
+
+def check_fact(
+    fact: dict[str, Any], universe: list[float], exemptions: dict[str, str]
+) -> list[dict[str, str]]:
+    fid = str(fact.get("id", "<no id>"))
+    claim = fact.get("claim")
+    if not isinstance(claim, str) or not claim.strip():
+        return [{"fact": fid, "literal": "", "problem": "claim is missing or empty"}]
+    found: list[dict[str, str]] = []
+    stated = tuple(
+        v
+        for m in _NUM.finditer(claim)
+        if (v := _as_float(m.group(0).strip())) is not None
+    )
+    for m in _NUM.finditer(claim):
+        literal = m.group(0).strip()
+        value = _as_float(literal)
+        if value is None:
+            continue
+        # Most specific first: a figure that is a formula operand is that, even
+        # if it also happens to be the right number of bits for some pinned
+        # value. Reporting the coincidence would hide the real explanation.
+        structural, _ = _is_structural(m, claim)
+        if structural:
+            continue
+        reason = _declared(exemptions, fid, literal)
+        if reason:
+            continue
+        ok, why = _binds(value, universe, _ndigits(literal), stated)
+        if ok:
+            continue
+        nearest = min(((_rel(value, u), u) for u in universe), default=(float("inf"), 0.0))
+        found.append(
+            {
+                "fact": fid,
+                "literal": literal,
+                "problem": (
+                    f"unclassified number {literal!r}: closest pinned value {nearest[1]!r} "
+                    f"at relative gap {nearest[0]:.3g}. Bind it, mark it structural, "
+                    f"or declare it in {EXEMPTIONS.name} with a reason."
+                ),
+            }
+        )
+    return found
+
+
+#: The declared exemptions ship beside this check, not under docs/, because
+#: tools/install.py copies skills/ alone. A distribution has no docs/ directory,
+#: and a gate that cannot find its own exemptions fails every claim it should
+#: have passed -- the same silent-green defect, inverted.
+EXEMPTIONS = Path(__file__).resolve().parent / "claim_binding_exemptions.json"
+
+
+def collect(root: Path) -> tuple[list[Path], list[dict[str, Any]], list[float]]:
+    """Every ledger visible from ``root``, whichever layout it is.
+
+    A checkout keeps them at ``skills/<name>/ledger.json``; an installed
+    distribution is flat, ``<base>/<name>/ledger.json``, because the installer
+    copies the skills themselves and no wrapper. Reading only the checkout
+    shape would make the gate exit 2 -- "no ledgers" -- in every install, which
+    is a gate that never runs where a claim is most likely to be read.
+    """
+    base = root / "skills" if (root / "skills").is_dir() else root
+    ledgers = sorted(p for p in base.glob("*/ledger.json") if p.is_file())
+    facts: list[dict[str, Any]] = []
+    universe: list[float] = []
+    for path in ledgers:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        for fact in data.get("facts", []):
+            facts.append(fact)
+            universe.extend(_cite_universe(fact.get("expect")))
+    return ledgers, facts, universe
+
+
+def load_exemptions(path: Path | None = None) -> dict[str, str]:
+    target = EXEMPTIONS if path is None else path
+    if not target.is_file():
+        return {}
+    raw = json.loads(target.read_text(encoding="utf-8"))
+    return {str(k): str(v) for k, v in raw.get("exemptions", {}).items()}
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--root", default=".")
+    ap.add_argument("--json", action="store_true")
+    ap.add_argument("--quiet", action="store_true")
+    args = ap.parse_args(argv)
+
+    root = Path(args.root).resolve()
+    ledgers, facts, universe = collect(root)
+    if not ledgers:
+        print(f"claim_binding: no ledgers under {root}", file=sys.stderr)
+        return 2
+    exemptions = load_exemptions()
+
+    failures: list[dict[str, str]] = []
+    for fact in facts:
+        for f in check_fact(fact, universe, exemptions):
+            failures.append({"file": "ledger.json", **f})
+
+    report = {
+        "check": "claim_binding",
+        "ledgers": len(ledgers),
+        "facts": len(facts),
+        "pinned_values_in_universe": len(universe),
+        "declared_exemptions": len(exemptions),
+        "unverified_exemptions": sum(
+            1 for r in exemptions.values() if r.startswith(UNVERIFIED)
+        ),
+        "failures": failures,
+        "ok": not failures,
+    }
+    if args.json:
+        print(json.dumps(report, indent=2))
+    elif not args.quiet:
+        if failures:
+            for f in failures:
+                print(f"claim_binding: FAIL {f['fact']}: {f['problem']}", file=sys.stderr)
+            print(
+                f"claim_binding: {len(failures)} unclassified number(s) in {len(facts)} facts",
+                file=sys.stderr,
+            )
+        else:
+            unverified = report["unverified_exemptions"]
+            print(
+                f"claim_binding: OK  {len(facts)} facts, {len(universe)} pinned values, "
+                f"{len(exemptions)} declared exemptions, 0 unclassified"
+            )
+            if unverified:
+                print(
+                    f"claim_binding: {unverified} declared exemption(s) are UNVERIFIED "
+                    f"figures -- claims asserting measurements no gate pins. See "
+                    f"{EXEMPTIONS.name}."
+                )
+    return 1 if failures else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

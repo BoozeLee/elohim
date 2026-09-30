@@ -36,3 +36,6 @@ jobs:
 
       - name: every gated skill is green
         run: python3 tests/test_all.py
+
+      - name: claim sentences are bound to pinned values
+        run: python3 skills/elohim-harness/scripts/claim_binding.py --root .
