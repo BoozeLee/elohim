@@ -147,7 +147,7 @@ re-derived the traps rather than reading them.
 
 | skill | what it measures | pinned facts | traps |
 |---|---|---|---|
-| `elohim-harness` | the gate itself: pin, ledger, traps, hygiene. No ledger and no instrument of its own, so nothing to pin. | 0 | 0 |
+| `elohim-harness` | the gate itself: pin, ledger, traps, hygiene, claim binding. No ledger and no instrument of its own, so nothing to pin. | 0 | 0 |
 | `estimator-bias` | what a least-squares fit does to a Pisot decay rate the deflation already proves exactly | 15 | 7 |
 | `invariant-hunter` | a claimed Collatz conserved quantity and a derived ghost seed, both returned as honest negatives | 3 | 5 |
 | `precision-budget` | the working-digit budget a Pisot bound needs, and what collapses when it is starved | 9 | 6 |
