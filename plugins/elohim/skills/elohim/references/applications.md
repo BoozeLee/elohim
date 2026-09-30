@@ -18,11 +18,11 @@ proved bound is both. This is the procedure that turned three facts from
 6. **Record the portability hazard** if any part of the rule is precision
    sensitive, in the save format rather than in a comment.
 
-## Worked case: Voidshatter Echo
+## Worked case
 
 The full write-up of the case below, including the mechanics that were
-deliberately left alone, is what a step-1-through-6 record looks like. The game's
-lore already described a lattice void and a machine that decides whether you get
+deliberately left alone, is what a step-1-through-6 record looks like. The
+setting already had a lattice void and a machine that decides whether you get
 out. The shard supplies the actual mathematics for that description, which is
 why three of its facts became mechanics rather than decoration.
 
