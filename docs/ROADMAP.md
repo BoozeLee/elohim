@@ -406,9 +406,15 @@ page renders.
   anyone has verified. A seventh skill is a worse use of a week than C1 was. The
   sixth — `reproducibility` — was added under this item, on the grounds that it was
   B1, it corrected a false claim, and it was a tripwire rather than a new subject.
-- **Branch protection on `main`.** Neither of the user's other public repos
-  protects `main`. Matching the precedent is the right call until there is a
-  stated reason to diverge.
+- **Changing the branch protection on `main`.** This entry used to read
+  "Branch protection on `main`", and justified leaving it off by the user's
+  other public repos not protecting theirs. Measured on 2026-09-30, that was
+  false: a direct push to `main` is refused with `GH006: Protected branch
+  update failed for refs/heads/main`. Which rules are enforced is not readable
+  from here — `branches/main/protection` and `/rulesets` both return 404 under
+  the scopes this machine's `gh` token carries — so what is claimed here is the
+  refusal and nothing about the rule set. What stays off the list is changing
+  any of it.
 - **Adversarial security.** The pin is integrity by visibility. Making it
   tamper-proof against a consistent hostile edit is a different project.
 - **A commit sha in this file.** A sha names a tree, and a rebase renames that

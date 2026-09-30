@@ -211,7 +211,10 @@ it is cheaper than six more weeks of the same.
 - No hosted service, no account system, no telemetry. The README promises a
   local process you can read; this plan does not weaken that.
 - No branch protection, no sixth instrument, no new skill. The roadmap's own
-  list of what is not on it still holds.
+  list of what is not on it held against the baseline above; that baseline is a
+  dated snapshot, not a live reading. Two of its entries have since been
+  overtaken — more skills, and branch protection — and `docs/ROADMAP.md` records
+  both.
 - No market-size figure. None has been measured and inventing one would repeat
   the failure this project documents.
 - No claim that the gates are faster, more accurate or more popular than
