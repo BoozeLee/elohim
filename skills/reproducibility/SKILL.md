@@ -108,7 +108,9 @@ decides it is worth being wrong about, and adds it to `ledger.json` by hand.
 | `scripts/check_traps.py` | the seven re-derivations |
 | `scripts/discover.py` | unpromoted measurements, re-derived from scratch |
 | `references/traps.md` | the class table, the full digests, and why each trap exists |
+| `references/seal-independence.md` | which traps a forger cannot fool, and which 77 % of tampers only the checksum catches |
 | `ledger.json` | the six pinned counts |
 | `backlog.json` | what has been measured and not yet promoted |
 | `../elohim-harness/` | the harness that runs all of this |
 | `../../tools/matrix.py` | the same classification across every interpreter on the machine |
+| `../../tools/seal_independence.py` | the seal-independence sweep, re-derives the census above |

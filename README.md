@@ -155,7 +155,7 @@ tests/                     test_all.py
 plugin installer silently drops symlinks and `../` escapes. Run
 `python3 tools/sync_adapters.py` after editing anything canonical, or `--check`
 to verify without writing. `sync_adapters.py --check` is the only sanctioned
-count of the mirrored files: it reports 57 files byte-identical across 7 skill
+count of the mirrored files: it reports 58 files byte-identical across 7 skill
 directories today.
 
 ## Use it
@@ -170,11 +170,22 @@ Ask for a verdict, not a number:
 ## Distribution
 
 MIT. One repository, one canonical `skills/` tree, byte-identical copies per
-agent adapter. The skills are discoverable by the agent-skill indexes that crawl
-public repositories, and installable through the plugin marketplaces declared
-here: `.agents/plugins/` for Codex and `.claude-plugin/` for Claude Code. There
-is no hosted service, no account, and no telemetry. The gate is a local process
-you can read.
+agent adapter. Install them with `./install.sh` from a clone, or through the
+plugin marketplaces declared here: `.agents/plugins/` for Codex and
+`.claude-plugin/` for Claude Code.
+
+These skills are **not yet listed in the public agent-skill indexes.** An
+earlier version of this file claimed they were, which was a claim nobody had
+measured. Checked on 2026-09-30 against skills.sh: a request for this
+repository's `SKILL.md` returns a soft-404 within a kilobyte of the size a
+known-nonexistent path returns, while a genuinely indexed repository returns
+real content thirteen times larger. Citing a `200` here proves nothing, because
+the page is rendered client-side. The marketplace listings above are declared
+in this repository but have not been verified to resolve; until both are
+measured, treat "it is on an index" as unproven.
+
+There is no hosted service, no account, and no telemetry. The gate is a local
+process you can read.
 
 ## Support
 

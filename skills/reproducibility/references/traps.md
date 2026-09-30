@@ -104,3 +104,18 @@ Both `_table()` implementations here, and the copy in `discover.py`, therefore
 compile the source directly with `exec(compile(...))` and never touch the import
 system. A check that can read stale bytes is worse than no check: it is a check that
 reports findings about a file that is not there.
+
+## Not here: seal independence
+
+Which of the 38 traps in this repository a forger cannot fool is a separate
+measurement, on separate machinery, with its own record:
+`references/seal-independence.md`, re-derived by `tools/seal_independence.py`.
+
+It is not in this file because it is a census rather than a claim, and because
+it costs more than the harness's entire budget to produce. Two of its results
+bear on this skill's own traps, though, and are worth knowing here:
+`own_seal_is_self_consistent` is one of the 5 checksums and nothing else is, and
+the other 6 traps here are reported not-reached rather than independent — they
+read their siblings' shards, so no tamper to this skill's own shard can move
+them. That is the correct behaviour for traps that read foreign state, and it is
+why "not reached" is not the same verdict as "decoration".
