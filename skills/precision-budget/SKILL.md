@@ -6,7 +6,7 @@ compatibility: Python 3.10 or newer, standard library only. No network access, n
 metadata:
   author: BoozeLee
   version: "1.0.0"
-  entrypoint: scripts/harness_run.py
+  entrypoint: scripts/elohim_run.py
   consumers: precision-budget
 ---
 
@@ -67,7 +67,7 @@ python3 skills/elohim-harness/scripts/harness_run.py --skill-dir skills/precisio
 | `--list-backlog` | print measurements not yet promoted |
 | `--promote ID:PATH[:TOL]` | pin one backlog measurement as a ledger fact |
 
-Exit `0` when all four gates hold, `1` when one fails, `2` when the skill
+Exit `0` when all five gates hold, `1` when one fails, `2` when the skill
 or its instrument cannot be located. To run the instrument or either
 script on its own, `cd` nowhere: each resolves its own paths relative to
 its own file.
@@ -83,7 +83,7 @@ ELOHIM_PRECISION_BUDGET_SCRIPT=/path/to/precision_budget.py \
 An override that points at a missing file is an error, exit `2`, never a
 silent fallback to the bundled copy.
 
-## The four gates
+## The five gates
 
 **pin** — the ledger pins this instrument's sha256 and byte count.
 Holding the instrument beside its ledger fixes only *which* code runs;
@@ -110,6 +110,17 @@ exact digits or it does not.
 imports and for identifiers a shell filter can rewrite. A gate that
 reaches the network is not reproducible, and a gate whose source can be
 silently edited is not a gate.
+
+
+**claim binding** — `elohim-harness/scripts/claim_binding.py` pulls every
+number out of every claim sentence and requires each one to be a rendering of
+a value something pins, part of a formula or a scan window, or declared in
+`claim_binding_exemptions.json` with a written reason. The four gates above
+measure the ledger; this one reads the sentence beside the number, which is
+where the worst defect this project shipped lived: prose asserting the
+opposite of its own pins while every gate reported green, and found by a human
+reading the output. A number nothing pins is therefore a failure and not a
+warning.
 
 ## Promote on purpose
 
