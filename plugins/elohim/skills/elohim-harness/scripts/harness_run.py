@@ -30,9 +30,10 @@ Usage:
     harness_run.py --skill-dir PATH --discover  measure unrecorded structures
     harness_run.py --skill-dir PATH --list-backlog
     harness_run.py --skill-dir PATH --promote ID:PATH[:TOL]
+    harness_run.py --skill-dir PATH --max-seconds N
 
 Exit 0 = all five gates held.
-Exit 1 = a gate failed.
+Exit 1 = a gate failed, or a child process ran out of budget.
 Exit 2 = the skill or its instrument could not be located.
 """
 
@@ -44,12 +45,22 @@ import json
 import os
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
 HARNESS_ROOT = Path(__file__).resolve().parent.parent
 HYGIENE_SUITE = HARNESS_ROOT / "scripts" / "check_hygiene.py"
 CLAIM_BINDING_SUITE = HARNESS_ROOT / "scripts" / "claim_binding.py"
+
+# A child that runs longer than this is a verdict, not a hang to be waited out.
+# The value is a ceiling on a slow machine, not a measurement of one: measured
+# wall-clock varied by more than 50% across the five interpreters this gate is
+# run under, and by up to 87% between two runs of the same instrument on the
+# same interpreter, so no gate may pin a runtime. The budget only decides when
+# to stop waiting, and every payload now reports what it waited.
+DEFAULT_BUDGET_SECONDS = 600
+SUITE_BUDGET_SECONDS = 120
 
 LEGACY_INSTRUMENT = Path.home() / "elohim" / "summoning_shard.py"
 LEGACY_WARNING = (
@@ -179,19 +190,56 @@ def compare(actual: object, expect: object, tolerance: float | None) -> tuple[bo
     return actual == expect, 0.0 if actual == expect else 1.0
 
 
-def run_instrument(instrument: Path) -> tuple[dict, str]:
-    workdir = instrument.parent
-    result = subprocess.run(
-        [sys.executable, str(instrument)], cwd=workdir,
-        capture_output=True, text=True, timeout=600,
-    )
-    shard = workdir / "out" / "shard.json"
-    if result.returncode != 0 or not shard.is_file():
-        raise RuntimeError(
-            f"instrument exited {result.returncode} and produced no shard.json\n"
-            f"{result.stdout[-2000:]}\n{result.stderr[-2000:]}"
+def timed_run(cmd: list[str], cwd: Path, budget: int) -> dict:
+    """Run one child process and report what it cost in wall-clock.
+
+    A timeout used to be the single failure this gate could not describe. The
+    instrument raised, the suite helpers were never wrapped at all, and a run
+    that hung produced no payload -- so a consumer could not tell a hang from a
+    crash, and the only trace was a wall of stderr. Both now come back as a
+    status the payload carries, which is also where the measured seconds land,
+    so the noise is visible instead of something someone is tempted to pin.
+    """
+    started = time.perf_counter()
+    try:
+        result = subprocess.run(
+            cmd, cwd=cwd, capture_output=True, text=True, timeout=budget,
         )
-    return json.loads(shard.read_text()), result.stdout
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "TIMEOUT",
+            "ok": False,
+            "returncode": None,
+            "stdout": "",
+            "stderr": f"exceeded the {budget}s budget",
+            "runtime_seconds": round(time.perf_counter() - started, 3),
+        }
+    return {
+        "status": "OK",
+        "ok": result.returncode == 0,
+        "returncode": result.returncode,
+        "stdout": result.stdout,
+        "stderr": result.stderr,
+        "runtime_seconds": round(time.perf_counter() - started, 3),
+    }
+
+
+def run_instrument(instrument: Path, budget: int) -> tuple[dict, str, dict]:
+    """Run the instrument and read back the shard it claims to have written."""
+    workdir = instrument.parent
+    run = timed_run([sys.executable, str(instrument)], workdir, budget)
+    if run["status"] == "TIMEOUT":
+        raise TimeoutError(
+            f"instrument exceeded the {budget}s budget after "
+            f"{run['runtime_seconds']}s: {instrument}"
+        )
+    shard = workdir / "out" / "shard.json"
+    if not run["ok"] or not shard.is_file():
+        raise RuntimeError(
+            f"instrument exited {run['returncode']} and produced no shard.json\n"
+            f"{run['stdout'][-2000:]}\n{run['stderr'][-2000:]}"
+        )
+    return json.loads(shard.read_text()), run["stdout"], run
 
 
 def verify_facts(shard: dict, ledger: dict) -> list[dict]:
@@ -216,33 +264,39 @@ def verify_facts(shard: dict, ledger: dict) -> list[dict]:
     return outcomes
 
 
-def run_script(path: Path, args: list[str], label: str, timeout: int = 600) -> dict:
+def run_script(path: Path, args: list[str], label: str, timeout: int) -> dict:
     if not path.is_file():
         return {"ok": False, "error": f"missing {label} script: {path}"}
-    result = subprocess.run(
-        [sys.executable, str(path), *args],
-        capture_output=True, text=True, timeout=timeout,
-    )
+    run = timed_run([sys.executable, str(path), *args], Path.cwd(), timeout)
+    payload: dict = {
+        "status": run["status"],
+        "runtime_seconds": run["runtime_seconds"],
+    }
+    if run["status"] == "TIMEOUT":
+        payload.update({"ok": False, "error": run["stderr"]})
+        return payload
     try:
-        payload = json.loads(result.stdout)
+        parsed = json.loads(run["stdout"])
     except json.JSONDecodeError:
-        return {"ok": False, "error": (result.stdout + result.stderr)[-2000:]}
+        payload.update({"ok": False, "error": (run["stdout"] + run["stderr"])[-2000:]})
+        return payload
     # The exit code is authoritative. A suite may also state its verdict under
     # either spelling, so honour whichever it uses, but require agreement: a
     # suite that claims success while exiting non-zero has failed, and so has
     # one that exits zero while reporting failure. Both directions fail closed.
-    claimed = payload.get("ok")
+    claimed = parsed.get("ok")
     if claimed is None:
-        claimed = payload.get("clean")
+        claimed = parsed.get("clean")
     if claimed is None:
         claimed = True
-    payload["ok"] = bool(claimed) and result.returncode == 0
-    payload["returncode"] = result.returncode
-    return payload
+    parsed["ok"] = bool(claimed) and run["ok"]
+    parsed["returncode"] = run["returncode"]
+    parsed.update(payload)
+    return parsed
 
 
-def run_traps(skill: Skill) -> dict:
-    return run_script(skill.traps, ["--json"], "traps")
+def run_traps(skill: Skill, budget: int) -> dict:
+    return run_script(skill.traps, ["--json"], "traps", budget)
 
 
 def run_hygiene(skill: Skill) -> dict:
@@ -252,7 +306,7 @@ def run_hygiene(skill: Skill) -> dict:
     that proves it cannot be silently rewritten by a shell filter, nor quietly
     gain a network dependency.
     """
-    payload = run_script(HYGIENE_SUITE, [str(skill.root), "--json"], "hygiene", timeout=120)
+    payload = run_script(HYGIENE_SUITE, [str(skill.root), "--json"], "hygiene", SUITE_BUDGET_SECONDS)
     if "error" in payload and "findings" not in payload:
         return {"ok": False, "findings": [{"kind": "harness_error", "detail": payload["error"]}]}
     return payload
@@ -277,12 +331,33 @@ def run_claim_binding(skill: Skill) -> dict:
         CLAIM_BINDING_SUITE,
         ["--root", str(skill.root.parent), "--json"],
         "claim binding",
-        timeout=120,
+        SUITE_BUDGET_SECONDS,
     )
     if "error" in payload and "failures" not in payload:
         return {"ok": False, "failures": [], "error": payload["error"]}
     payload.setdefault("failures", [])
     return payload
+
+
+def runtime_line(payload: dict) -> str:
+    """One line naming what each phase cost, and what ran out of budget.
+
+    Wall-clock is reported and never pinned. It moved by more than half across
+    interpreters and by up to 87% between two runs of one instrument, so a
+    ledger ceiling drawn from it would be a fact about the machine wearing the
+    name of a fact about the mathematics.
+    """
+    runtime = payload.get("runtime") or {}
+    parts = [
+        f"{phase} {seconds}s" for phase, seconds in runtime.items() if phase != "total"
+    ]
+    total = runtime.get("total")
+    if total is not None:
+        parts.append(f"total {total}s")
+    line = ", ".join(parts) or "not measured"
+    if payload.get("timed_out"):
+        line += f" -- TIMED OUT against a {payload.get('budget_seconds')}s budget"
+    return line
 
 
 def write_report(skill: Skill, payload: dict) -> None:
@@ -296,6 +371,7 @@ def write_report(skill: Skill, payload: dict) -> None:
         f"- hygiene: **{'clean' if payload['hygiene'].get('ok') else 'FINDINGS'}**",
         f"- claim binding: **{'bound' if payload['claim_binding'].get('ok') else 'UNBOUND'}** "
         f"({len(payload['claim_binding'].get('failures', []))} unbound number(s))",
+        f"- runtime: {runtime_line(payload)}",
         f"- verdict: **{payload['verdict']}**", "",
         "## Facts", "",
         "| fact | status | residual | measurement |", "|---|---|---|---|",
@@ -345,6 +421,11 @@ def print_human(skill: Skill, payload: dict) -> None:
         print(f"  UNBOUND: {item.get('fact')} {item.get('problem')}")
     if claims.get("error"):
         print(f"  UNBOUND: claim binding could not run: {claims['error']}")
+    if payload.get("timed_out"):
+        print(f"  TIMED OUT: {payload.get('timed_out_phase')} exceeded "
+              f"{payload.get('budget_seconds')}s")
+    if payload.get("instrument_error"):
+        print(f"  INSTRUMENT: {payload['instrument_error']}")
     for fact in drifted:
         print(f"  DRIFTED: {fact['id']} - {fact['detail']}")
     for trap in regressed:
@@ -355,18 +436,22 @@ def print_human(skill: Skill, payload: dict) -> None:
     print(f"verdict {payload['verdict']}, report at {skill.report}")
 
 
-def do_discover(skill: Skill) -> int:
+def do_discover(skill: Skill, budget: int) -> int:
     if not skill.discover_script.is_file():
         print(f"ERROR no discovery script at {skill.discover_script}", file=sys.stderr)
         return 2
-    result = subprocess.run(
-        [sys.executable, str(skill.discover_script)],
-        capture_output=True, text=True, timeout=600,
-    )
-    if result.returncode != 0:
-        print(result.stdout + result.stderr, file=sys.stderr)
+    run = timed_run([sys.executable, str(skill.discover_script)], skill.root, budget)
+    if run["status"] == "TIMEOUT":
+        print(
+            f"ERROR discovery exceeded the {budget}s budget after "
+            f"{run['runtime_seconds']}s",
+            file=sys.stderr,
+        )
         return 1
-    measured = json.loads(result.stdout)
+    if not run["ok"]:
+        print(run["stdout"] + run["stderr"], file=sys.stderr)
+        return 1
+    measured = json.loads(run["stdout"])
     backlog = load(skill.backlog_path)
     known = {m["id"] for m in backlog.get("measurements", [])}
     added = [m for m in measured if m["id"] not in known]
@@ -413,6 +498,11 @@ def main() -> int:
     parser.add_argument("--discover", action="store_true")
     parser.add_argument("--promote", metavar="ID:PATH[:TOL]")
     parser.add_argument("--list-backlog", action="store_true")
+    parser.add_argument(
+        "--max-seconds", type=int, default=DEFAULT_BUDGET_SECONDS,
+        help="ceiling on any single child process; a child that exceeds it is "
+             "reported as TIMEOUT in the payload rather than waited out",
+    )
     args = parser.parse_args()
 
     skill = Skill(Path(args.skill_dir).expanduser().resolve())
@@ -425,7 +515,7 @@ def main() -> int:
         print(json.dumps(load(skill.backlog_path).get("measurements", []), indent=2))
         return 0
     if args.discover:
-        return do_discover(skill)
+        return do_discover(skill, args.max_seconds)
     if args.promote:
         return do_promote(skill, ledger, args.promote)
 
@@ -439,19 +529,46 @@ def main() -> int:
         return 2
 
     pin = verify_pin(skill, ledger, instrument, source)
+    gate_started = time.perf_counter()
+    runtime: dict = {}
+    timed_out_phase = None
+    instrument_error = None
+    stdout = ""
     try:
-        shard, stdout = run_instrument(instrument)
-    except Exception as exc:
-        print(f"ERROR instrument failed: {exc}", file=sys.stderr)
-        return 1
+        shard, stdout, run = run_instrument(instrument, args.max_seconds)
+        runtime["instrument"] = run["runtime_seconds"]
+    except (TimeoutError, RuntimeError) as exc:
+        shard = {}
+        stdout = ""
+        instrument_error = str(exc)
+        timed_out_phase = "instrument" if isinstance(exc, TimeoutError) else None
+        if timed_out_phase:
+            runtime["instrument"] = None
 
-    facts = verify_facts(shard, ledger)
-    traps = run_traps(skill)
-    hygiene = run_hygiene(skill)
-    claims = run_claim_binding(skill)
+    if shard:
+        facts = verify_facts(shard, ledger)
+        traps = run_traps(skill, args.max_seconds)
+        runtime["traps"] = traps.get("runtime_seconds")
+        hygiene = run_hygiene(skill)
+        runtime["hygiene"] = hygiene.get("runtime_seconds")
+        claims = run_claim_binding(skill)
+        runtime["claim_binding"] = claims.get("runtime_seconds")
+    else:
+        # An instrument that did not produce a shard has not been measured, so
+        # there is nothing to verify. Report that as the failure it is instead
+        # of as an empty pass, and still hand back a payload a consumer can read.
+        facts, traps, hygiene, claims = [], {}, {"ok": False}, {"ok": False}
+        timed_out_phase = timed_out_phase or "instrument"
+
+    for phase, value in (("traps", traps), ("hygiene", hygiene), ("claim_binding", claims)):
+        if isinstance(value, dict) and value.get("status") == "TIMEOUT" and not timed_out_phase:
+            timed_out_phase = phase
+    runtime["total"] = round(time.perf_counter() - gate_started, 3)
+
     drifted = [f for f in facts if f["status"] != "verified"]
     ok = (
-        not drifted
+        bool(shard)
+        and not drifted
         and traps.get("ok")
         and hygiene.get("ok")
         and claims.get("ok")
@@ -470,6 +587,11 @@ def main() -> int:
         "claim_binding": claims,
         "seal": shard.get("seal"),
         "stdout_tail": stdout[-2000:],
+        "budget_seconds": args.max_seconds,
+        "runtime": runtime,
+        "timed_out": timed_out_phase is not None,
+        "timed_out_phase": timed_out_phase,
+        "instrument_error": instrument_error,
     }
     write_report(skill, payload)
     if args.json:
