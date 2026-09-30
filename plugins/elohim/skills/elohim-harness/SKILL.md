@@ -33,9 +33,20 @@ python3 scripts/harness_run.py --skill-dir ../elohim --json
 | `--discover` | measure unrecorded structures into the skill's `backlog.json` |
 | `--list-backlog` | print unpromoted measurements |
 | `--promote ID:PATH[:TOL]` | pin a backlog measurement as a ledger fact |
+| `--max-seconds N` | ceiling on any single child process; default 600 |
 
-Exit `0` when all five gates hold, `1` when one fails, `2` when the skill or
-its instrument cannot be located.
+Exit `0` when all five gates hold, `1` when one fails **or a child process ran
+out of budget**, `2` when the skill or its instrument cannot be located.
+
+The payload carries `budget_seconds`, `runtime` (seconds per phase and
+`total`), `timed_out`, `timed_out_phase` and `instrument_error`. A run that runs
+out of budget is a described verdict, not a wall of stderr: the phases that
+depend on the unmeasured work report as not run rather than as passing.
+
+Runtime is reported and never pinned. Measured across five interpreters on one
+machine, the same instrument's wall-clock spread 51 % between interpreter
+medians and 87 % run to run, so a ceiling tight enough to mean anything would
+be a fact about the machine wearing a fact's clothes.
 
 ## The five gates
 
