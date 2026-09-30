@@ -1,0 +1,69 @@
+name: A measurement disagrees with its pin
+description: The gate failed, a fact is wrong, or a claim reads backwards
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A finding here is a result, not a complaint. The most useful reports
+        are the ones that show a number that should not be what it is.
+
+  - type: input
+    id: skill
+    attributes:
+      label: Skill
+      placeholder: elohim, precision-budget, tolerance-prover, estimator-bias, invariant-hunter
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit SHA
+      placeholder: 5c06834
+    validations:
+      required: true
+
+  - type: input
+    id: interpreter
+    attributes:
+      label: Python version
+      description: Every pinned value reads identically from 3.10 to 3.14, so the version alone is unlikely to be the cause. If it is, that is the finding.
+      placeholder: 3.12.3
+    validations:
+      required: true
+
+  - type: textarea
+    id: command
+    attributes:
+      label: Command
+      description: The exact command you ran.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: output
+    attributes:
+      label: Output
+      description: Verbatim, including the PIN DRIFT or facts line.
+      render: shell
+    validations:
+      required: true
+
+  - type: textarea
+    id: expectation
+    attributes:
+      label: What you expected, and why
+      description: If you expected the claim and the measurement to agree, say which one you believe and what would settle it.
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I ran `python3 tests/test_all.py` and it did not print ALL_SKILLS_PASS.
+        - label: I did not edit anything under `plugins/` by hand.
+        - label: I did not change a pinned number to make a sentence agree with it.

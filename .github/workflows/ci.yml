@@ -1,0 +1,38 @@
+name: Core CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # 3.10 is the floor install.sh declares. 3.14 is current. Every pinned
+        # value must read identically on both, or the pin is measuring the
+        # interpreter rather than the mathematics.
+        python-version: ["3.10", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: shipped text is clean
+        run: python3 tools/check_text.py
+
+      - name: derived mirrors are byte-identical
+        run: python3 tools/sync_adapters.py --check
+
+      - name: every gated skill is green
+        run: python3 tests/test_all.py
