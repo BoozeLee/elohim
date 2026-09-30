@@ -4,7 +4,7 @@
 
 ELOHIM is a gate for numerical claims. Six instruments measure hard mathematics,
 pin every result they claim, and refuse to pass if anything moved — including the
-instrument itself. A seventh skill, `reproducibility`, holds all six to that: it
+instrument itself. The sixth, `reproducibility`, holds the other five to that: it
 runs each of them, reads back the seal each recorded, and turns the gate red when a
 shard arrives from an interpreter class nobody pinned.
 
@@ -40,7 +40,7 @@ each one is now a check that runs on every invocation, forever.
    precision 38 breaks, 39 holds, 40 breaks, and 41 holds again.
    `tolerance-prover`
 
-## The five gated skills
+## The six gated skills
 
 | skill | measures | facts | traps | instrument |
 |---|---|---|---|---|
@@ -49,13 +49,14 @@ each one is now a check that runs on every invocation, forever.
 | `precision-budget` | the working-digit budget, its crossover, and its starved maximum | 9 | 6 | 23807 B, `2baf65bb…` |
 | `estimator-bias` | fitting a Pisot decay rate, and the bias that survives | 15 | 7 | 28213 B, `dddfdebd…` |
 | `tolerance-prover` | how tight Pisot's bound of 2 really is, and route dependence | 23 | 7 | 33152 B, `2182c01c…` |
+| `reproducibility` | which interpreter classes reproduce each sibling's shard, and the one that splits | 6 | 7 | 12380 B, `ca222ba4…` |
 
-66 pinned facts, 31 independent trap re-derivations, 5 instrument pins. Every
+72 pinned facts, 38 independent trap re-derivations, 6 instrument pins. Every
 number in that table is measured by running that skill's gate, not typed in by
 hand. Full derivations with residuals live in each skill's `references/`.
 
-`skills/elohim-harness/` is the shared gate all five run through. It has no
-instrument and no ledger of its own, so it is not one of the five.
+`skills/elohim-harness/` is the shared gate all six run through. It has no
+instrument and no ledger of its own, so it is not one of the six.
 
 ## What it refuses to do
 
@@ -118,7 +119,7 @@ python3 tests/test_all.py             # mirror, text lint, clean run, tamper
 python3 tools/check_text.py           # shipped-text lint
 python3 tools/sync_adapters.py        # regenerate the derived plugin copies
 python3 tools/sync_adapters.py --check
-python3 tools/submit.py --check       # 7 distribution checks
+python3 tools/submit.py --check       # 10 distribution checks
 ```
 
 `tests/test_all.py` is the real gate, and it ends in `ALL_SKILLS_PASS`. It
