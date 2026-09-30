@@ -152,8 +152,9 @@ tests/                     test_all.py
 `plugins/elohim/skills/` is a real copy rather than a symlink because the Codex
 plugin installer silently drops symlinks and `../` escapes. Run
 `python3 tools/sync_adapters.py` after editing anything canonical, or `--check`
-to verify without writing. 43 files across 6 skill directories are byte-identical
-today.
+to verify without writing. `sync_adapters.py --check` is the only sanctioned
+count of the mirrored files: it reports 49 files byte-identical across 6 skill
+directories today.
 
 ## Use it
 
