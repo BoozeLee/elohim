@@ -4,8 +4,9 @@ Every item below names the measurement that decides it. An item without a
 pinnable number is a preference, not a task. Nothing here is scheduled against a
 week that has not been agreed.
 
-Status: **2026-09-30**, tree at `7dd8915`, all five skills green, public at
-`github.com/BoozeLee/elohim`, CI green on Python 3.10 and 3.14.
+Status: **2026-09-30**, tree at `0be7385` plus the A1 working change, all five
+skills green, public at `github.com/BoozeLee/elohim`, CI green on Python 3.10
+and 3.14. A1 is shipped; the measurement it was going to pin killed the pin.
 
 ---
 
@@ -67,20 +68,23 @@ without the timeout caveat attached.
 
 ## Track A — the gate defends itself
 
-### A1. A runtime budget, measured and pinned
+### A1. A runtime budget — shipped, with the pin dropped
 **Why:** finding 1. An instrument can be made arbitrarily slow without tripping
 a single fact or trap.
-**Do:** record wall-clock per skill in the payload. Add `--max-seconds` with a
-default of 600, so a timeout is a *reported verdict field* rather than a wall
-of stderr. Pin a runtime ceiling per skill in `ledger.json` with a tolerance of
-20 %, on the grounds that runtime is a property of the machine, not the maths —
-so it is pinned loosely, unlike a value.
-**Decided by:** a mutation that previously burned 600 s now fails inside the
-budget, and a runtime fact exists in the ledger.
-**Kill:** if runtime varies more than 20 % across the 17 interpreters, pin it
-per-interpreter or drop the fact as noise. A value that moves with the
-environment is noise and belongs in `backlog.json`, unpinned, with a written
-reason.
+**Done:** the payload records wall-clock per phase and in total, and
+`--max-seconds` (default 600) makes a child process that runs out of budget a
+reported verdict field — `timed_out`, `timed_out_phase`, `instrument_error` —
+instead of a wall of stderr. An instrument that produces no shard is no longer
+treated as an empty pass: its facts, traps, hygiene and claim binding report as
+not run, and the gate fails.
+**The pin was dropped, by its own kill criterion.** The plan was a per-skill
+ceiling in `ledger.json` at 20 % tolerance. Measured across five interpreters
+(3.10.20, 3.11.9, 3.12.13, 3.13.13, 3.14.5) × 3 repeats × 5 instruments,
+`summoning_shard` medians ran 1.610 s → 2.548 s, a **51 %** spread between
+interpreters, and run-to-run spread within one interpreter reached **87.2 %**
+(`invariant_hunter`, 0.058 s → 0.100 s on 3.10.20). 20 % was the stated kill
+threshold, so no runtime ceiling is pinned. The budget is a guard against a hang;
+the seconds are a measurement, not a fact.
 
 ### A2. Mutation survival as a first-class, repeatable measurement
 **Why:** finding 3.
@@ -216,9 +220,10 @@ resolves.
 
 ## The order, and why
 
-`C1` first. It is the smallest item on this list and it prevents the specific
-failure this project has already shipped once. `A1` second, because a gate with
-an unbounded runtime is a gate that can be made to lie by making it wait.
-`B1` third, because it is the difference between a claim in a README and a fact
-in a ledger. `A2` and `A3` are what turn the gate into something that audits
-itself. Track D is reach, and reach matters least — it is last for that reason.
+`C1` first, and it is done. It was the smallest item on this list and it
+prevents the specific failure this project has already shipped once. `A1`
+second, and it is done: a gate with an unbounded runtime is a gate that can be
+made to lie by making it wait. `B1` is next, because it is the difference between
+a claim in a README and a fact in a ledger. `A2` and `A3` are what turn the gate
+into something that audits itself. Track D is reach, and reach matters least —
+it is last for that reason.
