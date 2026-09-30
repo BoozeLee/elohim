@@ -2,9 +2,11 @@
 
 > A number is a finding only after its residual was measured.
 
-ELOHIM is a gate for numerical claims. Five skills each ship a self-contained
-instrument that measures hard mathematics, pins every result it claims, and
-refuses to pass if anything moved — including the instrument itself.
+ELOHIM is a gate for numerical claims. Six instruments measure hard mathematics,
+pin every result they claim, and refuse to pass if anything moved — including the
+instrument itself. A seventh skill, `reproducibility`, holds all six to that: it
+runs each of them, reads back the seal each recorded, and turns the gate red when a
+shard arrives from an interpreter class nobody pinned.
 
 It exists because of six specific failures. Each of the six produced a result
 that was internally consistent, readable, and wrong, and none of them announced
@@ -153,7 +155,7 @@ tests/                     test_all.py
 plugin installer silently drops symlinks and `../` escapes. Run
 `python3 tools/sync_adapters.py` after editing anything canonical, or `--check`
 to verify without writing. `sync_adapters.py --check` is the only sanctioned
-count of the mirrored files: it reports 49 files byte-identical across 6 skill
+count of the mirrored files: it reports 57 files byte-identical across 7 skill
 directories today.
 
 ## Use it

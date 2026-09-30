@@ -102,9 +102,9 @@ The instrument override variable is derived from the directory name: skill
 
 ## The skills this harness gates
 
-Five skills ship in this repository and each of them needs no gate code. The
-counts below are what `harness_run.py --skill-dir <skill>` printed for each,
-with the instrument run and the traps re-derived on that run.
+Six instrumented skills ship in this repository and each of them needs no gate
+code. The counts below are what `harness_run.py --skill-dir <skill>` printed for
+each, with the instrument run and the traps re-derived on that run.
 
 | skill | instrument override | pinned facts | traps |
 |---|---|---|---|
@@ -112,9 +112,10 @@ with the instrument run and the traps re-derived on that run.
 | `estimator-bias` | `ELOHIM_ESTIMATOR_BIAS_SCRIPT` | 15 | 7 |
 | `invariant-hunter` | `ELOHIM_INVARIANT_HUNTER_SCRIPT` | 3 | 5 |
 | `precision-budget` | `ELOHIM_PRECISION_BUDGET_SCRIPT` | 9 | 6 |
+| `reproducibility` | `ELOHIM_REPRODUCIBILITY_SCRIPT` | 6 | 7 |
 | `tolerance-prover` | `ELOHIM_TOLERANCE_PROVER_SCRIPT` | 23 | 7 |
 
-This skill is the sixth directory under `skills/`, and it is not in that table
+This skill is the seventh directory under `skills/`, and it is not in that table
 because it is the gate rather than a consumer of it: it has no `ledger.json`
 and no `instrument/`, so there is nothing for it to pin and nothing for it to
 re-measure. It is still covered, because a consumer only passes when it can find

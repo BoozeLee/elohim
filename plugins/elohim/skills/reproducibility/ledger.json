@@ -1,0 +1,59 @@
+{
+  "label": "REPRODUCIBILITY",
+  "note": "Facts bind to version-independent counts only, so this ledger passes on every interpreter class it pins. No floating point enters the shard: a float measured here would vary with the interpreter and would make this skill's own seal vary with it, which is the one property worth having. The magnitude of each sibling's ledger residual is reported on stdout and measured across the whole matrix by tools/matrix.py, and pinned nowhere.",
+  "instrument": {
+    "path": "instrument/cross_version.py",
+    "sha256": "ca222ba46fc5491134907c80ce5fbda265a9fb3c4b1f9892a093c01d88f8da0a",
+    "bytes": 12380
+  },
+  "facts": [
+    {
+      "id": "every_sibling_answered",
+      "claim": "all 5 sibling instruments ran and produced a shard this gate could read",
+      "path": "summary.siblings_measured",
+      "path_keys": ["summary", "siblings_measured"],
+      "expect": 5,
+      "origin": "measured 2026-09-30 on CPython 3.10.20, 3.11.9, 3.12.13, 3.13.13 and 3.14.5"
+    },
+    {
+      "id": "no_unpinned_class_in_the_range",
+      "claim": "all 5 observed seals name a class this ledger pins, so no interpreter in the range produced one that is unpinned",
+      "path": "summary.in_pinned_class",
+      "path_keys": ["summary", "in_pinned_class"],
+      "expect": 5,
+      "origin": "measured 2026-09-30; this is the tripwire, and it is the fact that turns red first on a new class"
+    },
+    {
+      "id": "sibling_instrument_pins_hold",
+      "claim": "all 5 sibling instrument files still hash to what their own ledger pins",
+      "path": "summary.pins_matching",
+      "path_keys": ["summary", "pins_matching"],
+      "expect": 5,
+      "origin": "re-derived from the sibling ledgers, not from a second copy of the digests held here"
+    },
+    {
+      "id": "sibling_tolerances_absorb_the_shift",
+      "claim": "all 5 sibling ledgers reproduce their own pinned values here, which is what lets a single pin serve both interpreter classes",
+      "path": "summary.ledger_reproducing",
+      "path_keys": ["summary", "ledger_reproducing"],
+      "expect": 5,
+      "origin": "the one shard that moves still reproduces; its worst residual across the range is 2.220e-16, measured and printed by the instrument"
+    },
+    {
+      "id": "at_most_two_classes_per_instrument",
+      "claim": "no instrument is pinned to more than 2 classes",
+      "path": "summary.classes_pinned_per_skill",
+      "path_keys": ["summary", "classes_pinned_per_skill"],
+      "expect": 2,
+      "origin": "two classes in the whole matrix: before and after CPython 3.12"
+    },
+    {
+      "id": "exactly_one_instrument_moves",
+      "claim": "exactly 1 instrument's shard moves with the interpreter",
+      "path": "summary.moving_skills",
+      "path_keys": ["summary", "moving_skills"],
+      "expect": 1,
+      "origin": "estimator-bias, because sum() switched to Neumaier compensated summation in CPython 3.12"
+    }
+  ]
+}

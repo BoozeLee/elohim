@@ -4,9 +4,12 @@ Every item below names the measurement that decides it. An item without a
 pinnable number is a preference, not a task. Nothing here is scheduled against a
 week that has not been agreed.
 
-Status: **2026-09-30**, tree at `0be7385` plus the A1 working change, all five
-skills green, public at `github.com/BoozeLee/elohim`, CI green on Python 3.10
-and 3.14. A1 is shipped; the measurement it was going to pin killed the pin.
+Status: **2026-09-30**, tree at `64488e1` plus the B1 working change, all six
+instrumented skills green, public at `github.com/BoozeLee/elohim`, CI green on
+Python 3.10, 3.12 and 3.14. A1 is shipped; the measurement it was going to pin
+killed the pin. B1 is shipped; the measurement it was going to pin found a
+second, differently-shaped thing — a real interpreter boundary — so B1 pins two
+named classes and fails on a third instead of pretending there is one.
 
 ---
 
@@ -125,18 +128,30 @@ is described as independent until it is measured to be.
 ## Track B — reproducibility, the project's actual thesis
 
 ### B1. A version matrix, widened
-**Why:** the 17-interpreter result is currently a one-off local measurement.
-Nothing in CI or in the repo records it.
-**Do:** commit the matrix runner as `tools/matrix.py`. CI runs the floor and the
-tip already; add one mid-range version. Record the outcome as a promoted fact in
-a new `reproducibility` skill, not as a README sentence.
-**Decided by:** `reproducibility/ledger.json` exists, pins the interpreter
-range, and asserts that all five instruments' drift hashes are stable across
-it. A future interpreter that changes a hash turns the gate red.
-**Kill:** if the drift hashes are *not* stable across the full 3.10–3.14 range —
-i.e. the current local result was a coincidence of the sampled builds — the fact
-is narrowed to the versions actually measured, and the README claim is corrected
-rather than the matrix being widened to hide it.
+**Why:** the 17-interpreter result was a one-off local measurement. Nothing in CI or
+in the repo recorded it, and when the measurement was actually repeated it turned out
+to be false in one place — which is the whole argument for recording it.
+**Do:** ship the matrix runner as `tools/matrix.py`; add the measured boundary
+interpreter to CI; record the outcome as a promoted fact in a new `reproducibility`
+skill, not as a README sentence.
+**Shipped.** `tools/matrix.py` runs every sibling instrument under every interpreter on
+the machine, deduped by minor version. Measured across 3.10.20, 3.11.9, 3.12.13,
+3.13.13 and 3.14.7: four of the five instruments produce a byte-identical shard
+everywhere, and `estimator-bias` splits into exactly two classes at CPython 3.12, where
+`sum()` became Neumaier compensated summation. The shift is real and measured at about
+1e-13 relative — and every sibling ledger still reproduces its own pinned values on both
+sides of it, which is *why* one pin can serve two classes.
+**Decided by:** `skills/reproducibility/ledger.json` pins both measured classes per
+instrument, and `every_observed_seal_is_pinned` in its trap suite turns the gate red
+naming the instrument and the seal when a shard falls outside them. The tripwire was
+proven by tampering, not by inspection: with a pinned class replaced the suite goes
+6 of 7 and exit 1, and it is green again once the bytes are restored.
+**Kill: fired, and it is recorded rather than hidden.** The original decided-by was "all
+five instruments' drift hashes are stable across the range". They are not, so the fact
+was narrowed to what was actually measured — two named classes with a measured cause —
+and the README claim was corrected rather than the matrix being widened. CI now runs
+3.10, 3.12 and 3.14, because a matrix that only ran the two ends was exercising one of
+the two classes and would have missed a third.
 
 ### B2. Pin the residuals, not just the values
 **Why:** `precision-budget` learned that a value which moves when precision
@@ -222,8 +237,10 @@ resolves.
 
 - **A hosted service.** The gate is a local process you can read. That is the
   product, and `SECURITY.md` says so.
-- **More skills.** Five skills, 66 facts, 31 traps is already more surface than
-  anyone has verified. A sixth skill is a worse use of a week than C1.
+- **More skills.** Six skills, 72 facts, 38 traps is already more surface than
+  anyone has verified. A seventh skill is a worse use of a week than C1 was. The
+  sixth — `reproducibility` — was added under this item, on the grounds that it was
+  B1, it corrected a false claim, and it was a tripwire rather than a new subject.
 - **Branch protection on `main`.** Neither of the user's other public repos
   protects `main`. Matching the precedent is the right call until there is a
   stated reason to diverge.
@@ -235,7 +252,10 @@ resolves.
 `C1` first, and it is done. It was the smallest item on this list and it
 prevents the specific failure this project has already shipped once. `A1`
 second, and it is done: a gate with an unbounded runtime is a gate that can be
-made to lie by making it wait. `B1` is next, because it is the difference between
-a claim in a README and a fact in a ledger. `A2` and `A3` are what turn the gate
-into something that audits itself. Track D is reach, and reach matters least —
-it is last for that reason.
+made to lie by making it wait. `B1` third, and it is done: it turned a README
+sentence into a ledger fact, and the fact it found was the opposite of the one
+the sentence asserted. `A3` next, because a trap that only fires because of the
+checksum is decoration, and the motivating number — eleven of fifteen tampers in
+`tolerance-prover` caught by the seal alone — was found by accident, once. Then
+`D1`, because a gate nothing outside the repository can consume is a gate with no
+users. Track D is reach, and reach matters least — it is last for that reason.
