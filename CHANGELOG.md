@@ -29,6 +29,16 @@ version.
 - `tools/submit.py` gained three derived checks and a tri-state value, so
   `?` now means "could not be determined here" rather than "nobody wrote this
   check".
+- **D1: `harness_run.py` is a real command-line tool** rather than a script you
+  had to know the internals of to call. `--all` gates every instrumented skill
+  in one run and prints one summary; `--fail-under N` fails the run unless at
+  least N facts verify; `--json` emits a versioned payload tagged
+  `elohim.gate/1`, so a consumer can tell what shape it is holding instead of
+  guessing from the keys it happens to find. The four outcomes are distinct
+  exit codes — `0` ok, `1` a skill failed, `2` nothing was located, `3` the
+  `--fail-under` threshold was not met — because a caller that cannot tell "too
+  few facts" from "a gate failed" cannot act on the difference. The test suite
+  drives the CLI rather than reimplementing it.
 
 ### Fixed
 - **The README claimed the skills were "discoverable by the agent-skill

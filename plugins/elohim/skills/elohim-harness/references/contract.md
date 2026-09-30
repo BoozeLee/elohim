@@ -167,6 +167,53 @@ present, and writes nothing else. Nothing becomes a fact until a person reads
 it and runs `--promote ID:PATH[:TOL]`. A ledger is a record of measurements,
 and inventing entries is the exact failure this harness exists to catch.
 
+## Gating a whole tree
+
+`--all` gates every skill that owns an instrument under the skills root, and
+aggregates. The root is the harness's own parent directory, which makes both
+layouts work without a flag: a checkout at `<root>/skills/<skill>` and an
+installed flat tree at `<root>/<skill>` are the same directory to this script.
+
+```json
+{
+  "schema": "elohim.gate/1",
+  "run": "2026-09-30T08:41:00+00:00",
+  "skills_root": "/path/to/skills",
+  "budget_seconds": 600,
+  "fail_under": null,
+  "verdict": "PASS",
+  "skills": [ { "schema": "elohim.gate/1", "skill": "...", "verdict": "..." } ],
+  "summary": {
+    "skills": 6, "passed": 6, "failed": 0, "unlocated": 0,
+    "facts": 72, "facts_verified": 72, "facts_drifted": 0,
+    "traps": 38, "traps_holding": 38,
+    "hygiene_findings": 0, "unbound_claims": 0, "timed_out": 0,
+    "runtime_seconds": 17.143, "verdict": "PASS"
+  }
+}
+```
+
+Each entry in `skills` is a complete single-skill payload, schema key included,
+so a consumer can lift one out and read it without special-casing the aggregate.
+
+Three things about this shape are decisions rather than conveniences.
+
+**A failing skill does not stop the others.** An aggregate reporting only the
+first failure leaves every skill after it silently ungated, which is the shape
+of defect this project keeps producing.
+
+**`unlocated` outranks a plain failure.** A skill that could not be located at
+all means the tree is not the tree that was asked about. Folded into `failed` it
+would be indistinguishable from an ordinary red, so it gets its own count and
+its own exit code (`2`).
+
+**`fail_under` counts verified facts, not present ones.** A fact that drifted
+is in the payload and not in the count, because a consumer asking for a floor
+wants facts the gate actually re-measured this run.
+
+`--all` and `--skill-dir` are exclusive. `--all` already means the tree, and
+accepting both would leave the question of which one wins unanswered.
+
 ## Overrides
 
 Each skill's instrument override is derived from its directory name:

@@ -24,19 +24,38 @@ same 18 KB, and a fix to the gate then reaches some consumers and not others.
 ```sh
 python3 scripts/harness_run.py --skill-dir ../elohim
 python3 scripts/harness_run.py --skill-dir ../elohim --json
+python3 scripts/harness_run.py --all
+python3 scripts/harness_run.py --all --json --fail-under 72
 ```
 
 | flag | effect |
 |---|---|
-| `--skill-dir PATH` | required; the skill whose instrument is being verified |
+| `--skill-dir PATH` | the skill whose instrument is being verified; required unless `--all` |
+| `--all` | gate every skill that owns an instrument under the skills root |
 | `--json` | machine-readable payload on stdout |
 | `--discover` | measure unrecorded structures into the skill's `backlog.json` |
 | `--list-backlog` | print unpromoted measurements |
 | `--promote ID:PATH[:TOL]` | pin a backlog measurement as a ledger fact |
 | `--max-seconds N` | ceiling on any single child process; default 600 |
+| `--fail-under N` | require at least `N` facts verified; exit `3` when every gate held and fewer verified |
 
-Exit `0` when all five gates hold, `1` when one fails **or a child process ran
-out of budget**, `2` when the skill or its instrument cannot be located.
+Exit `0` when every gate asked for held, `1` when one fails **or a child process
+ran out of budget**, `2` when the skill, its instrument, or the skills root
+cannot be located, `3` when every gate held but fewer facts were verified than
+`--fail-under` required.
+
+`--fail-under` earns its own exit code rather than borrowing `0` or `1`. A
+consumer asking for a fact count is asking a different question from one asking
+whether a ledger drifted, and collapsing the two makes "the tree is clean" and
+"the tree is too small" indistinguishable to a pipeline. `3` is neither success
+nor failure of a measurement.
+
+The JSON payload carries a `schema` key — currently `elohim.gate/1` — so a
+consumer can pin to a version instead of discovering a missing field later and
+guessing whether it is a bug or a change. Bump the minor when a field is added;
+the major is for a field that changed meaning. The aggregate payload under
+`--all` carries the same `schema`, and every per-skill payload inside it carries
+it too, so one extracted entry is still self-describing.
 
 The payload carries `budget_seconds`, `runtime` (seconds per phase and
 `total`), `timed_out`, `timed_out_phase` and `instrument_error`. A run that runs
@@ -122,6 +141,11 @@ re-measure. It is still covered, because a consumer only passes when it can find
 this harness beside it.
 
 ## Adding a skill
+
+Nothing here needs editing. `--all` discovers skills the way this table does —
+a directory holding `SKILL.md` that owns an `instrument/` — so a new skill is
+picked up by the gate the moment it ships, and `tests/test_all.py` fails if the
+harness's discovery and its own ever disagree about what a skill is.
 
 1. `mkdir -p skills/<name>/{instrument,scripts}`.
 2. Write the instrument. It must exit 0 and write `out/shard.json`.
