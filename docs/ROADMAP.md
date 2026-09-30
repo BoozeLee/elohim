@@ -4,12 +4,15 @@ Every item below names the measurement that decides it. An item without a
 pinnable number is a preference, not a task. Nothing here is scheduled against a
 week that has not been agreed.
 
-Status: **2026-09-30**, tree at `64488e1` plus the B1 working change, all six
+Status: **2026-09-30**, tree at `37c6b34` plus the A3 working change, all six
 instrumented skills green, public at `github.com/BoozeLee/elohim`, CI green on
 Python 3.10, 3.12 and 3.14. A1 is shipped; the measurement it was going to pin
 killed the pin. B1 is shipped; the measurement it was going to pin found a
 second, differently-shaped thing — a real interpreter boundary — so B1 pins two
-named classes and fails on a third instead of pretending there is one.
+named classes and fails on a third instead of pretending there is one. A3 is
+shipped, and its measurement went the other way from the item's framing: 25 of
+38 traps are provably independent of the checksum, and 77 % of all tampers are
+caught by nothing but the sha256.
 
 ---
 
@@ -114,14 +117,61 @@ instrument has saturated as a signal. Then it is a release gate, not a CI gate,
 and it stops earning runner time.
 
 ### A3. Trap coverage measured, not counted
+**Status: shipped.**
+
 **Why:** `tolerance-prover` needed an entire rebuild because 11 of 15 tampers
 were caught by the checksum alone. That number was found by accident, once.
-**Do:** for each trap, measure whether it still fires with the checksum
-**disabled**, and record the answer. A trap that only fires because of the seal
-is decoration.
-**Decided by:** every trap has a recorded seal-independence verdict, and no trap
-is described as independent until it is measured to be.
-**Kill:** n/a — this is measurement, and measurement is always worth having.
+**Do, as built:** for each trap, measure whether it still fires when the
+checksum cannot be trusted to help it, and record the answer.
+
+The method changed while building, because the method as written was a
+tautology. "Fire with the checksum disabled" is unanswerable for the checksum
+traps — the checksum trap *is* the checksum. The falsifiable version is
+adversarial: **forge** the seal over the tampered body, because anyone who can
+write a shard can recompute a sha256, and a trap that only fires because the
+recorded seal no longer disagrees is decoration the attacker simply rewrites
+away. Every tamper therefore runs twice, forged and unforged.
+
+**Decided by, met:** every trap has a recorded seal-independence verdict, and no
+trap is described as independent until it is measured to be.
+`tools/seal_independence.py` sweeps all 38 traps across 522 shard leaves and
+prints the census; `skills/reproducibility/references/seal-independence.md` is
+the record.
+
+**Result: 25 independent, 5 decoration, 8 not-reached.** The 5 decorations are
+exactly the 5 checksum traps and nothing else — the census found no trap that
+behaves like a checksum without being one. `elohim` has no seal trap at all, so
+all 6 of its traps are independent and the seal it records is a claim with no
+gate behind it.
+
+**The number this item was opened for reproduced, at 13.5× the sample.** The
+recorded 11-of-15 for `tolerance-prover` (73%) measures as **177 of 203 shard
+leaves (87%)** caught only by the checksum. Repository-wide it is **404 of 522,
+77.4%**, against 118 (22.6%) caught by a seal-independent trap. So the honest
+summary is the reverse of the reassuring one: the traps are a real, measured,
+independent core, and they are a **thin** one. Per-trap, `tolerance-prover`'s six
+measurement traps fire on 31 of 203 leaves between them.
+
+A trap not firing does not mean the field is unprotected — it means no trap reads
+it, and the seal is what stands behind it. The seal is forgeable by anyone who
+can write a shard, which is why `tests/test_all.py` pins the instrument source
+rather than trusting a shard that arrived on disk. **The pin is the load-bearing
+control here, not the seal.**
+
+**Three false claims were found and fixed on the way, in `elohim`'s suite.** Its
+three oldest traps had claims that measurement contradicted, and all six traps
+were rebuilt to read the shard their own instrument produced — the suite had no
+`shard()` at all. Trap 3's density band `(0.02, 0.06)` was satisfied only by
+double-precision exhaustion: the true digit densities are 0.2013 and 0.1713,
+both *outside* the band, so the trap was passing because the arithmetic ran out
+of precision. Trap 4 integrated the superellipse **area** rather than its
+perimeter, which coincides with the perimeter only at n=2 and overflowed to
+`OverflowError` past n=8. Trap 6 asserted a positively-biased least-squares
+slope over two identical moduli, which is identically zero. Each was rewritten
+into something sharp and falsifiable, and all six were then proven able to fail
+by tampering each one's own shard field.
+
+**Kill: n/a — this is measurement, and measurement is always worth having.**
 
 ---
 
@@ -254,8 +304,11 @@ prevents the specific failure this project has already shipped once. `A1`
 second, and it is done: a gate with an unbounded runtime is a gate that can be
 made to lie by making it wait. `B1` third, and it is done: it turned a README
 sentence into a ledger fact, and the fact it found was the opposite of the one
-the sentence asserted. `A3` next, because a trap that only fires because of the
-checksum is decoration, and the motivating number — eleven of fifteen tampers in
-`tolerance-prover` caught by the seal alone — was found by accident, once. Then
-`D1`, because a gate nothing outside the repository can consume is a gate with no
-users. Track D is reach, and reach matters least — it is last for that reason.
+the sentence asserted. `A3` fourth, and it is done: 25 of the 38 traps are
+provably independent of the checksum, the 5 that are not are exactly the 5
+checksums, and the motivating number — eleven of fifteen tampers in
+`tolerance-prover` caught by the seal alone — was not folklore, measuring at
+177 of 203 once the sweep could forge the seal instead of deleting it. Three
+false claims in `elohim`'s oldest traps died on the way. Then `D1`, because a
+gate nothing outside the repository can consume is a gate with no users. Track D
+is reach, and reach matters least — it is last for that reason.
