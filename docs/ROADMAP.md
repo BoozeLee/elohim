@@ -12,7 +12,9 @@ a real interpreter boundary — so B1 pins two named classes and fails on a
 third instead of pretending there is one. A3 is shipped, and its measurement
 went the other way from the item's framing: 25 of 38 traps are provably
 independent of the checksum, and 77 % of all tampers are caught by nothing but
-the sha256.
+the sha256. D1 is shipped: `--all` gates the whole tree under one payload, the
+clean case delegates to it, and a fourth exit code now separates "the tree is
+clean" from "the tree is too small".
 
 ---
 
@@ -37,6 +39,8 @@ Measured, not asserted:
 | traps that are the checksum | 5, exactly the 5 seal checks |
 | tampers caught by a seal-independent trap | **118 of 522 (22.6 %)** |
 | tampers caught by nothing but the sha256 | **404 of 522 (77.4 %)** |
+| CLI exit codes, each measured rather than assumed | 4 (0, 1, 2, 3) |
+| JSON payload contract version | `elohim.gate/1` |
 | tools in the repo that are not stdlib-only | 0 |
 
 The strongest result is the interpreter matrix, and it needed correcting before
@@ -260,15 +264,57 @@ becomes a verified act rather than a copy-paste.
 
 ## Track D — surface and reach
 
-### D1. A real CLI
-**Why:** `harness_run.py` supports `--skill-dir`, `--json`, `--discover`,
+### D1. A real CLI — shipped
+**Why:** `harness_run.py` supported `--skill-dir`, `--json`, `--discover`,
 `--promote`, `--list-backlog`. No multi-skill mode, no `--watch`, no
 `--fail-under`, no exit-code granularity, no published JSON schema.
-**Do:** `--all` to run every skill in the tree and aggregate; `--fail-under N`
-so a consumer can require a fact count; a versioned `--schema` key in the JSON
-payload so downstream tooling can pin to it.
-**Decided by:** `harness_run.py --all` reproduces what `tests/test_all.py` does,
-and the test delegates rather than duplicating.
+**Do, as built:** `--all` runs every skill in the tree and aggregates; `--fail-under N`
+lets a consumer require a verified fact count; a versioned `schema` key pins the
+JSON payload. `--watch` was **not** built, and the reason is in the item's own
+framing: a watcher is a convenience for a person already looking at the screen,
+and the consumers this item is for are not people. It would have been the only
+part of D1 that could not be gated by an exit code.
+**Decided by: met.** `harness_run.py --all` reproduces what `tests/test_all.py` does,
+and the test delegates rather than duplicating. Measured: `--all` over the six
+shipped skills is 31.2 s wall-clock, and the whole `tests/test_all.py` battery
+fell from roughly 90 s to 41 s, because the clean case now makes one aggregate
+call instead of six per-skill ones.
+
+**The test was the last thing to see the new code, and it had been the thing
+policing it.** The clean case looped the harness one skill at a time, so the
+repository's own multi-skill path was the single thing no gate exercised — the
+defect D1 exists to remove, sitting in the very file meant to police the gate.
+The loop is gone. What replaced it is stronger than what it gave up: the
+aggregate is now required to name exactly the skills `test_all.py` names
+independently, and `instrument_source` is read from JSON rather than grepped
+for the substring `[bundled]`. A harness whose discovery drifted from the test's
+would now be a red gate rather than two quietly different answers.
+
+**The decided-by is enforced by a check that can fail, which was proven rather
+than asserted.** The new `clean` case requires a specific `schema` value, so a
+harness that stopped emitting the key fails instead of comparing `None` to `None`
+and passing. `EXPECTED_SCHEMA` is named in the test rather than read out of the
+payload for exactly that reason.
+
+**Exit-code granularity earned a fourth code instead of borrowing one.**
+`--fail-under` reports `3`, distinct from `1`. A consumer asking for a fact count
+is asking a different question from one asking whether a ledger drifted, and
+folding "the tree is clean" into "the tree is too small" is how a pipeline ends up
+accepting an empty tree. All four codes were measured rather than assumed:
+`--all --fail-under 72` → 0, `--all --fail-under 100` → 3, single-skill
+`--fail-under 100` → 3, `--all --skill-dir` together → 2, neither → 2.
+
+**`--fail-under` counts verified facts, not present ones.** A drifted fact is in
+the payload and out of the count, because the question being asked is how many
+facts the gate re-measured this run.
+
+**`unlocated` outranks `failed` in the aggregate.** A skill that could not be
+located means the tree is not the tree that was asked about, and reported as an
+ordinary red it would be indistinguishable from a drifting ledger. It gets its
+own count and its own exit code.
+
+**Kill: n/a — the consumer is a person or a pipeline, and both are better served
+by an exit code than by a sentence.**
 
 ### D2. GitHub Sponsors — the one blocking inconsistency
 **Why:** `docs/MONETIZATION.md` says "from launch". The sponsors listing returns
@@ -324,5 +370,18 @@ checksums, and the motivating number — eleven of fifteen tampers in
 `tolerance-prover` caught by the seal alone — was not folklore, measuring at
 177 of 203 once the sweep could forge the seal instead of deleting it. Three
 false claims in `elohim`'s oldest traps died on the way. Then `D1`, because a
-gate nothing outside the repository can consume is a gate with no users. Track D
-is reach, and reach matters least — it is last for that reason.
+gate nothing outside the repository can consume is a gate with no users, and it
+is shipped: `--all`, `--fail-under` and a versioned `schema` key, with the clean
+case delegating to it instead of looping six per-skill invocations that proved
+nothing about the aggregate.
+
+What is left is three items and none of them is code. `D2` needs a human in a
+browser with a 2FA code and cannot be automated at all. `D3` is a push and a
+release page, and the release page needs a person to confirm it renders. `A2`
+and `C2` and `C3` are real work with no blocker, and the honest order after D1 is
+`C2` then `C3`: both are extensions of `C1`, which is the check that prevents
+this project's worst failure mode from recurring silently, and the cheapest way
+to extend a working tool is while its author still remembers why it is shaped
+that way. `A2` is deliberately last of the three — its own kill criterion says a
+0 % survival rate at N=2000 means it should stop earning runner time, and a tool
+with a standing kill criterion is not one to build first.

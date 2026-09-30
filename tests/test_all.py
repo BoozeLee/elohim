@@ -13,8 +13,9 @@
 ``ALL_SKILLS_PASS`` is printed only when all five hold.
 
 One gate serves every skill: the shared harness, invoked as
-``harness_run.py --skill-dir <skill>``.  Nothing here knows a skill's file
-names, so a sixth skill needs this file edited before it ships.
+``harness_run.py --skill-dir <skill>`` or, for the whole tree at once,
+``harness_run.py --all --json``.  Nothing here knows a skill's file names, so a
+seventh skill needs no edit to this file.
 
 The tamper happens only inside the temporary copy.  The canonical tree is
 never written to, so a failing case can never damage what it is measuring.
@@ -36,6 +37,11 @@ SKILLS_DIR = REPO_ROOT / "skills"
 
 # The harness is the reusable half and lives beside the skills it gates.
 HARNESS_RELATIVE = Path("elohim-harness") / "scripts" / "harness_run.py"
+
+# The payload contract version this file is written against. Named here rather
+# than read out of the payload, so a harness that stops emitting the key fails
+# instead of quietly comparing None to None and passing.
+EXPECTED_SCHEMA = "elohim.gate/1"
 
 # Appended as a comment, never as code: a tamper that breaks syntax is
 # rejected because the instrument will not run, which proves nothing about
@@ -223,39 +229,101 @@ def copy_skills(dest: Path) -> None:
             shutil.rmtree(stale, ignore_errors=True)
 
 
+def all_command(skills_root: Path) -> list[str] | None:
+    """The one argv that gates a whole tree.
+
+    Same lookup rule as gate_command -- the harness is a sibling of the skills,
+    not a path fixed to this repository -- so a copy of the tree gates itself
+    wherever it is unpacked. None means the copy carries no harness, which is a
+    broken distribution rather than a failing skill.
+    """
+    harness = skills_root / HARNESS_RELATIVE
+    if not harness.is_file():
+        return None
+    return [sys.executable, str(harness), "--all", "--json"]
+
+
 def case_clean() -> bool:
+    """One --all run over a fresh copy, then the per-skill traps standalone.
+
+    This used to loop the harness one skill at a time, which meant the
+    repository's own multi-skill path was the one thing no gate exercised --
+    the defect D1 was opened to remove, present in the very test meant to
+    police the gate. So the loop is gone: the tree is gated the way a consumer
+    gates it, and what this case now adds on top is stronger than what it gave
+    up. The aggregate must agree with this file's own discovery, which is a
+    check the loop could not make, and instrument_source is read from JSON
+    rather than grepped for the substring "[bundled]".
+
+    check_traps.py still runs standalone per skill. --all reports what the
+    harness measured, and this is the assertion that the suite agrees with the
+    harness about its own verdict, which is a different question.
+    """
     with tempfile.TemporaryDirectory() as raw:
         copied_root = Path(raw) / "skills"
         copy_skills(copied_root)
-        ok = True
-        for source in gated_skills(SKILLS_DIR):
-            name = source.name
-            copied = copied_root / name
-            argv = gate_command(copied_root, copied)
-            if argv is None:
-                print(f"clean    FAIL  {name} cannot be gated: no harness beside the copy")
-                ok = False
-                continue
-            result = run(argv, cwd=copied_root)
-            for line in result.stdout.splitlines():
-                if line.startswith(("facts ", "instrument ", "pin ")):
-                    print(f"clean     {name:<22} {line.strip()}")
-            passed = (
-                result.returncode == 0
-                and "verdict PASS" in result.stdout
-                and "[bundled]" in result.stdout
-            )
-            if not passed:
-                ok = False
-                print(f"clean    FAIL  {name} exit {result.returncode}")
-                if result.stderr.strip():
-                    print("  " + result.stderr.strip()[-600:].replace("\n", "\n  "))
-                continue
+        argv = all_command(copied_root)
+        if argv is None:
+            print("clean    FAIL  the copied tree carries no harness to gate it")
+            return False
 
-            traps = copied / "scripts" / "check_traps.py"
-            if traps.is_file():
-                standalone = run([sys.executable, str(traps)], cwd=copied_root)
-                held = next(
+        result = run(argv, cwd=copied_root)
+        if result.returncode != 0:
+            print(f"clean    FAIL  --all exit {result.returncode}")
+            for line in (result.stdout + result.stderr).strip().splitlines()[-12:]:
+                print("  " + line)
+            return False
+
+        try:
+            payload = json.loads(result.stdout)
+        except json.JSONDecodeError:
+            print("clean    FAIL  --all --json did not print a JSON payload")
+            return False
+
+        if payload.get("schema") != EXPECTED_SCHEMA:
+            print(f"clean    FAIL  --all payload has no usable schema key: "
+                  f"{payload.get('schema')!r}, expected {EXPECTED_SCHEMA!r}")
+            return False
+        if payload.get("verdict") != "PASS":
+            print(f"clean    FAIL  --all verdict {payload.get('verdict')!r}")
+            return False
+
+        # The aggregate's discovery and this file's must name the same skills.
+        # Two quietly different definitions of "a skill" would make the harness
+        # gate a subset and report the whole tree green.
+        expected = {s.name for s in gated_skills(SKILLS_DIR)}
+        entries = {e["skill"]: e for e in payload.get("skills", [])}
+        if set(entries) != expected:
+            missing = ", ".join(sorted(expected - set(entries))) or "none"
+            extra = ", ".join(sorted(set(entries) - expected)) or "none"
+            print(f"clean    FAIL  --all gated {sorted(entries)} but this file "
+                  f"expects {sorted(expected)}; missing: {missing}; extra: {extra}")
+            return False
+
+        summary = payload["summary"]
+        print(f"clean    exit 0  schema {payload['schema']}, {summary['skills']} skill(s), "
+              f"facts {summary['facts_verified']}/{summary['facts']} verified, "
+              f"traps {summary['traps_holding']}/{summary['traps']} hold")
+
+        ok = True
+        for name in sorted(entries):
+            entry = entries[name]
+            pinned = entry["instrument_source"]
+            facts = f"{sum(1 for f in entry['facts'] if f['status'] == 'verified')}/{len(entry['facts'])}"
+            traps = entry["traps"]
+            held = sum(1 for t in traps if t.get("pass"))
+            print(f"clean     {name:<22} facts {facts:<7} traps {held}/{len(traps)}  "
+                  f"pin {entry['instrument_pin']['status']}  source {pinned}")
+            if entry["verdict"] != "PASS" or pinned != "bundled":
+                ok = False
+                print(f"clean    FAIL  {name} verdict {entry['verdict']!r} "
+                      f"instrument_source {pinned!r}; a copy gated from the "
+                      f"repository must find its own bundled instrument")
+
+            traps_script = copied_root / name / "scripts" / "check_traps.py"
+            if traps_script.is_file():
+                standalone = run([sys.executable, str(traps_script)], cwd=copied_root)
+                held_line = next(
                     (l.strip() for l in standalone.stdout.splitlines() if "traps hold" in l),
                     "no trap summary",
                 )
@@ -263,7 +331,7 @@ def case_clean() -> bool:
                     ok = False
                     print(f"clean    FAIL  {name} check_traps.py exit {standalone.returncode}")
                 else:
-                    print(f"clean     {name:<22} {held}")
+                    print(f"clean     {name:<22} {held_line}")
         return ok
 
 
@@ -342,46 +410,41 @@ def case_claim_binding() -> bool:
 def case_index_drift() -> bool:
     """Every shipped skill must appear in skills.sh.json.
 
-    A skill can be fully instrumented, fully pinned, fully green, and still be
-    invisible to the only channel that would tell a stranger it exists.
-    reproducibility shipped exactly that way.  This case delegates to
-    tools/submit.py rather than re-reading the index, so there is one
-    definition of what "listed" means and the gate and the check cannot drift
-    apart.
+    `reproducibility` shipped gated, pinned, green in CI, and absent from the
+    index. Nothing said so, because no check compared the tree to the index.
+    The index is the only thing a stranger reads before installing, so a
+    skill that is not in it is a skill that does not exist to them.
 
-    An unusable index fails rather than passes: _unlisted_skills() returns []
-    when it cannot read the file, and treating that as "everything is listed"
-    would turn this case green exactly when the index is broken.
+    This delegates to tools/submit.py rather than re-reading the index, so
+    the definition of "listed" has exactly one owner and the gate and the
+    checker cannot drift apart.
     """
-    try:
+    if str(REPO_ROOT / "tools") not in sys.path:
         sys.path.insert(0, str(REPO_ROOT / "tools"))
-        import submit  # noqa: PLC0415  late import is deliberate: keeps the
-        # suite's discovery independent of module import order.
-    except Exception as exc:  # noqa: BLE001
-        print(f"index     could not import tools/submit.py: {exc}")
+    try:
+        import submit  # noqa: PLC0415 -- deliberately late, it is a local tool
+    except Exception as exc:
+        print(f"index     FAIL  tools/submit.py could not be imported: {exc}")
         return False
 
     listed = submit.list_indexed_skills()
     if listed is None:
-        print(
-            "index     FAIL  skills.sh.json is missing or is not readable as "
-            '{"skills": [...]}, so no shipped skill can be proven listed'
-        )
+        # An unreadable index is not an empty one. Reading a missing file as
+        # "nothing is unlisted" would turn this case green exactly when the
+        # index is broken, which is the silent-green defect it exists for.
+        print("index     FAIL  skills.sh.json is missing or is not readable as "
+              '{"skills": [...]}, so no shipped skill can be proven listed')
         return False
 
     unlisted = submit._unlisted_skills()
-    if unlisted:
-        print(
-            f"index     FAIL  {len(unlisted)} shipped skill(s) absent from "
-            f"skills.sh.json: {', '.join(unlisted)}"
-        )
-        return False
-
-    shipped = sum(
-        1
-        for d in sorted((REPO_ROOT / "skills").iterdir())
-        if d.is_dir() and (d / "SKILL.md").is_file()
+    shipped = len(
+        [c for c in (REPO_ROOT / "skills").iterdir()
+         if c.is_dir() and (c / "SKILL.md").is_file()]
     )
+    if unlisted:
+        print(f"index     FAIL  {len(unlisted)} shipped skill(s) absent from "
+              f"skills.sh.json: {', '.join(unlisted)}")
+        return False
     print(f"index     exit 0  {shipped} shipped skill(s), all listed in skills.sh.json")
     return True
 
