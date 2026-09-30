@@ -31,10 +31,25 @@ Usage:
     harness_run.py --skill-dir PATH --list-backlog
     harness_run.py --skill-dir PATH --promote ID:PATH[:TOL]
     harness_run.py --skill-dir PATH --max-seconds N
+    harness_run.py --skill-dir PATH --fail-under N
+    harness_run.py --all                         every gated skill in the tree
+    harness_run.py --all --json --fail-under N
 
-Exit 0 = all five gates held.
+Exit 0 = every gate asked for held.
 Exit 1 = a gate failed, or a child process ran out of budget.
-Exit 2 = the skill or its instrument could not be located.
+Exit 2 = the skill, its instrument, or the skills root could not be located.
+Exit 3 = every gate held, but fewer facts verified than --fail-under required.
+
+``--fail-under`` earns its own exit code rather than borrowing 0 or 1. A
+consumer asking for a fact count is asking a different question from one asking
+whether a ledger drifted, and collapsing the two would make "the tree is clean"
+and "the tree is too small" indistinguishable to a pipeline. 3 is neither
+success nor failure of a measurement, so it gets its own number.
+
+``--all`` exists because one gate that nothing outside this repository can
+invoke is a gate with no users. It runs every skill that owns an instrument --
+the same discovery tests/test_all.py uses, so the two cannot disagree about
+what counts as a skill -- and aggregates under one payload.
 """
 
 from __future__ import annotations
@@ -61,6 +76,19 @@ CLAIM_BINDING_SUITE = HARNESS_ROOT / "scripts" / "claim_binding.py"
 # to stop waiting, and every payload now reports what it waited.
 DEFAULT_BUDGET_SECONDS = 600
 SUITE_BUDGET_SECONDS = 120
+
+# The JSON payload's contract version, and the key downstream tooling pins to.
+# A consumer that needs a field this version does not have must be able to say
+# so by reading one string, rather than by noticing a missing key and guessing
+# whether it is a bug or a version. Bump the minor when a field is added and
+# keep the major for a field that changed meaning; the two are not the same
+# decision and a consumer treating them as one is a consumer that breaks.
+SCHEMA = "elohim.gate/1"
+
+EXIT_OK = 0
+EXIT_FAIL = 1
+EXIT_UNLOCATED = 2
+EXIT_UNDER = 3
 
 LEGACY_INSTRUMENT = Path.home() / "elohim" / "summoning_shard.py"
 LEGACY_WARNING = (
@@ -367,7 +395,7 @@ def write_report(skill: Skill, payload: dict) -> None:
         f"- run: {payload['run']}",
         f"- instrument: `{payload['instrument']}` ({payload['instrument_source']})",
         f"- instrument pin: **{payload['instrument_pin']['status']}** "
-        f"`{payload['instrument_pin']['actual_sha256'][:16]}`",
+        f"`{str(payload['instrument_pin'].get('actual_sha256') or 'none')[:16]}`",
         f"- hygiene: **{'clean' if payload['hygiene'].get('ok') else 'FINDINGS'}**",
         f"- claim binding: **{'bound' if payload['claim_binding'].get('ok') else 'UNBOUND'}** "
         f"({len(payload['claim_binding'].get('failures', []))} unbound number(s))",
@@ -395,7 +423,7 @@ def print_human(skill: Skill, payload: dict) -> None:
     print(f"{skill.label} LEDGER")
     print("=" * 74)
     print(f"instrument {payload['instrument']}  [{payload['instrument_source']}]")
-    print(f"pin        {pin['status']}  {pin['actual_sha256'][:16]}")
+    print(f"pin        {pin['status']}  {str(pin.get('actual_sha256') or 'none')[:16]}")
     print(f"seal       {payload.get('seal')}")
     for fact in payload["facts"]:
         mark = "ok  " if fact["status"] == "verified" else "DRIFT"
@@ -491,42 +519,115 @@ def do_promote(skill: Skill, ledger: dict, spec: str) -> int:
     return 0
 
 
-def main() -> int:
-    parser = argparse.ArgumentParser(description="parameterised ELOHIM gate")
-    parser.add_argument("--skill-dir", required=True)
-    parser.add_argument("--json", action="store_true")
-    parser.add_argument("--discover", action="store_true")
-    parser.add_argument("--promote", metavar="ID:PATH[:TOL]")
-    parser.add_argument("--list-backlog", action="store_true")
-    parser.add_argument(
-        "--max-seconds", type=int, default=DEFAULT_BUDGET_SECONDS,
-        help="ceiling on any single child process; a child that exceeds it is "
-             "reported as TIMEOUT in the payload rather than waited out",
-    )
-    args = parser.parse_args()
+def discover_gated(root: Path) -> list[Path]:
+    """Every skill under root that owns an instrument, sorted by name.
 
-    skill = Skill(Path(args.skill_dir).expanduser().resolve())
+    A directory with no instrument/ has nothing to pin and nothing to
+    re-measure, so it is not a gate run. This directory itself is the case in
+    point: it ships beside the skills and is not one of them.
+
+    The two tests are deliberate. A skill is identified by its SKILL.md, not by
+    the presence of instrument/, so a half-written directory that has an
+    instrument but no SKILL.md is a broken distribution rather than something
+    to gate quietly; and the ordering is by name so a payload is byte-stable
+    across runs, which is what lets a consumer diff two of them.
+
+    This is the same rule tests/test_all.py applies, restated here. Duplication
+    is the honest response to a shared root, because importing a test module
+    into a shipped distribution would make the test a runtime dependency. The
+    test delegates its own clean case to --all, so a disagreement is a red gate
+    rather than two quietly different answers.
+    """
+    if not root.is_dir():
+        return []
+    return [
+        child
+        for child in sorted(root.iterdir(), key=lambda p: p.name)
+        if child.is_dir()
+        and (child / "SKILL.md").is_file()
+        and (child / "instrument").is_dir()
+    ]
+
+
+def skills_root(skill_dir: str | None) -> Path:
+    """Where the tree of skills is, from a skill dir or from the harness itself.
+
+    The harness is always a sibling of the skills it gates, which is what makes
+    both layouts work: a checkout at ``<root>/skills/<skill>`` and an installed
+    flat tree at ``<root>/<skill>`` give the same answer. A --skill-dir that was
+    passed in wins over the harness's own position, so a consumer can point the
+    gate at a copy somewhere else.
+    """
+    if skill_dir:
+        return Path(skill_dir).expanduser().resolve().parent
+    return HARNESS_ROOT.parent
+
+
+def not_run_payload(skill: Skill, detail: str, budget: int) -> dict:
+    """A payload for a skill that was never measured.
+
+    The same keys as a real run, so a consumer can read one without branching on
+    which kind it got. A skill that could not be gated is reported as the
+    failure it is, never as an empty pass: the trap suite is a failing dict
+    rather than a list of traps that trivially held, because "no traps ran" and
+    "the traps passed" are the same JSON to anyone not checking.
+    """
+    return {
+        "schema": SCHEMA,
+        "skill": skill.root.name,
+        "run": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "instrument": None,
+        "instrument_source": "missing",
+        "instrument_pin": {
+            "path": None, "source": "missing", "pinned": False,
+            "expected_sha256": None, "actual_sha256": None,
+            "expected_bytes": None, "actual_bytes": None,
+            "status": "UNLOCATED", "detail": detail,
+        },
+        "verdict": "FAIL",
+        "facts": [],
+        "traps": [],
+        "hygiene": {"ok": False, "findings": [{"kind": "not_run", "detail": detail}]},
+        "claim_binding": {"ok": False, "failures": [], "error": detail},
+        "seal": None,
+        "stdout_tail": "",
+        "budget_seconds": budget,
+        "runtime": {},
+        "timed_out": False,
+        "timed_out_phase": None,
+        "instrument_error": detail,
+    }
+
+
+def gate_skill(skill: Skill, budget: int) -> tuple[dict, int]:
+    """Run the five gates for one skill. Returns (payload, exit code).
+
+    The per-skill report and last-run.json are written here rather than by the
+    caller, so that --all leaves the same artefacts behind on every skill it
+    gates. A report that only exists in single-skill mode is a report that
+    disappears the moment someone automates the tree, which is the opposite of
+    what D1 is for.
+    """
     if not skill.ledger_path.is_file():
-        print(f"ERROR no ledger at {skill.ledger_path}", file=sys.stderr)
-        return 2
-    ledger = load(skill.ledger_path)
+        detail = f"no ledger at {skill.ledger_path}"
+        payload = not_run_payload(skill, detail, budget)
+        write_report(skill, payload)
+        return payload, EXIT_UNLOCATED
 
-    if args.list_backlog:
-        print(json.dumps(load(skill.backlog_path).get("measurements", []), indent=2))
-        return 0
-    if args.discover:
-        return do_discover(skill, args.max_seconds)
-    if args.promote:
-        return do_promote(skill, ledger, args.promote)
+    ledger = load(skill.ledger_path)
 
     try:
         instrument, source = skill.instrument()
     except SystemExit as exc:
-        print(f"ERROR {exc}", file=sys.stderr)
-        return 2
+        detail = str(exc)
+        payload = not_run_payload(skill, detail, budget)
+        write_report(skill, payload)
+        return payload, EXIT_UNLOCATED
     if instrument is None:
-        print(f"ERROR no instrument under {skill.instrument_dir}", file=sys.stderr)
-        return 2
+        detail = f"no instrument under {skill.instrument_dir}"
+        payload = not_run_payload(skill, detail, budget)
+        write_report(skill, payload)
+        return payload, EXIT_UNLOCATED
 
     pin = verify_pin(skill, ledger, instrument, source)
     gate_started = time.perf_counter()
@@ -535,7 +636,7 @@ def main() -> int:
     instrument_error = None
     stdout = ""
     try:
-        shard, stdout, run = run_instrument(instrument, args.max_seconds)
+        shard, stdout, run = run_instrument(instrument, budget)
         runtime["instrument"] = run["runtime_seconds"]
     except (TimeoutError, RuntimeError) as exc:
         shard = {}
@@ -547,7 +648,7 @@ def main() -> int:
 
     if shard:
         facts = verify_facts(shard, ledger)
-        traps = run_traps(skill, args.max_seconds)
+        traps = run_traps(skill, budget)
         runtime["traps"] = traps.get("runtime_seconds")
         hygiene = run_hygiene(skill)
         runtime["hygiene"] = hygiene.get("runtime_seconds")
@@ -575,6 +676,7 @@ def main() -> int:
         and pin["status"] in {"PASS", "unpinned"}
     )
     payload = {
+        "schema": SCHEMA,
         "skill": skill.root.name,
         "run": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "instrument": str(instrument),
@@ -587,19 +689,225 @@ def main() -> int:
         "claim_binding": claims,
         "seal": shard.get("seal"),
         "stdout_tail": stdout[-2000:],
-        "budget_seconds": args.max_seconds,
+        "budget_seconds": budget,
         "runtime": runtime,
         "timed_out": timed_out_phase is not None,
         "timed_out_phase": timed_out_phase,
         "instrument_error": instrument_error,
     }
     write_report(skill, payload)
+    return payload, (EXIT_OK if ok else EXIT_FAIL)
+
+
+def count_verified(payload: dict) -> int:
+    """How many of this skill's facts the run actually re-measured."""
+    return sum(1 for f in payload.get("facts", []) if f.get("status") == "verified")
+
+
+def gate_all(root: Path, budget: int, fail_under: int | None) -> tuple[dict, int]:
+    """Gate every skill in the tree and aggregate under one payload.
+
+    A skill that fails does not stop the others. A consumer asking about a tree
+    wants to know how much of it is broken, and an aggregate that reports only
+    the first failure cannot answer that -- the remaining skills would be
+    silently ungated, which is the shape of defect this project keeps
+    producing.
+    """
+    skills = discover_gated(root)
+    if not skills:
+        detail = f"no gated skill under {root}"
+        print(f"ERROR {detail}", file=sys.stderr)
+        return {
+            "schema": SCHEMA,
+            "run": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "skills_root": str(root),
+            "budget_seconds": budget,
+            "fail_under": fail_under,
+            "skills": [],
+            "summary": {
+                "skills": 0, "passed": 0, "failed": 0, "unlocated": 0,
+                "facts": 0, "facts_verified": 0, "facts_drifted": 0,
+                "traps": 0, "traps_holding": 0, "hygiene_findings": 0,
+                "unbound_claims": 0, "timed_out": 0,
+                "runtime_seconds": 0.0, "verdict": "FAIL", "error": detail,
+            },
+            "verdict": "FAIL",
+        }, EXIT_UNLOCATED
+
+    started = time.perf_counter()
+    results: list[dict] = []
+    codes: list[int] = []
+    for path in skills:
+        payload, code = gate_skill(Skill(path), budget)
+        results.append(payload)
+        codes.append(code)
+
+    summary = {
+        "skills": len(results),
+        "passed": sum(1 for p in results if p["verdict"] == "PASS"),
+        "failed": sum(1 for p in results if p["verdict"] == "FAIL"),
+        "unlocated": sum(1 for c in codes if c == EXIT_UNLOCATED),
+        "facts": sum(len(p.get("facts", [])) for p in results),
+        "facts_verified": sum(count_verified(p) for p in results),
+        "facts_drifted": sum(
+            1 for p in results for f in p.get("facts", []) if f.get("status") != "verified"
+        ),
+        "traps": sum(len(p.get("traps", [])) for p in results),
+        "traps_holding": sum(
+            1 for p in results for t in p.get("traps", []) if t.get("pass")
+        ),
+        "hygiene_findings": sum(
+            len(p.get("hygiene", {}).get("findings", []) or []) for p in results
+        ),
+        "unbound_claims": sum(
+            len(p.get("claim_binding", {}).get("failures", []) or []) for p in results
+        ),
+        "timed_out": sum(1 for p in results if p.get("timed_out")),
+        "runtime_seconds": round(time.perf_counter() - started, 3),
+    }
+
+    # A skill that could not be located outranks a skill that failed a gate:
+    # the first means the tree is not the tree that was asked about, and an
+    # aggregate that reports it as a plain failure is hiding a broken
+    # distribution inside an ordinary red.
+    if summary["unlocated"]:
+        code = EXIT_UNLOCATED
+    elif summary["failed"]:
+        code = EXIT_FAIL
+    elif fail_under is not None and summary["facts_verified"] < fail_under:
+        code = EXIT_UNDER
+    else:
+        code = EXIT_OK
+    summary["verdict"] = "PASS" if code == EXIT_OK else "FAIL"
+
+    return {
+        "schema": SCHEMA,
+        "run": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "skills_root": str(root),
+        "budget_seconds": budget,
+        "fail_under": fail_under,
+        "skills": results,
+        "summary": summary,
+        "verdict": "PASS" if code == EXIT_OK else "FAIL",
+    }, code
+
+
+def print_human_all(payload: dict) -> None:
+    """One line per skill, then the totals, so a tree reads as a tree."""
+    summary = payload["summary"]
+    if summary.get("error"):
+        print(f"ERROR {summary['error']}")
+        return
+    print(f"{payload['skills_root']}")
+    print("=" * 74)
+    for entry in payload["skills"]:
+        traps = entry.get("traps", [])
+        held = sum(1 for t in traps if t.get("pass"))
+        pin = entry["instrument_pin"]["status"]
+        facts = f"{count_verified(entry)}/{len(entry.get('facts', []))}"
+        print(
+            f"{entry['verdict']:<4} {entry['skill']:<20} pin {pin:<9} "
+            f"facts {facts:<7} traps {held}/{len(traps)}"
+        )
+        if entry.get("timed_out"):
+            print(f"     TIMED OUT: {entry.get('timed_out_phase')}")
+        if entry.get("instrument_error"):
+            print(f"     INSTRUMENT: {entry['instrument_error']}")
+    print("-" * 74)
+    print(
+        f"skills {summary['passed']}/{summary['skills']} pass, "
+        f"facts {summary['facts_verified']}/{summary['facts']} verified, "
+        f"traps {summary['traps_holding']}/{summary['traps']} hold, "
+        f"hygiene {summary['hygiene_findings']} findings, "
+        f"claims {summary['unbound_claims']} unbound"
+    )
+    if payload.get("fail_under") is not None:
+        short = summary["facts_verified"] < payload["fail_under"]
+        print(
+            f"fail-under {payload['fail_under']}: "
+            f"{'NOT met' if short else 'met'} by {summary['facts_verified']} verified fact(s)"
+        )
+    print(f"runtime  {summary['runtime_seconds']}s")
+    print("=" * 74)
+    print(f"verdict {payload['verdict']}")
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="parameterised ELOHIM gate")
+    parser.add_argument("--skill-dir")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("--discover", action="store_true")
+    parser.add_argument("--promote", metavar="ID:PATH[:TOL]")
+    parser.add_argument("--list-backlog", action="store_true")
+    parser.add_argument(
+        "--all", action="store_true",
+        help="gate every skill that owns an instrument under the skills root",
+    )
+    parser.add_argument(
+        "--fail-under", type=int, metavar="N",
+        help="require at least N facts to be verified; the run reports exit 3 "
+             "when every gate held but fewer verified than this",
+    )
+    parser.add_argument(
+        "--max-seconds", type=int, default=DEFAULT_BUDGET_SECONDS,
+        help="ceiling on any single child process; a child that exceeds it is "
+             "reported as TIMEOUT in the payload rather than waited out",
+    )
+    args = parser.parse_args()
+
+    if args.all and args.skill_dir:
+        print("ERROR --all and --skill-dir are exclusive: --all already means the tree",
+              file=sys.stderr)
+        return EXIT_UNLOCATED
+    if not args.all and not args.skill_dir:
+        print("ERROR one of --skill-dir or --all is required", file=sys.stderr)
+        return EXIT_UNLOCATED
+
+    if args.all:
+        payload, code = gate_all(skills_root(None), args.max_seconds, args.fail_under)
+        if args.json:
+            print(json.dumps(payload, indent=2))
+        else:
+            print_human_all(payload)
+        if code == EXIT_UNDER:
+            # Stated on stderr in both modes, because a bare exit 3 with no
+            # message is the one code a consumer is least likely to have
+            # implemented and most likely to hit by accident.
+            print(
+                f"fail-under {args.fail_under} not met: "
+                f"{payload['summary']['facts_verified']} fact(s) verified",
+                file=sys.stderr,
+            )
+        return code
+
+    skill = Skill(Path(args.skill_dir).expanduser().resolve())
+    if args.list_backlog or args.discover or args.promote:
+        if not skill.ledger_path.is_file():
+            print(f"ERROR no ledger at {skill.ledger_path}", file=sys.stderr)
+            return EXIT_UNLOCATED
+        if args.list_backlog:
+            print(json.dumps(load(skill.backlog_path).get("measurements", []), indent=2))
+            return EXIT_OK
+        if args.discover:
+            return do_discover(skill, args.max_seconds)
+        return do_promote(skill, load(skill.ledger_path), args.promote)
+
+    payload, code = gate_skill(skill, args.max_seconds)
     if args.json:
         print(json.dumps(payload, indent=2))
     else:
         print_human(skill, payload)
-    return 0 if ok else 1
+    if code == EXIT_OK and args.fail_under is not None:
+        verified = count_verified(payload)
+        if verified < args.fail_under:
+            print(
+                f"fail-under {args.fail_under} not met: {verified} fact(s) verified",
+                file=sys.stderr,
+            )
+            return EXIT_UNDER
+    return code
 
 
 if __name__ == "__main__":
     sys.exit(main())
+
