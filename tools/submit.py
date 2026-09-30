@@ -65,8 +65,8 @@ PRIVACY_CHECKS = [
     ("shipped text is clean",
      subprocess.run([sys.executable, str(REPO_ROOT / "tools/check_text.py")],
                     capture_output=True).returncode == 0),
-    ("gate is green",
-     subprocess.run([sys.executable, str(REPO_ROOT / "skills/elohim/scripts/elohim_run.py")],
+    ("every gated skill is green",
+     subprocess.run([sys.executable, str(REPO_ROOT / "tests/test_all.py")],
                     capture_output=True).returncode == 0),
 ]
 
