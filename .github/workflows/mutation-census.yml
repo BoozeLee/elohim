@@ -1,0 +1,107 @@
+name: Mutation Census
+
+# Nightly, not per-PR, and the reason is measured rather than preferred.
+#
+# The full population is 1679 (operator x site) pairs and is finite, so it is
+# enumerated rather than sampled. The sampled arm is NOT a substitute: N=200
+# reads 0.2686 against a population of 0.0375, because 200 draws reach only 47
+# (operator x skill) cells and always take site #1 of each. That is structural
+# bias, not noise, so it does not converge on the population rate as N grows.
+# A per-PR job on the sample would gate a number that is not the quantity it
+# names.
+#
+# Nightly rather than per-PR for the other reason: every one of the 63
+# surviving mutations has been individually explained in
+# docs/MUTATION_SURVIVAL.md. Re-proving that on every push is ten minutes of
+# runner time to learn nothing that has changed.
+on:
+  schedule:
+    # 03:17 UTC. An off-round minute on purpose: every workflow scheduled at
+    # :00 queues behind the same wave, and this one runs 1679 subprocesses.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      fail_over:
+        description: "Survival rate above which the run fails. Empty means the absolute-gap mode."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# No cancel-in-progress. A run that is 10 minutes in is most of the way through
+# the population; cancelling it to start a newer one wastes the work and leaves
+# no record. Two nights overlapping for a few minutes is cheaper than that.
+concurrency:
+  group: mutation-census
+  cancel-in-progress: false
+
+jobs:
+  census:
+    runs-on: ubuntu-latest
+    # The population is 1679 mutations at a 45s per-mutation budget each.
+    # Measured 600s wall on 12 cores; a GitHub runner has 4, so jobs defaults
+    # to 2 and the run is roughly 3x that. The cap is set well above the
+    # expected time rather than at it, because a timeout here produces no
+    # verdict and would read as "no regression found".
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          # 3.13, deliberately. The threshold below was measured on 3.13.13,
+          # and estimator-bias's shard provably changes class at the CPython
+          # 3.12 sum() boundary. Running the gate on an interpreter the
+          # threshold was not measured on would make a drift in the
+          # interpreter look like a change in the ledgers.
+          python-version: "3.13"
+
+      - name: the census, against the whole population
+        run: |
+          args=""
+          if [ -n "${{ inputs.fail_over }}" ]; then
+            args="--fail-over ${{ inputs.fail_over }}"
+          else
+            args="--fail-over 0.05"
+          fi
+          python3 tools/census.py \
+            --seed 1 \
+            --limit 0 \
+            --jobs 2 \
+            --out census-report.json \
+            $args
+
+      - name: the report is published either way
+        if: always()
+        uses: actions/upload-artifact@ea165f8c65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mutation-census-report
+          path: census-report.json
+          retention-days: 30
+
+      # The report is uploaded unconditionally on purpose. Under --fail-over
+      # the accepted survivors are the recorded gap, not a regression, and the
+      # only way to see them is to open the artifact. A job that goes green
+      # with 63 survivors hidden behind the exit code is the failure mode this
+      # step exists to prevent.
+      - name: name the surviving mutations
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          p = pathlib.Path("census-report.json")
+          if not p.exists():
+              raise SystemExit("census-report.json is absent: the run died before it could write one")
+          d = json.loads(p.read_text())
+          s = d["summary"]
+          cov = s["coverage"]
+          rate = s["forged"]["effective_rate"]
+          print(f"population {cov['population_sites']}, attempted {cov['forged_sites_attempted']}")
+          print(f"forged survival rate {rate} (threshold 0.05)")
+          print(f"equivalent {s['forged']['EQUIVALENT']} of {s['forged']['n']} -- no gate can catch these")
+          rows = [r for r in d["rows"] if r.get("arm") == "forged" and r.get("outcome") == "EFFECTIVE"]
+          print(f"effective survivors {len(rows)}")
+          for r in rows:
+              print(f"  {r['operator']} {r['skill']} site {r['site_index']} (line {r['lineno']})")
+          PY
