@@ -194,10 +194,26 @@ mutate different units and answer different questions, so the "a second mutator
 is a second thing whose behaviour nobody has checked" objection does not reach
 this one.
 **Decided by:** the report is committed, and a regression in survival rate turns
-CI red. **Half met.** The report is committed, and the tool can turn CI red on a
-regression — verified in both directions, with an empty run counted as a failure
-rather than a pass. Nothing is wired to CI, and the wiring needs a rate this
-document does not name.
+CI red. **Met, 2026-10-02.** The report is committed; the tool turns CI red on a
+regression, verified in both directions against real runs; and it is wired —
+`.github/workflows/mutation-census.yml`, nightly, whole population, `--fail-over
+0.05`. It ran green on a real four-core runner as run `37038849838`, reporting
+`GATED defect-arm rate 0.039424280350438046 (63/1598) against threshold 0.05`.
+
+Two things about that number, both of which are why it is not the number the
+report's headline field carries. The gated quantity is the **defect-arm** rate,
+which excludes the inert class from numerator and denominator alike; the
+forged rate including inert is 0.0375, and it is the lower of the two because it
+credits the population with 81 sites `docstring_kill` is declared unable to
+cover. And the rate reproduced **bit-identically on CPython 3.13.15** against the
+local 3.13.13 — a different patch release, same sixteen decimals, same 63
+survivors, same 572 equivalents. The census is deterministic across patch
+releases of the pinned minor, which is the property the threshold depends on and
+the reason the workflow pins `setup-python` to 3.13 rather than tracking latest.
+
+The threshold is 0.05 against a measured 0.0394: derived as 1.33x the recorded
+rate, so it fails at 71 survivors and passes at 70. It has never yet faced a real
+regression, only the recorded 63.
 **Kill:** if the surviving rate is 0 at N=200 and stays 0 at N=2000, the
 instrument has saturated as a signal. Then it is a release gate, not a CI gate,
 and it stops earning runner time.
@@ -618,17 +634,26 @@ is shipped: `--all`, `--fail-under` and a versioned `schema` key, with the clean
 case delegating to it instead of looping six per-skill invocations that proved
 nothing about the aggregate.
 
-What is left is two items: `D2` and `A2`. One of them is
-code. An earlier draft of this paragraph said "three items and none of them is
+What is left is **one item, and it is not code**: `D2`. An earlier draft of this
+paragraph said "three items and none of them is
 code" and then described five, two of which it called real work in the same
 breath — a count in prose that the paragraph itself contradicted, in the
-document that orders every item below it. `D2` needs a human in a browser with a
-2FA code and cannot be automated at all.
+document that orders every item below it. `D2` needs a human in a browser, and
+on 2026-10-02 the user deferred it deliberately ("skip sponsorship setup for
+now") rather than leaving it blocked. It is deferred, not abandoned: its
+verification is one read, `gh api users/BoozeLee/sponsors/sponsors_listing`
+returning 200, and `.github/FUNDING.yml` is deliberately left pointing at a
+listing that does not exist so the Sponsor button stays visibly dead rather
+than quietly wrong. `gh api user` confirms 2FA is already enabled, so nothing
+about the account is missing — only a browser step nobody has taken.
 
-`A2` is no longer "is there a mutator" — there is one, it is committed, and it
-measured itself. What remains on it is a decision, not code: the kill clause
-retires the instrument at a rate of 0 and names no gating rate, so nothing here
-states what rate should turn CI red. Until someone states one, `A2` stays open.
+`A2` is closed. The mutator is committed as three files, the measurement is
+committed, the kill criterion was evaluated and does not fire, and the gating
+rate that this paragraph previously said no document named has been stated and
+is wired into a nightly workflow that has run green. The remainder below is the
+history of how that ordering was decided, and two of its claims are now false;
+they are corrected where they are wrong rather than deleted, because the reason
+the decision looked wrong is the reason it was right at the time.
 
 `B2` is not in that count, and until 2026-10-02 it should have been: it was the
 one item in this file with no status marker, no measurement and exactly one
@@ -655,16 +680,38 @@ CI gate at all. This ordering was chosen deliberately against the item's own
 written sequence, and the reason is recorded because it will look wrong later.
 
 One measured fact changed that decision. `A2` describes promoting `mutate.py`
-from a scratch script. **No `mutate.py` exists in this tree**, and the mutator
-that produced the roadmap's own numbers still lives outside it — only the
-separate trap-side `tools/mutation_survival.py` is committed — so `A2` remains
-a from-scratch build as far as `tools/mutate.py` goes. At the time of this
-decision the 0-of-200 baseline its kill criterion reasoned from could not be
+from a scratch script. When the ordering was written, **no `mutate.py` existed
+in this tree**, and the mutator that produced the roadmap's own numbers lived
+outside it — only the separate trap-side `tools/mutation_survival.py` was
+committed — so `A2` was a from-scratch build as far as `tools/mutate.py` went.
+At the time the 0-of-200 baseline its kill criterion reasoned from could not be
 reproduced from this repository at all, which made the saturation question
 unanswerable rather than answered, and building the tool first would have
-produced a working runner guarding a question nobody had asked. That baseline
-is now retracted: `docs/MUTATION_SURVIVAL.md` puts the rate at 66 of 1,679
-(3.93 %), so the question is answered and the kill criterion does not fire.
+produced a working runner guarding a question nobody had asked.
+
+**Both halves of that paragraph are now false, and how they became false is the
+point.** The scratch harness was found in `/tmp` and promoted as
+`tools/mutate.py`, `tools/census.py` and `tools/sites.py` — three files, because
+`census.py` imports the other two. Promoting it exposed four defects that made
+it untrustworthy as published: a `count_sites` that returned 0 for every skill
+because it built a visitor and never visited with it, an unconditional
+`return 0` that made a census structurally incapable of failing, a duplicated
+operator table that could enumerate one population and mutate another, and a
+hardcoded path into one contributor's home directory. All four are fixed, and
+the population the repaired code enumerates is 1,679 — the same figure the
+scratch run produced, now derived from committed code rather than asserted from
+a report nobody could re-run.
+
+The baseline was retracted and replaced. `docs/MUTATION_SURVIVAL.md` now reports
+**63 of 1,679 (3.75 %)**, not 66. The move from 66 to 63 was not an instrument
+change — the instrument's sha256 is unchanged and has exactly one commit ever —
+but a ledger strengthening under the measurement: commit `114f660` added two
+facts pinning continued-fraction leaves that three mutations at
+`summoning_shard.py` lines 649 and 651 were moving, and those three rows flipped
+from EFFECTIVE to CAUGHT. Both runs agree on equivalent = 572, which is the
+evidence that the two harnesses are the same instrument. So the saturation
+question is answered and the kill criterion does not fire, and the gap shrank
+because the gate got stronger.
 
 `C2` and `C3` were the weaker pair of the three, and both are now shipped: the
 promotion command refuses an id whose value cannot carry it, and a promotion
