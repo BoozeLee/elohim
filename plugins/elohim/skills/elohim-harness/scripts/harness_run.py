@@ -514,6 +514,23 @@ def do_promote(skill: Skill, ledger: dict, spec: str) -> int:
         "tolerance": tolerance if tolerance is not None else match.get("tolerance"),
         "origin": f"promoted from backlog on {datetime.now(timezone.utc).date().isoformat()}",
     })
+    promoted = ledger["facts"][-1]
+    # C2: the id is part of the assertion. Checked before the write, so a refusal
+    # leaves the ledger exactly as it was rather than needing an undo.
+    import claim_binding
+
+    refusals = claim_binding.check_id(promoted, claim_binding.load_exemptions())
+    if refusals:
+        ledger["facts"].pop()
+        for r in refusals:
+            print(f"refusing to pin {r['fact']}: {r['problem']}", file=sys.stderr)
+        print(
+            "the id asserts a property the value contradicts. Rename the id to what "
+            f"the value supports, or declare id:{target_id} in "
+            f"{claim_binding.EXEMPTIONS.name} with a written reason.",
+            file=sys.stderr,
+        )
+        return 1
     skill.ledger_path.write_text(json.dumps(ledger, indent=2) + "\n")
     print(f"pinned {target_id} at {path}")
     return 0

@@ -263,6 +263,93 @@ def _declared(exemptions: dict[str, str], fact_id: str, literal: str) -> str | N
     return exemptions.get(f"{fact_id}:{literal}") or exemptions.get(literal)
 
 
+def _sequence(value: Any) -> bool:
+    return isinstance(value, (list, tuple))
+
+
+def _number(value: Any) -> float | None:
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    return float(value)
+
+
+# C2. The id is part of the assertion, not a label on it. A slug names the
+# property the value is supposed to carry, and a value that cannot carry that
+# property is a false id whatever it is pinned to.
+#
+# "Is this slug entailed by this value" is not decidable in general, so this
+# table does not pretend to decide it. It lists the shapes it *can* refute, and
+# an id it cannot reason about is left alone rather than guessed at. Every entry
+# is (name, slug pattern, refutes) where refutes reads the whole fact and
+# returns a reason when the value cannot support the slug, or None when it can.
+# Same declaration-in-data shape as STRUCTURAL above, for the same reason: a
+# rule that lives in a branch of code is a rule nobody can enumerate.
+# Two rules were written and then cut, and the reasons are part of the rule:
+#
+# "exact-with-tolerance" (slug claims exactness, fact carries a tolerance) fired
+# on modulus_identity_is_exact and its two siblings, whose claims are that a
+# modulus *identity* is exact while the pinned value is the residual 0.0 under a
+# 1e-15 tolerance -- the tolerance is the working precision of a float, not a
+# hedge on an inexact quantity. "universal-negation" (slug says never/none, value
+# is non-zero) fired on no_unpinned_class_in_the_range, whose value 5 is the count
+# that discharges the negation. Both were refuted by facts that are correct, so
+# both were cut rather than exempted: an exemption on a bad rule hides the rule.
+# A rule that refutes a correct claim is a defect in the rule, and this repository
+# does not get to call a checked claim wrong to make its own check green.
+ID_ASSERTIONS: list[tuple[str, re.Pattern[str], Any]] = [
+    (
+        "universal-quantifier",
+        re.compile(r"(?:^|_)(?:every|all|always)(?:_|$)"),
+        lambda fact: (
+            "the slug asserts a universal property but the pinned value is an "
+            f"enumeration of {len(fact.get('expect') or [])} case(s), and an "
+            "enumeration of cases cannot evidence 'every'"
+        )
+        if _sequence(fact.get("expect"))
+        else None,
+    ),
+    (
+        "integer-quantity",
+        re.compile(r"(?:^|_)(?:is_?integer|integer_?count|n_?terms|how_?many)(?:_|$)"),
+        lambda fact: (
+            "the slug asserts a whole number but the pinned value "
+            f"{fact.get('expect')!r} is not integral"
+        )
+        if (_n := _number(fact.get("expect"))) is not None and _n != int(_n)
+        else None,
+    ),
+]
+
+
+def check_id(fact: dict[str, Any], exemptions: dict[str, str]) -> list[dict[str, str]]:
+    """Refutations of a fact's own id, found without reading its claim.
+
+    This runs before the number binding on purpose. A number that does not bind
+    is a missing proof; an id whose value contradicts the slug is a wrong
+    statement about what was proved, and no amount of pinning repairs it.
+    """
+    fid = str(fact.get("id", "<no id>"))
+    slug = str(fact.get("id", ""))
+    if not slug:
+        return [{"fact": fid, "literal": "", "problem": "fact has no id to check"}]
+    if f"id:{fid}" in exemptions:
+        return []
+    found: list[dict[str, str]] = []
+    for name, pattern, refutes in ID_ASSERTIONS:
+        if not pattern.search(slug):
+            continue
+        reason = refutes(fact)
+        if reason:
+            found.append(
+                {
+                    "fact": fid,
+                    "literal": "",
+                    "problem": f"id asserts more than the value can carry ({name}): {reason}",
+                }
+            )
+    return found
+
+
 def check_fact(
     fact: dict[str, Any], universe: list[float], exemptions: dict[str, str]
 ) -> list[dict[str, str]]:
@@ -359,7 +446,9 @@ def main(argv: list[str] | None = None) -> int:
     exemptions = load_exemptions()
 
     failures: list[dict[str, str]] = []
+    id_failures: list[dict[str, str]] = []
     for fact in facts:
+        id_failures.extend({"file": "ledger.json", **f} for f in check_id(fact, exemptions))
         for f in check_fact(fact, universe, exemptions):
             failures.append({"file": "ledger.json", **f})
 
@@ -372,12 +461,15 @@ def main(argv: list[str] | None = None) -> int:
         "unverified_exemptions": sum(
             1 for r in exemptions.values() if r.startswith(UNVERIFIED)
         ),
+        "id_failures": id_failures,
         "failures": failures,
-        "ok": not failures,
+        "ok": not failures and not id_failures,
     }
     if args.json:
         print(json.dumps(report, indent=2))
     elif not args.quiet:
+        for f in id_failures:
+            print(f"claim_binding: FAIL {f['fact']}: {f['problem']}", file=sys.stderr)
         if failures:
             for f in failures:
                 print(f"claim_binding: FAIL {f['fact']}: {f['problem']}", file=sys.stderr)
@@ -385,7 +477,7 @@ def main(argv: list[str] | None = None) -> int:
                 f"claim_binding: {len(failures)} unclassified number(s) in {len(facts)} facts",
                 file=sys.stderr,
             )
-        else:
+        if not failures and not id_failures:
             unverified = report["unverified_exemptions"]
             print(
                 f"claim_binding: OK  {len(facts)} facts, {len(universe)} pinned values, "
@@ -397,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
                     f"figures -- claims asserting measurements no gate pins. See "
                     f"{EXEMPTIONS.name}."
                 )
-    return 1 if failures else 0
+    return 1 if (failures or id_failures) else 0
 
 
 if __name__ == "__main__":
