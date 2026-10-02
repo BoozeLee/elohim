@@ -1,9 +1,10 @@
 # Changelog
 
 All notable changes to this project are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the project does
-not yet follow semantic versioning — the tip of `main` is the only supported
-version.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Releases are numbered
+[Semantic Versioning](https://semver.org/), but the number labels a release
+rather than promising compatibility: the tip of `main` is the only supported
+version, and no version is covered by a stability guarantee.
 
 ## [Unreleased]
 
