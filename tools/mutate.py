@@ -463,22 +463,54 @@ def main() -> int:
     # and no regression could ever do that through this tool: the report
     # described the defect and the exit code denied it.
     #
-    # No rate threshold is invented here. Two exits, both non-zero on a defect:
-    #   1  --fail-over was given and the measured rate exceeds it, or
-    #   1  a fact-bound survivor exists at all.
-    # The second is the tool's own comment made true. The first is left for
-    # whoever decides the CI wiring, because the kill clause retires the
-    # instrument at rate 0 and says nothing about the rate that should gate.
+    # Two ways to fail, and which one applies depends on whether a rate was
+    # given.
+    #
+    #   --fail-over RATE given   fail when the measured rate exceeds RATE
+    #   --fail-over RATE absent  fail when any fact-bound survivor exists
+    #
+    # The second is the default and it means the tool cannot pass on any tree
+    # that still has an unpinned value. That is deliberate: it is the mode a
+    # tool should be in before anyone has decided what rate CI should assert,
+    # because it cannot be made to go green by choosing a threshold after the
+    # fact. A2's kill clause is written only as a retiring clause -- it says
+    # when to stop using the instrument (rate 0) and names no gating rate --
+    # so there is no documented rate to default to, and this tool will not
+    # invent one and thereby become the authority for a number no document
+    # chose.
+    #
+    # The distinction that matters: under the default, a survivor that is
+    # already known and documented keeps the tool red, so the tool measures the
+    # absolute gap. Under an explicit --fail-over, it measures the change. Both
+    # are useful and they are not the same measurement, which is why the flag
+    # is not given a value.
     real = report["summary"]["rate_excluding_inert"]
-    if args.fail_over is not None and real["n"] \
-            and real["surviving_rate"] > args.fail_over:
-        print(f"\nFAIL: surviving rate {real['surviving_rate']} exceeds "
-              f"--fail-over {args.fail_over}", file=sys.stderr)
-        return 1
-    if report["summary"]["survivors"]:
-        print(f"\nFAIL: {len(report['summary']['survivors'])} fact-bound "
-              f"survivor(s) -- the gate did not see a mutated instrument",
-              file=sys.stderr)
+    survivors = report["summary"]["survivors"]
+    if args.fail_over is not None:
+        if not real["n"]:
+            print("\nFAIL: no rows decided, so there is no rate to compare "
+                  "against --fail-over. An empty run is not a passing run: a "
+                  "harness that died on every mutation would otherwise report "
+                  "a rate of nothing and be indistinguishable from a clean one.",
+                  file=sys.stderr)
+            return 1
+        if real["surviving_rate"] > args.fail_over:
+            print(f"\nFAIL: surviving rate {real['surviving_rate']} exceeds "
+                  f"--fail-over {args.fail_over}", file=sys.stderr)
+            return 1
+        if survivors:
+            # Not a failure -- the threshold says these are the accepted gap --
+            # but it is the whole point of the number, so it is stated rather
+            # than left to be inferred from a green exit code.
+            print(f"note: {len(survivors)} fact-bound survivor(s) at rate "
+                  f"{real['surviving_rate']}, within --fail-over "
+                  f"{args.fail_over}. These are the recorded gap, not a "
+                  f"regression. They are listed in the report above, and "
+                  f"`docs/MUTATION_SURVIVAL.md` explains each.")
+        return 0
+    if survivors:
+        print(f"\nFAIL: {len(survivors)} fact-bound survivor(s) -- the gate "
+              f"did not see a mutated instrument", file=sys.stderr)
         return 1
     return 0
 
