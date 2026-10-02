@@ -21,6 +21,7 @@ census is the whole population, not N draws from it.
 from __future__ import annotations
 
 import ast
+from typing import Callable, TypedDict
 
 # ------------------------------------------------------------------ predicates
 
@@ -31,7 +32,14 @@ def _is_num(node: ast.AST) -> bool:
 
 
 def _is_tolerance(node: ast.AST) -> bool:
-    return _is_num(node) and 0 < abs(node.value) < 1
+    # Spelled out rather than `_is_num(node) and 0 < abs(node.value) < 1`:
+    # the predicate cannot see through the isinstance() inside _is_num, so the
+    # short-circuit form leaves mypy reading .value off a bare ast.AST.
+    if not (isinstance(node, ast.Constant)
+            and isinstance(node.value, (int, float))
+            and not isinstance(node.value, bool)):
+        return False
+    return 0 < abs(node.value) < 1
 
 
 def _is_bool(node: ast.AST) -> bool:
@@ -116,7 +124,23 @@ def m_doc_kill(node):
     node.body.pop(0)
 
 
-OPERATORS = [
+class Operator(TypedDict):
+    """The declared shape of one operator row.
+
+    OPERATORS is data, so its values are heterogeneous by construction and
+    mypy infers every lookup as `object` without this. That is not cosmetic:
+    an untyped `op["targets"](tree)` is a call on something mypy has proved
+    it knows nothing about, which is exactly how a table entry gets a typo
+    and ships.
+    """
+
+    name: str
+    targets: Callable[[ast.AST], list[ast.AST]]
+    mutate: Callable[[ast.AST], None]
+    expect: str
+
+
+OPERATORS: list[Operator] = [
     {"name": "num_mul", "targets": t_num, "mutate": m_num_mul,
      "expect": "value moves off its recorded result"},
     {"name": "num_add", "targets": t_num, "mutate": m_num_add,
@@ -151,7 +175,12 @@ def enumerate_sites(source: str) -> dict[str, list[dict]]:
     for op in OPERATORS:
         rows = []
         for index, node in enumerate(op["targets"](tree)):
-            lineno = getattr(node, "lineno", 0)
+            # ast.Module carries no lineno, so the module docstring -- which
+            # docstring_kill is declared to target -- would be recorded at line
+            # 0 with no source text, and a row that cannot be located cannot be
+            # checked against the tree. A module's docstring is always its
+            # first line, so that is where the position is read from.
+            lineno = getattr(node, "lineno", None) or 1
             text = lines[lineno - 1].strip() if 0 < lineno <= len(lines) else ""
             rows.append({"index": index, "lineno": lineno,
                          "col": getattr(node, "col_offset", 0),

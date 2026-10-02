@@ -45,6 +45,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
+from typing import Any, Callable, TypedDict
 
 # Derived from this file so the tool runs against whichever checkout holds it.
 # The previous default was an absolute path into one contributor's home
@@ -85,7 +86,7 @@ class _FirstSite:
     `sites`, so they pickle by reference.
     """
 
-    def __init__(self, operator: dict) -> None:
+    def __init__(self, operator: S.Operator) -> None:
         self._operator = operator
 
     def __call__(self, tree) -> bool:
@@ -96,8 +97,22 @@ class _FirstSite:
         return True
 
 
-MUTATORS = [{"name": op["name"], "fn": _FirstSite(op), "expect": op["expect"]}
-            for op in S.OPERATORS]
+class _Mutator(TypedDict):
+    """The declared shape of one MUTATORS row.
+
+    Same reasoning as `sites.Operator`: a heterogeneous data table reads as
+    `object` on every lookup, so `op["name"]` loses its type and the call
+    through `op["fn"]` is unchecked. Declaring it is what lets mypy prove
+    the sampler is reading the fields it thinks it is.
+    """
+
+    name: str
+    fn: Callable[[ast.AST], bool]
+    expect: str
+
+
+MUTATORS: list[_Mutator] = [{"name": op["name"], "fn": _FirstSite(op), "expect": op["expect"]}
+                            for op in S.OPERATORS]
 
 # Operators expected to be semantically inert. A survivor in this class is a
 # measurement bug, not a gate gap, so it is reported separately and excluded
@@ -307,17 +322,27 @@ def plan(rng: random.Random, n: int, skills: list[str], stale_cap: int) -> list[
 
 
 def summarise(rows: list[dict]) -> dict:
-    out = {}
+    # The per-arm block holds three int counts and then two values that are not
+    # ints, so it is spelled as a union rather than left to inference: a dict
+    # first given `{"SURVIVED": 0, ...}` infers `dict[str, int]`, and every
+    # later assignment of a rate into it is then an error the author has to
+    # unpick by reading their own arithmetic.
+    out: dict[str, Any] = {}
     for arm in ("forged", "stale", "all"):
         sel = [r for r in rows if r["outcome"] in ("CAUGHT", "SURVIVED", "ARTEFACT")
                and (arm == "all" or r["arm"] == arm)]
-        counts = {k: sum(1 for r in sel if r["outcome"] == k)
-                  for k in ("SURVIVED", "CAUGHT", "ARTEFACT")}
-        n = sum(counts.values())
-        counts["surviving_rate"] = round(counts["SURVIVED"] / n, 6) if n else None
+        decided = {k: sum(1 for r in sel if r["outcome"] == k)
+                   for k in ("SURVIVED", "CAUGHT", "ARTEFACT")}
+        n = sum(decided.values())
+        # An empty arm reports None rather than 0.0: "no rows were decided" and
+        # "no row survived" are different facts, and a rate of 0.0 on an empty
+        # arm would let an arm that failed to run look like a perfect one.
+        counts: dict[str, int | float | None] = dict(decided)
+        counts["surviving_rate"] = (round(decided["SURVIVED"] / n, 6)
+                                    if n else None)
         counts["n"] = n
         out[arm] = counts
-    artefacts = {}
+    artefacts: dict[str, int] = {}
     for r in rows:
         if r["outcome"] == "ARTEFACT":
             artefacts[r.get("cause", "?")] = artefacts.get(r.get("cause", "?"), 0) + 1
