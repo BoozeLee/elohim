@@ -506,12 +506,65 @@ def do_promote(skill: Skill, ledger: dict, spec: str) -> int:
     match = next((m for m in backlog.get("measurements", []) if m["id"] == target_id), None)
     if match is None:
         raise SystemExit(f"no backlog measurement named {target_id}; run --discover first")
+
+    # C3: a promotion is a measurement, not a transcription. The backlog entry is
+    # what some earlier run saw; the instrument is re-run here so what gets pinned
+    # is what it says now. A fact copied from the backlog can outlive the run that
+    # justified it, and a drifted fact still verifies as long as the gate never
+    # compares it against the value it was promoted from.
+    pinned_tolerance = tolerance if tolerance is not None else match.get("tolerance")
+    try:
+        instrument, _source = skill.instrument()
+    except SystemExit as exc:
+        print(f"refusing to pin {target_id}: {exc}", file=sys.stderr)
+        return 1
+    if instrument is None:
+        print(
+            f"refusing to pin {target_id}: no instrument under {skill.instrument_dir}, "
+            "so there is nothing to re-derive the value from",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        fresh_shard, _stdout, _run = run_instrument(instrument, DEFAULT_BUDGET_SECONDS)
+    except (TimeoutError, RuntimeError) as exc:
+        # An instrument that cannot be re-run is not evidence of a stale value,
+        # but it is certainly not evidence for one either.
+        print(
+            f"refusing to pin {target_id}: the instrument did not produce a fresh "
+            f"shard ({exc}), so the promoted value cannot be re-derived",
+            file=sys.stderr,
+        )
+        return 1
+    try:
+        actual = dotted(fresh_shard, path)
+    except (KeyError, IndexError):
+        print(
+            f"refusing to pin {target_id}: {path} is absent from the fresh shard, "
+            "so there is no value at that path to pin",
+            file=sys.stderr,
+        )
+        return 1
+    holds, residual = compare(actual, match["value"], pinned_tolerance)
+    if not holds:
+        print(
+            f"refusing to pin {target_id}: the backlog value {match['value']!r} no "
+            f"longer holds at {path}. The instrument now says {actual!r} "
+            f"(residual {residual:.3g}, tolerance {pinned_tolerance!r}). Re-run "
+            "--discover, review the change, and promote the fresh measurement.",
+            file=sys.stderr,
+        )
+        return 1
+
     ledger.setdefault("facts", []).append({
         "id": target_id,
         "claim": match["claim"],
         "path": path,
-        "expect": match["value"],
-        "tolerance": tolerance if tolerance is not None else match.get("tolerance"),
+        # The freshly derived value, not the backlog's copy of it. They agree to
+        # within the tolerance that was just checked, but only one of them is what
+        # this instrument produces today, and that is the one worth pinning.
+        "expect": actual,
+        "tolerance": pinned_tolerance,
         "origin": f"promoted from backlog on {datetime.now(timezone.utc).date().isoformat()}",
     })
     promoted = ledger["facts"][-1]
