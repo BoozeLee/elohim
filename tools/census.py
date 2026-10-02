@@ -40,7 +40,6 @@ import tempfile
 import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
-from typing import NamedTuple
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -344,21 +343,28 @@ def run_census(*, seed: int = 1, skills: list[str] | None = None,
     return report
 
 
-class Verdict(NamedTuple):
-    """A gate decision and the words that justify it."""
-    passed: bool
-    exit_code: int
-    stderr: str
-    note: str
+Verdict = M.Verdict
+"""A gate decision and the words that justify it.
+
+Re-exported from mutate rather than redeclared here. Two structurally identical
+NamedTuples would be two types, and `return M.verdict(...)` would not satisfy
+this module's own annotation -- which is exactly the kind of small type fork
+that lets two copies of a policy drift apart without anything looking wrong.
+"""
 
 
 def gate_verdict(summary: dict, fail_over: float | None = None) -> Verdict:
-    """Decide pass/fail from a summary. Pure: no I/O, no arguments, no clock.
+    """Decide pass/fail from a summary, by asking the one policy.
 
-    Two questions, and they are not the same question:
+    This used to carry its own copy of the rules. It does not any more, and the
+    reason is not tidiness: mutate.py gained --fail-over and a real non-zero exit
+    path while this function kept an unconditional `return 0` for a full release,
+    and the divergence shipped as a nightly CI job that measured nothing. The
+    policy now lives in mutate.verdict, which this module already imports.
 
-      fail_over given  -> is the rate WORSE than the threshold? (change)
-      fail_over absent -> is the gap non-zero at all?        (absolute gap)
+    What stays here is the mapping from this report's shape onto the shared
+    triple, plus the `detail` string, because only this function knows which of
+    its two rates is the gated one.
 
     Returns exit_code 0 or 1; 2 is reserved for refusing to classify, which is
     raised by run_census instead and never reaches here.
@@ -369,25 +375,7 @@ def gate_verdict(summary: dict, fail_over: float | None = None) -> Verdict:
     detail = (f"defect-arm survival rate {rate} ({eff}/{n}, inert excluded); "
               f"forged including inert {summary['forged']['effective_rate']} "
               f"({summary['forged']['EFFECTIVE']}/{summary['forged']['n']})")
-    if fail_over is None:
-        if eff:
-            return Verdict(False, 1,
-                           f"FAIL: no threshold given and the gate has survivors. "
-                           f"{detail}", "")
-        return Verdict(True, 0, "", "")
-    if not n:
-        return Verdict(False, 1,
-                       "FAIL: no defect-arm rows decided, so nothing was measured. "
-                       "An empty run is not a passing run.", "")
-    if rate is not None and rate > fail_over:
-        return Verdict(False, 1,
-                       f"FAIL: {detail} exceeds the threshold {fail_over}.", "")
-    if eff:
-        return Verdict(True, 0, "",
-                       f"note: {eff} survivors at rate {rate} against a threshold "
-                       f"of {fail_over}. These are the recorded gap rather than a "
-                       f"regression; docs/MUTATION_SURVIVAL.md accounts for each.")
-    return Verdict(True, 0, "", "")
+    return M.verdict(n, eff, rate, fail_over, detail)
 
 
 def main() -> int:

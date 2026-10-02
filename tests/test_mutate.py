@@ -572,3 +572,85 @@ def test_census_publishes_the_threshold_it_was_given():
     assert '"threshold"' in (REPO_ROOT / "tools" / "census.py").read_text()
     for field in ("fail_over", "rate_measured", "forged_including_inert", "basis"):
         assert field in (REPO_ROOT / "tools" / "census.py").read_text()
+
+
+# ------------------------------------------- one policy, two entry points
+
+def _census_summary(n: int, survivors: int, rate: float) -> dict:
+    return {
+        "defect_arm_total": {"n": n, "EFFECTIVE": survivors},
+        "forged": {"n": n + 81, "EFFECTIVE": survivors, "effective_rate": rate},
+        "inert_class": {"n": 81},
+    }
+
+
+def _mutate_summary(n: int, survivors: int, rate: float) -> dict:
+    # `survivors` is a LIST of rows in this summary shape, not a count. A
+    # fixture that puts an int here raises before it checks anything, which
+    # cost this test's first run.
+    return {
+        "rate_excluding_inert": {"n": n, "survived": n - survivors,
+                                 "surviving_rate": rate},
+        "survivors": [{"index": i} for i in range(survivors)],
+    }
+
+
+def _expected_exit(n: int, survivors: int, rate: float,
+                   fail_over: float | None) -> int:
+    """The policy, derived by hand rather than captured from either tool."""
+    if fail_over is None:
+        return 1 if survivors else 0
+    if n == 0:
+        return 1
+    return 1 if rate > fail_over else 0
+
+
+def test_both_entry_points_apply_one_policy():
+    """census and mutate must not each carry their own copy of the decision.
+
+    They did, and the copies diverged: mutate.py got --fail-over and a real
+    exit path while census.py silently kept an unconditional `return 0` for a
+    full release. The result shipped as a nightly job that died on
+    "unrecognized arguments" and measured nothing. This asserts both now route
+    through mutate.verdict, and that the routed result matches the policy
+    written out by hand rather than matching each other.
+    """
+    checked = 0
+    for n in (0, 1, 1598):
+        for survivors in (0, 1, 63):
+            if survivors > n:
+                continue
+            rate = survivors / n if n else 0.0
+            for fail_over in (None, -1.0, 0.0, 0.039424280350438046, 0.05, 0.9):
+                expected = _expected_exit(n, survivors, rate, fail_over)
+                m = mutate.verdict_from_summary(
+                    _mutate_summary(n, survivors, rate), fail_over)
+                c = census.gate_verdict(
+                    _census_summary(n, survivors, rate), fail_over)
+
+                where = f"n={n} survivors={survivors} rate={rate:.6f} fail_over={fail_over}"
+                assert isinstance(m, mutate.Verdict), where
+                assert isinstance(c, mutate.Verdict), (
+                    f"{where}: census returned {type(c).__name__}, so the two "
+                    f"entry points do not share one Verdict type")
+                assert m.exit_code == expected, f"mutate {where}"
+                assert c.exit_code == expected, f"census {where}"
+                assert m.exit_code == c.exit_code, f"parity {where}"
+                assert m.passed == c.passed, f"passed {where}"
+                checked += 1
+    assert checked == 36, f"the matrix shrank to {checked} cases"
+
+
+def test_an_accepted_survivor_run_explains_itself():
+    """A green exit over 63 survivors is the failure this guards.
+
+    With a threshold and survivors below it, the run passes -- and says so, by
+    naming the count, the rate, the threshold, and where each survivor is
+    accounted for. Passing silently would be the same as a gate hiding its gap.
+    """
+    rate = 63 / 1598
+    v = mutate.verdict_from_summary(_mutate_summary(1598, 63, rate), 0.05)
+    assert v.exit_code == 0
+    assert v.note, "a passing run with survivors produced no note"
+    assert "63" in v.note and "0.05" in v.note, v.note
+    assert "MUTATION_SURVIVAL" in v.note, v.note

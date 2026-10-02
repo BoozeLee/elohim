@@ -45,7 +45,7 @@ import sys
 import tempfile
 import time
 from pathlib import Path
-from typing import Any, Callable, TypedDict
+from typing import Any, Callable, NamedTuple, TypedDict
 
 # Derived from this file so the tool runs against whichever checkout holds it.
 # The previous default was an absolute path into one contributor's home
@@ -367,6 +367,139 @@ def summarise(rows: list[dict]) -> dict:
     return out
 
 
+class Verdict(NamedTuple):
+    """A gate decision and the words that justify it."""
+    passed: bool
+    exit_code: int
+    stderr: str
+    note: str
+
+
+def verdict(n_decided: int, n_survivors: int, rate: float | None,
+            fail_over: float | None, detail: str = "") -> Verdict:
+    """Decide pass/fail from a measured triple. Pure: no I/O, no clock, no globals.
+
+    This function is the whole policy, and it lives here because census.py
+    imports this module. That is not tidiness. The two entry points used to
+    carry independent copies of these rules, and the copies diverged for a full
+    release: mutate.py gained --fail-over and a real non-zero exit path while
+    census.py kept an unconditional `return 0`. The result shipped as a nightly
+    CI job that died on "unrecognized arguments" and measured no mutation at all.
+
+    Two questions, and they are not the same question:
+
+      fail_over given  -> is the rate WORSE than the threshold? (change)
+      fail_over absent -> is the gap non-zero at all?        (absolute gap)
+
+    The second is the default and it means the tool cannot pass on any tree that
+    still has an unpinned value. That is deliberate: it is the mode a tool should
+    be in before anyone has decided what rate CI should assert, because it cannot
+    be made to go green by choosing a threshold after the fact. A2's kill clause
+    is written only as a retiring clause -- it says when to stop using the
+    instrument (rate 0) and names no gating rate -- so there is no documented
+    rate to default to, and this tool will not invent one and thereby become the
+    authority for a number no document chose.
+
+    The distinction that matters: under the default, a survivor that is already
+    known and documented keeps the tool red, so the tool measures the absolute
+    gap. Under an explicit fail_over, it measures the change. Both are useful
+    and they are not the same measurement, which is why there is no default.
+
+    `detail` names the measurement in the messages. The caller owns that string
+    because only it knows which of its rates is the gated one; the default
+    describes the same thing generically.
+    """
+    clause = detail or f"defect-arm survival rate {rate}"
+    if fail_over is None:
+        if n_survivors:
+            return Verdict(False, 1,
+                           f"FAIL: {n_survivors} fact-bound survivor(s) -- "
+                           f"{clause}",
+                           "")
+        return Verdict(True, 0, "", "")
+
+    if not n_decided:
+        return Verdict(False, 1,
+                       "FAIL: no rows decided, so nothing was measured. An empty "
+                       "run is not a passing run: a harness that died on every "
+                       "mutation would otherwise report a rate of nothing and be "
+                       "indistinguishable from a clean one.",
+                       "")
+    if rate is not None and rate > fail_over:
+        return Verdict(False, 1,
+                       f"FAIL: {clause} exceeds the threshold {fail_over}.", "")
+    if n_survivors:
+        # Not a failure -- the threshold says these are the accepted gap -- but
+        # it is the whole point of the number, so it is stated rather than left
+        # to be inferred from a green exit code.
+        return Verdict(True, 0, "",
+                       f"note: {n_survivors} survivors at rate {rate} against a "
+                       f"threshold of {fail_over}. These are the recorded gap "
+                       f"rather than a regression; docs/MUTATION_SURVIVAL.md "
+                       f"explains each.")
+    return Verdict(True, 0, "", "")
+
+
+def verdict_from_summary(summary: dict, fail_over: float | None = None) -> Verdict:
+    """Map this module's summary shape onto the shared policy."""
+    real = summary["rate_excluding_inert"]
+    return verdict(real["n"], len(summary["survivors"]),
+                   real["surviving_rate"], fail_over)
+
+
+def run_mutations(*, sample: int = 200, seed: int = 0,
+                  skills: list[str] | None = None, stale_cap: int = STALE_CAP,
+                  budget: int = DEFAULT_BUDGET, workers: int | None = None,
+                  progress=None) -> dict:
+    """Measure a mutation sample and return the report.
+
+    `progress` receives each line the CLI would have printed; the library
+    default is silence, because a library that writes to stdout is a library
+    nobody can nest. Judging the result is `verdict_from_summary`'s job, so no
+    policy number enters the thing that measures.
+
+    Mirrors census.run_census in shape, deliberately: two entry points that
+    disagree about what a pass means is the defect that shipped once already.
+    """
+    if skills is None:
+        skills = list(INSTRUMENTED)
+    if workers is None:
+        workers = max(1, (os.cpu_count() or 4) - 2)
+
+    rng = random.Random(seed)
+    jobs = plan(rng, sample, skills, stale_cap)
+    for j in jobs:
+        j["budget"] = budget
+
+    t0 = time.time()
+    rows = []
+    with futures.ProcessPoolExecutor(max_workers=workers) as pool:
+        for i, row in enumerate(pool.map(one_mutation, jobs), 1):
+            rows.append(row)
+            if progress and (i % 25 == 0 or i == len(jobs)):
+                s = summarise(rows)
+                progress(f"  {i}/{len(jobs)}  forged survivors "
+                         f"{s['forged']['SURVIVED']}/{s['forged']['n']}  "
+                         f"artefacts {s['forged']['ARTEFACT']}  "
+                         f"{round(time.time()-t0)}s")
+
+    rows.sort(key=lambda r: (r["outcome"], r["arm"], r["operator"], r["skill"]))
+    return {
+        "schema": "elohim.mutation/1",
+        "sample": sample,
+        "seed": seed,
+        "skills": skills,
+        "budget_seconds": budget,
+        "outer_margin_seconds": OUTER_MARGIN,
+        "stale_cap": stale_cap,
+        "operators": [{"name": o["name"], "expect": o["expect"]} for o in MUTATORS],
+        "population": population_report(skills),
+        "wall_seconds": round(time.time() - t0, 1),
+        "summary": summarise(rows),
+        "rows": rows,
+    }
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -394,38 +527,13 @@ def main() -> int:
         return 0
 
     skills = [s for s in args.skills.split(",") if s]
-    rng = random.Random(args.seed)
-    jobs = plan(rng, args.sample, skills, args.stale_cap)
-    for j in jobs:
-        j["budget"] = args.budget
 
-    t0 = time.time()
-    rows = []
-    with futures.ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        for i, row in enumerate(pool.map(one_mutation, jobs), 1):
-            rows.append(row)
-            if i % 25 == 0 or i == len(jobs):
-                s = summarise(rows)
-                print(f"  {i}/{len(jobs)}  forged survivors "
-                      f"{s['forged']['SURVIVED']}/{s['forged']['n']}  "
-                      f"artefacts {s['forged']['ARTEFACT']}  "
-                      f"{round(time.time()-t0)}s", flush=True)
+    def emit(line: str) -> None:
+        print(line, flush=True)
 
-    rows.sort(key=lambda r: (r["outcome"], r["arm"], r["operator"], r["skill"]))
-    report = {
-        "schema": "elohim.mutation/1",
-        "sample": args.sample,
-        "seed": args.seed,
-        "skills": skills,
-        "budget_seconds": args.budget,
-        "outer_margin_seconds": OUTER_MARGIN,
-        "stale_cap": args.stale_cap,
-        "operators": [{"name": o["name"], "expect": o["expect"]} for o in MUTATORS],
-        "population": population_report(skills),
-        "wall_seconds": round(time.time() - t0, 1),
-        "summary": summarise(rows),
-        "rows": rows,
-    }
+    report = run_mutations(sample=args.sample, seed=args.seed, skills=skills,
+                           stale_cap=args.stale_cap, budget=args.budget,
+                           workers=args.jobs, progress=emit)
     if args.out:
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(f"report -> {args.out}")
@@ -455,64 +563,12 @@ def main() -> int:
                   f"excluded from the rate ===")
             for r in s["inert_operator_survivors"]:
                 print(f"  {r['arm']:<7} {r['operator']:<14} {r['skill']:<18} {r['bytes']}")
-    # A complete census must not read as a clean one.
-    #
-    # The previous version of this function printed "=== SURVIVORS (defects)
-    # ===" and then returned 0 unconditionally, so it could not fail. A2's own
-    # Decided-by clause asks for "a regression in survival rate turns CI red",
-    # and no regression could ever do that through this tool: the report
-    # described the defect and the exit code denied it.
-    #
-    # Two ways to fail, and which one applies depends on whether a rate was
-    # given.
-    #
-    #   --fail-over RATE given   fail when the measured rate exceeds RATE
-    #   --fail-over RATE absent  fail when any fact-bound survivor exists
-    #
-    # The second is the default and it means the tool cannot pass on any tree
-    # that still has an unpinned value. That is deliberate: it is the mode a
-    # tool should be in before anyone has decided what rate CI should assert,
-    # because it cannot be made to go green by choosing a threshold after the
-    # fact. A2's kill clause is written only as a retiring clause -- it says
-    # when to stop using the instrument (rate 0) and names no gating rate --
-    # so there is no documented rate to default to, and this tool will not
-    # invent one and thereby become the authority for a number no document
-    # chose.
-    #
-    # The distinction that matters: under the default, a survivor that is
-    # already known and documented keeps the tool red, so the tool measures the
-    # absolute gap. Under an explicit --fail-over, it measures the change. Both
-    # are useful and they are not the same measurement, which is why the flag
-    # is not given a value.
-    real = report["summary"]["rate_excluding_inert"]
-    survivors = report["summary"]["survivors"]
-    if args.fail_over is not None:
-        if not real["n"]:
-            print("\nFAIL: no rows decided, so there is no rate to compare "
-                  "against --fail-over. An empty run is not a passing run: a "
-                  "harness that died on every mutation would otherwise report "
-                  "a rate of nothing and be indistinguishable from a clean one.",
-                  file=sys.stderr)
-            return 1
-        if real["surviving_rate"] > args.fail_over:
-            print(f"\nFAIL: surviving rate {real['surviving_rate']} exceeds "
-                  f"--fail-over {args.fail_over}", file=sys.stderr)
-            return 1
-        if survivors:
-            # Not a failure -- the threshold says these are the accepted gap --
-            # but it is the whole point of the number, so it is stated rather
-            # than left to be inferred from a green exit code.
-            print(f"note: {len(survivors)} fact-bound survivor(s) at rate "
-                  f"{real['surviving_rate']}, within --fail-over "
-                  f"{args.fail_over}. These are the recorded gap, not a "
-                  f"regression. They are listed in the report above, and "
-                  f"`docs/MUTATION_SURVIVAL.md` explains each.")
-        return 0
-    if survivors:
-        print(f"\nFAIL: {len(survivors)} fact-bound survivor(s) -- the gate "
-              f"did not see a mutated instrument", file=sys.stderr)
-        return 1
-    return 0
+    v = verdict_from_summary(report["summary"], args.fail_over)
+    if v.stderr:
+        print(v.stderr, file=sys.stderr)
+    if v.note:
+        print("\n" + v.note)
+    return v.exit_code
 
 
 if __name__ == "__main__":
