@@ -108,7 +108,7 @@ Expected output:
 ```
 instrument .../instrument/summoning_shard.py  [bundled]
 pin        PASS  a920cdd5dd51f732
-facts 16/16 verified, traps 6/6 hold, hygiene 0 findings
+facts 25/25 verified, traps 6/6 hold, hygiene 0 findings
 verdict PASS
 ```
 

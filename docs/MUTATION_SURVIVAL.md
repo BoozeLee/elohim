@@ -346,5 +346,5 @@ and the honest way to state the tool's scope is narrower than that:
 
 This is the correct outcome for a first honest pass: the instrument found a real
 blind spot, the number is now pinned, and any future hardening is scored against
-it. It is not a reason to distrust the 72 facts and 38 traps, which were
+it. It is not a reason to distrust the 81 facts and 38 traps, which were
 re-verified on every run of this measurement.

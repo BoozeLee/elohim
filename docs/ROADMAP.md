@@ -370,7 +370,7 @@ describes. What actually forced the move was the tag's own position, below.
 >>>>>>> 86c82cb
 
 The tag did not simply need pushing. Its annotation was a **measurement with no
-referent**: it quoted 72 facts across 7 skills, 52 pinned values, 57 mirror files
+referent**: it quoted 81 facts across 7 skills, 52 pinned values, 57 mirror files
 and 146 text files, and none of those figures describe any commit in this
 repository — 72 and 52 are the current tree, 57 and 146 sit between the current
 tree and its parent, and "7 skills" counts the shared harness, which has no
@@ -478,7 +478,7 @@ already known to hold is a gate with an untested half.
 
 - **A hosted service.** The gate is a local process you can read. That is the
   product, and `SECURITY.md` says so.
-- **More skills.** Six skills, 72 facts, 38 traps is already more surface than
+- **More skills.** Six skills, 81 facts, 38 traps is already more surface than
   anyone has verified. A seventh skill is a worse use of a week than C1 was. The
   sixth — `reproducibility` — was added under this item, on the grounds that it was
   B1, it corrected a false claim, and it was a tripwire rather than a new subject.
@@ -553,6 +553,6 @@ first would have produced a working runner guarding a question nobody has asked.
 `C2` and `C3` are still worth doing, and they are now the weaker pair of the
 three. Both extend `C1`, which already gates every claim against every pinned
 value on every run. What they add is a promotion path, and the value of a
-promotion path is proportional to how often facts get promoted. At 72 facts with
+promotion path is proportional to how often facts get promoted. At 81 facts with
 no growth, that number is near zero. That is a weaker position than "the author
 remembers", and it is a measurable one.

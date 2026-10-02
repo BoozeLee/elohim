@@ -7,7 +7,7 @@ metadata:
   author: BoozeLee
   version: "2.0.0"
   instrument_sha256: a920cdd5dd51f732129aa67b607cc59d9718a50aadb89c90ec397480c69cbd9b
-  facts: "16"
+  facts: "25"
   traps: "6"
   entrypoint: scripts/elohim_run.py
 ---

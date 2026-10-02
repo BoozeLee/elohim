@@ -134,6 +134,128 @@
       "expect": 8.881784197001252e-16,
       "tolerance": 1e-15,
       "origin": "shard section IV"
+    },
+    {
+      "id": "plastic_parry_digits",
+      "claim": "the greedy expansion of 1 in the plastic base begins with this digit sequence",
+      "path": "cf_plastic",
+      "expect": [
+        1,
+        3,
+        12,
+        1,
+        1,
+        3,
+        2,
+        3,
+        2,
+        4,
+        2,
+        141,
+        97,
+        2,
+        4,
+        41,
+        1,
+        8,
+        4,
+        14,
+        10,
+        1,
+        1,
+        1
+      ],
+      "tolerance": null,
+      "origin": "shard section I"
+    },
+    {
+      "id": "tribonacci_parry_digits",
+      "claim": "the greedy expansion of 1 in the tribonacci base begins with this digit sequence",
+      "path": "cf_tribonacci",
+      "expect": [
+        1,
+        1,
+        5,
+        4,
+        2,
+        305,
+        1,
+        8,
+        2,
+        1,
+        4,
+        6,
+        17,
+        5,
+        1,
+        5,
+        4,
+        6,
+        3,
+        7,
+        3,
+        1,
+        1,
+        3
+      ],
+      "tolerance": null,
+      "origin": "shard section I"
+    },
+    {
+      "id": "plastic_lambda",
+      "claim": "the plastic number is 1.324717957244746",
+      "path": "plastic.lambda",
+      "expect": 1.324717957244746,
+      "tolerance": 1e-15,
+      "origin": "shard section III"
+    },
+    {
+      "id": "plastic_bound_argmax",
+      "claim": "the Pisot ratio for the plastic base reaches its maximum at n = 183",
+      "path": "plastic.bound_argmax_n",
+      "expect": 183,
+      "tolerance": 0,
+      "origin": "shard section III"
+    },
+    {
+      "id": "plastic_deflation_digits",
+      "claim": "the plastic deflation residual needs 66 significant digits",
+      "path": "plastic.precision",
+      "expect": 66,
+      "tolerance": 0,
+      "origin": "shard section III"
+    },
+    {
+      "id": "tribonacci_deflation_digits",
+      "claim": "the tribonacci deflation residual needs 109 significant digits",
+      "path": "tribonacci.precision",
+      "expect": 109,
+      "tolerance": 0,
+      "origin": "shard section III"
+    },
+    {
+      "id": "tribonacci_modulus_is_sqrt_inv_lambda",
+      "claim": "the tribonacci modulus equals 1/sqrt(lambda) exactly, not lambda inverse",
+      "path": "tribonacci.sqrt_inv_lambda",
+      "expect": 0.7373527057603276,
+      "tolerance": 1e-15,
+      "origin": "shard section III"
+    },
+    {
+      "id": "collatz_peak_is_its_start",
+      "claim": "the capped Collatz trace never rises above the value it started from",
+      "path": "collatz.peak",
+      "expect": 79256,
+      "tolerance": 0,
+      "origin": "shard section VII"
+    },
+    {
+      "id": "collatz_odd_step_numerator",
+      "claim": "the exact odd-step product over rationals has this numerator",
+      "path": "collatz.product_num",
+      "expect": 1048576,
+      "tolerance": 0,
+      "origin": "shard section VII"
     }
   ],
   "instrument": {

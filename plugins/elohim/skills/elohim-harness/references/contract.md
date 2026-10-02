@@ -185,7 +185,7 @@ installed flat tree at `<root>/<skill>` are the same directory to this script.
   "skills": [ { "schema": "elohim.gate/1", "skill": "...", "verdict": "..." } ],
   "summary": {
     "skills": 6, "passed": 6, "failed": 0, "unlocated": 0,
-    "facts": 72, "facts_verified": 72, "facts_drifted": 0,
+    "facts": 81, "facts_verified": 81, "facts_drifted": 0,
     "traps": 38, "traps_holding": 38,
     "hygiene_findings": 0, "unbound_claims": 0, "timed_out": 0,
     "runtime_seconds": 17.143, "verdict": "PASS"
