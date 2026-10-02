@@ -30,9 +30,10 @@ Measured, not asserted:
 | interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** |
 | instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** |
 | recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** |
-| sampled mutations of instrument code | 200 |
-| mutations that passed the gate | **0** |
-| apparent survivors that were actually timeouts | 1 (mechanism understood) |
+| instrument mutation sites enumerated exhaustively, seal forged | **1,679** |
+| mutations that passed the full gate | **66 of 1,679 (3.93 %)** |
+| survivors that were fact-bound and outside declared tolerance | **0** |
+| runs left undetermined by a harness artefact | 1 of 1,679 (reported, not counted) |
 | shipped ledgers whose prose contradicted their pins | 1 (`precision-budget`, fixed) |
 | shard leaves swept twice, once with the seal forged and once left stale | **522, across 6 skills** |
 | traps measured to fire without the checksum | **25 of 38** |
@@ -85,11 +86,16 @@ of that test prepended the payload above a `from __future__` import and died
 on `SyntaxError`, so it proved nothing until the payload was moved to the end of
 the file.
 
-**3. The mutation harness is the missing instrument.** There is no way, today,
-to ask "how much gets past the gate?" The answer was asserted in prose and had
-never been measured. It is now: 0 of 200. Any future hardening is scored against
-that number, and the 0.5 % "apparent survivor" figure must never be quoted
-without the timeout caveat attached.
+**3. The mutation harness is the missing instrument.** There was no way, at the
+time this was written, to ask "how much gets past the gate?" The answer was
+asserted in prose and had never been measured. It has since been measured
+exhaustively: **66 of 1,679 sites (3.93 %) pass the full gate with the seal
+forged**, and 0 of those 66 are fact-bound and outside declared tolerance. Both
+earlier figures are retracted — "0 of 200" was not reproducible from this
+repository, and the 0.5 % "apparent survivor" was an artefact of the harness
+killing the child process before the gate could report, so the timeout caveat
+was the bug rather than a caveat. `docs/MUTATION_SURVIVAL.md` carries the
+measurement and the method.
 
 ---
 
