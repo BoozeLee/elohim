@@ -477,9 +477,19 @@ already known to hold is a gate with an untested half.
   anyone has verified. A seventh skill is a worse use of a week than C1 was. The
   sixth — `reproducibility` — was added under this item, on the grounds that it was
   B1, it corrected a false claim, and it was a tripwire rather than a new subject.
-- **Branch protection on `main`.** Neither of the user's other public repos
-  protects `main`. Matching the precedent is the right call until there is a
-  stated reason to diverge.
+- **Changing the branch protection on `main`.** This entry used to read
+  "Branch protection on `main`", and justified leaving it off by the user's
+  other public repos not protecting theirs. Measured on 2026-09-30, that was
+  false: a direct push to `main` is refused with `GH006: Protected branch
+  update failed for refs/heads/main`. Measured again on 2026-10-02: `main`
+  carries classic branch protection (`required_approving_review_count` 0,
+  `enforce_admins` off, force pushes off) and an active repository-wide ruleset
+  `protect-all-branches` covering every ref with deletion, non-fast-forward
+  and pull-request rules. The clause that the rules were not readable from
+  here — both endpoints 404 under this machine's token — is retracted: both
+  answer now, so the rule set is stated as measured rather than withheld. The
+  token here holds an always bypass, so a push from this machine is not a test
+  of the rule. What stays off the list is changing any of it.
 - **Adversarial security.** The pin is integrity by visibility. Making it
   tamper-proof against a consistent hostile edit is a different project.
 - **A commit sha in this file.** A sha names a tree, and a rebase renames that
