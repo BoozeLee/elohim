@@ -409,6 +409,71 @@ page renders.
 
 ---
 
+## Track V — the summoned artifact
+
+### V1. The summoned shard, as a committed artifact
+**Status: shipped 2026-10-02.**
+
+**Why:** the instrument emits three files — a shard report, a sigil and a
+17-fact digest — and every one of them was written into a gitignored `out/`
+directory. `git ls-files skills/elohim/` returned ten files, none of them an
+output. The most concrete thing in the repository was the least reachable, and
+`ELOHIM:AWAKEN` appeared only as gate input: a seed string in the instrument and
+one ledger fact, never as something a reader is invited to run.
+
+**Do, as built:** `skills/elohim/artifacts/` holds the three files plus
+`PUBLISHED.json`, written by `tools/publish_shard.py` and checked by
+`tools/verify_published.py`.
+
+Four things about that turned out differently from the plan, and each is recorded
+because the plan was the thing that was wrong.
+
+**The second normaliser rule was needed, and the first pass cut it for the wrong
+reason.** Across interpreters the emitted `shard.md` differs on exactly one line —
+the `python     :` header. The first pass concluded one rule sufficed and cut the
+`wrote <path>/…` rule, blaming its own version-numbered temporary directories.
+Building the publisher disproved that: the emitted text embeds the **absolute
+output path**, so it varies between *checkouts*, not between interpreters — and it
+is a leak of the operator's home directory into a public repository. So the
+generator normalises before committing and hashes the committed bytes; the
+alternative puts a home path into git history, which no later commit can undo.
+One line varies between interpreters, two between checkouts, and each is a distinct
+leak with a distinct source.
+
+**The verifier is a separate file, not a flag.** The load-bearing rule is that no
+existing gate may read `artifacts/`, and `harness_run.py` is precisely what all
+four gates execute. A flag inside it would satisfy that rule only by discipline; a
+separate file satisfies it structurally. Consequence: the gate runner and all 62
+mirrored files stayed untouched.
+
+**The manifest got stronger than specified.** There is no `enforce` key and no off
+switch. A file present in `artifacts/` but absent from the manifest is itself a
+finding, so there is no way to write into that directory without the check
+noticing.
+
+**The artifacts had to be mirrored.** `sync_adapters.py --check` exited 1 the moment
+`artifacts/` existed, with four `MISSING plugins/…/artifacts/…` lines. Adding
+`artifacts` to the skip list would have made a gate blind to a directory — the one
+thing this project does not do — so the files were mirrored instead, 58 → 62. The
+second copy is already covered by a mechanism that predates this work.
+
+**K3 — nothing ships without a measured pass *and* a measured fail.** Three
+measured results, not one: baseline passes; corrupting plastic's Parry digits is
+detected and exits 1, and the corruption was asserted to have landed before that
+verdict was read; restoring returns to green; an unlisted file alone exits 1. The
+assertion matters — an earlier control in the same session reported a false pass by
+tampering nothing at all.
+
+**K1 was scoped more narrowly than the drift it was measured against, and that is
+recorded rather than glossed.** K1 asks whether the emitted *values* are
+interpreter-stable. They are, across seven interpreters including 3.12, the
+version where `sum()` changes and `estimator-bias`'s seal moves. K1 does not ask
+whether the emitted *text* is stable across checkouts, and it is not. Had K1
+covered the whole file it would have fired. A gate that only ever measures the part
+already known to hold is a gate with an untested half.
+
+---
+
 ## What is deliberately not on this list
 
 - **A hosted service.** The gate is a local process you can read. That is the
