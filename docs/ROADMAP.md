@@ -230,15 +230,53 @@ and the README claim was corrected rather than the matrix being widened. CI now 
 the two classes and would have missed a third.
 
 ### B2. Pin the residuals, not just the values
+**Status: measured 2026-10-02 and closed without building the field.**
 **Why:** `precision-budget` learned that a value which moves when precision
 moves is noise. Its own residuals are the interesting quantity and are not
 currently part of any skill's contract.
 **Do:** for each promoted fact, record the residual against its tolerance so a
 fact that passes *barely* is distinguishable from one that passes *comfortably*.
-**Decided by:** the ledger distinguishes a fact at 0.1 % of tolerance from one
-at 99 % of it.
-**Kill:** if the residual distribution is uniformly either ~0 or ~tolerance,
-the field carries no information and is dropped.
+**Measured on CPython 3.14.5 before deciding anything, which cost nothing** —
+the harness already computes a residual for every fact on every run and
+discards it (`skills/elohim-harness/scripts/harness_run.py:285`), so this item
+was answerable without writing a line of it. Of the 81 facts, **52 are exact
+comparisons** — no tolerance, or a tolerance of 0 — for which `compare()`
+returns `0.0` by construction, so the field would record a constant. Of the
+**29 that carry a tolerance, 25 measured a residual of exactly 0.0** and
+**4 measured one or two ULP of float64**: `bias_n_le_400`,
+`fitted_base_n_le_400`, `residual_rms_n_le_40` and
+`bias_in_standard_errors_n_le_40`, at 1.11e-16 and 2.22e-16 against a tolerance
+of 1e-9. The largest residual-to-tolerance ratio anywhere in the tree is
+**2.22e-7**; every fact clears its tolerance by at least six and a half
+decades.
+**Kill: falsified rather than fired, and the difference is the finding.** The
+criterion as written asks whether the distribution is uniformly ~0 *or*
+~tolerance. It is not bimodal. It is unimodal at 0, with a 1-ULP floor and
+nothing anywhere near the far mode — so reporting "the kill fired" would be
+reading the criterion in whichever direction retires the item, which is the
+failure this file exists to catch. The field is dropped for three measured
+reasons rather than one convenient one: the criterion's premise is wrong, 52 of
+81 facts have no residual to record, and the residual is a pure function of
+three values that are already pinned — the fresh measurement, `expect` and
+`tolerance` — so a ledger field would add a fourth thing that can be wrong
+without adding a byte the gate does not already carry.
+**The gap this leaves is named rather than papered over.** A fact passing at
+99 % of its tolerance is green and silent: the harness prints `residual` and
+`tolerance` only on the failure path (`harness_run.py:553`), which is the one
+case where the number is already obvious. So *barely* is genuinely invisible.
+It is also unoccupied — the measurement above is what says so — and what it
+would expose is not residual visibility but **tolerance width**: these
+tolerances are wide enough that a fact could move seven orders of magnitude and
+stay green.
+**All four non-zero residuals belong to one instrument, and it is the one B1
+measured as moving.** `estimator-bias` is the single instrument whose shard
+splits into two seal classes at the CPython 3.12 boundary. This run was
+3.14.5 — the upper class — so the cross-class ratio is still unmeasured; on
+3.10 and 3.11 the ~1e-13 relative shift B1 recorded lands against the same
+1e-9 tolerance. That is the one case where the field would earn its keep, and
+it is already covered by a named mechanism rather than a new one: the two
+pinned seal classes, and `every_observed_seal_is_pinned` in the reproducibility
+trap suite.
 
 ---
 
@@ -526,6 +564,14 @@ code" and then described five, two of which it called real work in the same
 breath — a count in prose that the paragraph itself contradicted, in the
 document that orders every item below it. `D2` needs a human in a browser with a
 2FA code and cannot be automated at all.
+
+`B2` is not in that count, and until 2026-10-02 it should have been: it was the
+one item in this file with no status marker, no measurement and exactly one
+mention in the whole repository, while this sentence said two items remained
+without ever counting it. It is now measured and closed above. An item that is
+neither shipped nor on the list is the failure this paragraph was already
+written to prevent, so the count is stated with each item's disposition rather
+than as a number that has to be re-derived by reading every heading.
 
 The order after D1 is `A2`, and it changed from the order this file used to give.
 That earlier order was `C2` then `C3`, on the grounds that the cheapest way to
