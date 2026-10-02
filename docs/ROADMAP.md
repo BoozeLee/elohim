@@ -661,6 +661,13 @@ be the repository's own failure reproduced in a convenience feature.
 **Decided by:** `elohim init` on a skill with no ledger produces one that passes
 `verify_published` and is refused by `claim_binding` until promoted.
 
+**This does not close `E1`'s third clause.** `E1` is decided by a caller that
+did not write the code, and `elohim init` would be written by the same author
+inside the same repository as the gate it bootstraps — self-authored whatever
+the entry point is called. Only `E3`, `E4`, or a real external caller closes
+that clause. Recorded here rather than at `E2`'s start, because a reader who
+takes `E2` for the external adjudication has no reason to come back and check.
+
 ### E3. PyPI
 **Why:** mechanical, and the wheel is already verified byte-identical. Last of
 the four because publishing an API that E1 has not finished stabilising is a
