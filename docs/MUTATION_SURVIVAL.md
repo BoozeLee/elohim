@@ -27,8 +27,8 @@ Both the rows and that paragraph have since been corrected in place, against the
 measurement below. They are quoted here as the claim this document refutes.
 
 **That row is false as written.** Measured over every mutable site in the six
-instruments, **66 distinct mutants returned `verdict PASS` while changing the
-value the shard reports** — 3.93 % of 1,679 sites. The 0-of-200 baseline is not
+**63 distinct mutants returned
+value the shard reports** — 3.75 % of 1,679 sites.
 reproducible from this repository, as the roadmap itself says, and it is not
 merely unreproducible: it is wrong.
 
@@ -123,6 +123,25 @@ Full census, seed 1, 11 workers, 45 s harness budget, 497 s wall, **coverage
 | stale | 60 | 60 | 0 | 0 | 0 | 0.0 |
 | all | 1739 | 1100 | 572 | **66** | 1 | 0.037953 |
 
+That table is the **first** census, run at 12:55 on 2026-10-02. It is kept
+because the rest of this document reasons from it, and it is kept as history:
+three of its rows were superseded two hours later by a ledger change, reconciled
+in "Why the count moved from 66 to 63" below. The current figures:
+
+| arm | n | caught | equivalent | effective | artefacts | gap rate |
+| --- | --- | --- | --- | --- | --- | --- |
+| forged | 1679 | 1043 | 572 | **63** | 1 | **0.037522** |
+| stale | 40 | 40 | 0 | 0 | 0 | 0.0 |
+| all | 1719 | 1083 | 572 | **63** | 1 | 0.036649 |
+
+Re-measured from the committed tool at seed 1, 45 s budget, 600 s wall,
+coverage 1679/1679 = 1.0. The stale arm is sampled at 40 here rather than 60,
+which is why its `n` differs; the forged row is the census and is unaffected.
+
+The quantity CI gates on is neither row above. It is the defect-arm rate,
+**63/1598 = 0.039424**, which excludes the inert class from numerator and
+denominator alike for the reason given below.
+
 The N=200 prefix: caught 125, equivalent 68, **effective 7 → 3.5 %**.
 
 Inert class, reported and not counted: `docstring_kill` produced 81 equivalent
@@ -165,6 +184,10 @@ honest, not because the gate got stronger.
 undetermined. 1 of 1,679.
 
 ## What the 66 survivors actually are
+
+This section analyses the 12:55 run's 66. Three of them no longer survive, and
+the reconciliation below names them, so the field census here describes that run
+rather than the current tree.
 
 Each survivor was re-probed individually (0 errors, 66 of 66 reproduced) and its
 shard diffed field-by-field. The log's inline preview truncates shards at 190
@@ -246,18 +269,25 @@ item requires:
 - It **qualifies for** CI, at the item's stated N=20 per skill on a schedule. That
   is 120 sites, roughly 35 s at 11 workers — affordable. The full 1,679-site census
   is a release-grade measurement at 497 s and does not belong on every run.
-  **Qualifies for is not granted.** The kill clause above is written only as a
-  retiring clause; it names no gating rate, so a non-zero rate is not an
-  affirmative grant and the rate to gate at is not this document's to invent.
-- The **decided-by is half met.** It requires "the report is committed, and a
-  regression in survival rate turns CI red." The report is committed. A CI job is
-  not, and cannot be yet: `tools/mutate.py` exits 1 whenever any fact-bound
-  survivor exists, and this tree has 63 of them, so wiring it today would make CI
-  permanently red. It takes `--fail-over RATE` to decide what rate is acceptable,
-  and no such rate has been decided. What did change is that a regression is now
-  *expressible* — before this commit the tool ended in an unconditional `return 0`
-  under the comment "a complete census must not read as a clean one", so it could
-  not fail at all.
+  **The rate has since been stated, and it was not this document's to invent.**
+  The kill clause above is written only as a retiring clause and names no gating
+  rate, so on 2026-10-02 that clause alone granted nothing. A rate was then chosen
+  with the clause's silence named as the reason: `0.05`, on the defect-arm rate,
+  which is 1.33 times the recorded 0.039424. It is wired into
+  `.github/workflows/mutation-census.yml`, nightly over the whole population, and
+  has run green.
+- The **decided-by is met.** It requires "the report is committed, and a
+  regression in survival rate turns CI red." Both hold. The report is committed,
+  and the gate returns 1 in either mode -- no threshold means any survivor fails, a
+  threshold means only a rate above it fails -- verified in both directions with an
+  empty run counted as a failure rather than a pass.
+
+  It was not met when this section was first written, and the reason is worth
+  keeping: `tools/census.py`, the entry point the workflow actually invokes, had
+  never been given `--fail-over` and ended at an unconditional `return 0`. The flag
+  existed in `tools/mutate.py` only. Every nightly run died with "unrecognized
+  arguments" before mutating anything, so the census had never once run on a
+  runner.
 
 ### Why the count moved from 66 to 63
 
@@ -280,17 +310,24 @@ list is a to-do list for the ledger.
 
 - **Eight syntactic operators is not a mutation generator.** No operator changes
   control flow structurally, renames, deletes statements, or touches imports.
-  The 3.93 % is a floor on the gap, not an estimate of it.
+The 3.75 % is a floor on the gap
 - **572 equivalent mutants — 35.8 % of the non-inert population — changed no
   reported value.** That is a coverage statement about the shards, and it is
   arguably the more important number in this document: a third of the mutable
   surface of these instruments is unobserved by their own output.
 - **One site is `elohim-harness`, not a ledger-bearing instrument.** Its absence
   from the population is by design — it has no ledger to forge a pin against.
-- **The census was run on one machine, one Python.** `reproducibility` exists
-  precisely because results move across interpreters. Nothing here has been
-  re-run on a second interpreter.
-- **The rate is not a quality score for the instruments.** 66 mutants among 1,679
+- **The census has now been run on two machines, and one Python minor version.**
+  `reproducibility` exists precisely because results move across interpreters, so
+  this was the load-bearing weakness of the whole report. The nightly job answered
+  it on CPython 3.13.15 against this box's 3.13.13: same sixteen decimals, same 63
+  survivors, same 572 equivalents. Determinism is measured across a patch release
+  rather than assumed from a rerun.
+
+  What is still unmeasured is a minor-version change. `estimator_bias` splits into
+  two seal classes at the 3.12 boundary, and the census has not been run on both
+  sides of it.
+63 mutants among 1,679
   sites is a description of where the ledger's promises stop, nothing more.
 
 ## Reproducing this
