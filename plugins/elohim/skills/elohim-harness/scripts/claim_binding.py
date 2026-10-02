@@ -315,7 +315,10 @@ ID_ASSERTIONS: list[tuple[str, re.Pattern[str], Any]] = [
             "the slug asserts a whole number but the pinned value "
             f"{fact.get('expect')!r} is not integral"
         )
-        if (_n := _number(fact.get("expect"))) is not None and _n != int(_n)
+        # is_integer() and not `!= int(_n)`: int() raises OverflowError on
+        # inf and ValueError on nan, and a gate that dies with a traceback
+        # reports nothing at all. is_integer() is total -- it answers False.
+        if (_n := _number(fact.get("expect"))) is not None and not _n.is_integer()
         else None,
     ),
 ]
