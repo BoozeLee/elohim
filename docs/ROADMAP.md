@@ -896,3 +896,72 @@ is a promotion path, and the value of a promotion path is proportional to how
 often facts get promoted. At 81 facts with no growth, that number is near zero.
 That is a weaker position than "the author remembers", and it is a measurable
 one.
+
+## The next release, and what is in the way
+
+Written 2026-10-03. This is the first release planned in this file, so the shape
+below is the one to argue with.
+
+### Two things block it, and neither is code
+
+**`v0.1.0`'s tag no longer points at this history.** The 2026-10-02 re-sign
+rewrote all 53 commits onto verified email addresses so GitHub would badge them,
+which necessarily produced new commit objects. The tag still resolves to
+`6231e88`, a commit that is no longer an ancestor of `main`; its rewritten
+equivalent is `afb61a3`. The release itself is not broken — release `400397224`
+is still published and the old commit stays reachable through the tag — but a new
+version cannot honestly name its predecessor by commit. Moving the tag is refused
+by a GitHub ruleset (`GH013: Cannot update this protected ref`) that no API
+endpoint exposes. **This needs a person in Settings → Rules.** Until it is
+resolved, `v0.2.0` either ships without a resolvable predecessor or ships
+against a tag that points into a rewritten history.
+
+**45 commits are unreleased against 9 changelog bullets.** `git rev-list --count
+afb61a3..main` was 45 when this section was written on 2026-10-03, and it grows
+with every commit — re-measure it rather than trusting the number here. It
+already closes nine roadmap items (`A2`, `A3`, `B1`, `B2`, `C2`, `C3`, `D1`,
+`V1`, `E1`). The `[Unreleased]` section holds 9 bullets. The changelog has not
+been kept up with the tree, and this project is unusually well placed to notice
+that and unusually bad at noticing it, because the whole argument is that a
+claim nobody re-derives is not a fact.
+
+### Recommended: `v0.2.0`
+
+Minor, not patch, because of `E1`. Moving `tools/{census,mutate,sites}.py` into
+the `elohim_gate` package is breaking for anything importing `tools.census`. This
+roadmap records the only callers as being in `tests/`, which is the evidence that
+a minor bump is correct rather than a patch — but that is an assertion about a
+public repository, and the honest form of it is: no external importer is claimed,
+and the CHANGELOG entry should say the move happened so anyone who disagrees can
+find it.
+
+Each line is written as the condition that closes it, not as a task.
+
+| Item | Done when |
+|---|---|
+| The tag | `v0.1.0` points at `afb61a3`, or the decision to leave it orphaned is recorded in the changelog with the reason. |
+| `[Unreleased]` rewritten | Every one of the 45 commits is either a changelog entry or explicitly out of scope. |
+| The semver sentence | Corrected, as its own commit, because a changelog that denies its own version numbers is the same defect class this project exists to catch. |
+| `elohim_gate` recorded | The `tools/` → `elohim_gate/` move is in the changelog under Changed, with the breaking-ness stated. |
+| A changelog for the viewer | `BoozeLee/elohim-gate-viewer` shipped a report page and a Pages workflow with no CHANGELOG at all. A release with no release record is the failure mode, not the exception. |
+
+### Three findings that should not wait for the release
+
+**`E1`'s third clause is still open, and the viewer does not close it.** The
+published report page consumes `elohim.gate/1` JSON through `harness_run.py
+--json` — that is `D1` — not through `run_census` or `gate_verdict`, so it is
+evidence for `D1` and citing it for `E1` would be the exact move this roadmap
+keeps refusing: counting a consumer that does not call the thing. `E2` was
+already recorded as not closing the clause either; see `E2`'s closing note above.
+Only `E3`, `E4`, or a real external caller closes it.
+
+**The viewer's Rust has no CI.** The Pages workflow is deploy-only, because
+Tauri's Linux dependencies break a plain `ubuntu-latest` runner. Nothing compiles
+`src-tauri` on any push. Its 23 tests were run by hand and the result is not
+recorded anywhere a reader can check.
+
+**One dependency advisory is reachable and open.** `glib` 0.18.5 carries
+`RUSTSEC-2024-0429`. It is not fixable within Tauri 2 — the fix needs `glib`
+0.20, which arrives with Tauri 3 — and no code in the viewer references `glib` or
+any `Variant` type. Unreached is not the same as fixed, and the difference should
+survive into the release notes rather than into a README nobody re-reads.
