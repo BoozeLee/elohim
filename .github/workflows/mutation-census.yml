@@ -103,6 +103,42 @@ jobs:
                   f"version skew, not a measurement: refuse to report a gated rate "
                   f"the report does not carry.")
           t = d["threshold"]
+
+          # What this guards is not a crash. census.py exiting non-zero fails
+          # the job, and an empty run fails on its own inside verdict(). The
+          # silent failure is a refactor that stops ENUMERATING part of the
+          # population: that yields a SHORTER run with FEWER survivors, so the
+          # rate goes down, the gate goes GREEN, and the only symptom is a
+          # smaller number in this log. A gate that goes green on less evidence
+          # than it went green on last time is the one outcome it must never
+          # report, so the population is pinned from outside the run.
+          EXPECTED_SKILLS = [
+              "elohim",
+              "estimator-bias",
+              "invariant-hunter",
+              "precision-budget",
+              "reproducibility",
+              "tolerance-prover",
+          ]
+          got = sorted(d.get("skills") or [])
+          if got != EXPECTED_SKILLS:
+              raise SystemExit(
+                  f"the census covered {got}, not {EXPECTED_SKILLS}. elohim-harness "
+                  f"is deliberately absent from that list: it is the harness, not an "
+                  f"instrument. A different set means some instruments were not found, "
+                  f"so every number below is measured on a population that is not "
+                  f"this one.")
+          if cov["forged_sites_attempted"] != cov["population_sites"]:
+              raise SystemExit(
+                  f"the census attempted {cov['forged_sites_attempted']} of "
+                  f"{cov['population_sites']} sites: the population was not covered.")
+          if cov["population_sites"] != 1679:
+              raise SystemExit(
+                  f"the census enumerated {cov['population_sites']} sites, not the 1679 "
+                  f"this tree has. Adding a site is the only legitimate way to move it, "
+                  f"and that should turn the nightly red until a human looks, because a "
+                  f"changed population is a fact a human owes a reading.")
+
           print(f"population {cov['population_sites']}, attempted {cov['forged_sites_attempted']}")
           print(f"GATED defect-arm rate {t['rate_measured']} "
                 f"({t['defect_arm']['effective']}/{t['defect_arm']['n']}) against threshold {t['fail_over']}")
