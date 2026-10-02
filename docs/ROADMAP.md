@@ -24,7 +24,7 @@ Measured, not asserted:
 
 | claim | measurement |
 |---|---|
-| facts promoted | 72 across 6 instrumented skills |
+| facts promoted | 81 across 6 instrumented skills |
 | traps re-derived independently | 38 |
 | instrument checksums pinned | 6, all PASS |
 | interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** |
@@ -370,9 +370,9 @@ describes. What actually forced the move was the tag's own position, below.
 >>>>>>> 86c82cb
 
 The tag did not simply need pushing. Its annotation was a **measurement with no
-referent**: it quoted 81 facts across 7 skills, 52 pinned values, 57 mirror files
+referent**: it quoted 72 facts across 7 skills, 52 pinned values, 57 mirror files
 and 146 text files, and none of those figures describe any commit in this
-repository — 72 and 52 are the current tree, 57 and 146 sit between the current
+repository — 81 and 57 are the current tree, 57 and 146 sit between the current
 tree and its parent, and "7 skills" counts the shared harness, which has no
 ledger and so contributes no facts. It was withdrawn and rewritten rather than
 reconciled, because a figure that names no tree cannot be made true by picking a

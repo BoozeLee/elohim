@@ -171,7 +171,7 @@ shard diffed field-by-field. The log's inline preview truncates shards at 190
 characters, so the field-level delta had to be recovered separately; it was not
 in the first report.
 
-The survivors moved **68 distinct leaf fields**. Against the 72 pinned facts:
+The survivors moved **68 distinct leaf fields**. Against the 81 pinned facts:
 
 - **2 moved a field a fact does pin**, and the gate still passed.
 - **66 moved a field no fact path reaches.**
@@ -325,7 +325,7 @@ promoting this harness to `tools/mutate.py` is still outstanding.
 The 74.1 % figure is easy to misread as "this tool is 74 % broken". It is not,
 and the honest way to state the tool's scope is narrower than that:
 
-- **What it claims:** that 72 named facts are verified against pinned values and
+- **What it claims:** that 81 named facts are verified against pinned values and
   38 traps are independently re-derived, and that all of it refuses to pass if
   the instrument, the ledger, or a pinned value moves. That claim is measured,
   and this report is a measurement *against* it.

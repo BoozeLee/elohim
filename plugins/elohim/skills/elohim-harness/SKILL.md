@@ -25,7 +25,7 @@ same 18 KB, and a fix to the gate then reaches some consumers and not others.
 python3 scripts/harness_run.py --skill-dir ../elohim
 python3 scripts/harness_run.py --skill-dir ../elohim --json
 python3 scripts/harness_run.py --all
-python3 scripts/harness_run.py --all --json --fail-under 72
+python3 scripts/harness_run.py --all --json --fail-under 81
 ```
 
 | flag | effect |

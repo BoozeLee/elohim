@@ -51,7 +51,7 @@ each one is now a check that runs on every invocation, forever.
 | `tolerance-prover` | how tight Pisot's bound of 2 really is, and route dependence | 23 | 7 | 33152 B, `2182c01c…` |
 | `reproducibility` | which interpreter classes reproduce each sibling's shard, and the one that splits | 6 | 7 | 12380 B, `ca222ba4…` |
 
-72 pinned facts, 38 independent trap re-derivations, 6 instrument pins. Every
+81 pinned facts, 38 independent trap re-derivations, 6 instrument pins. Every
 number in that table is measured by running that skill's gate, not typed in by
 hand. Full derivations with residuals live in each skill's `references/`.
 
