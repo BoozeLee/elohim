@@ -1,0 +1,39 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "elohim"
+version = "0.1.0"
+description = "A gate for numerical claims: every published number pinned to a checksum, instrument tampering caught before a result is trusted."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+keywords = ["evaluation", "verification", "reproducibility", "claims", "gate"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Topic :: Scientific/Engineering",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+
+[project.scripts]
+elohim = "elohim_gate.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/BoozeLee/elohim"
+Source = "https://github.com/BoozeLee/elohim"
+Issues = "https://github.com/BoozeLee/elohim/issues"
+
+[tool.hatch.build.targets.wheel]
+packages = ["elohim_gate"]
+
+# The instruments and their ledger.json files ship as package data. The gate
+# resolves everything from Path(__file__), so the installed copy runs anywhere.
+[tool.hatch.build.targets.wheel.force-include]
+"skills" = "elohim_gate/_skills"
+"adapters" = "elohim_gate/_adapters"
+"plugins" = "elohim_gate/_plugins"

@@ -23,6 +23,53 @@ The first job of this plan is to make that claim true or to delete it.
 | followers | 11 | `gh api /users/BoozeLee` | none |
 | sponsors endpoint | HTTP 404 | `gh api /users/BoozeLee/sponsors` | the README's Sponsor button is a dead link because of this |
 | indexed on skills.sh | **no** | see below | the first probe returned HTTP 200 and was wrong; see the method |
+| wheel builds | yes, sdist + `py3-none-any` | `uv build`, re-measured 2026-10-02 | none; the build fails loudly on a malformed `pyproject.toml` |
+| wheel runtime dependencies | **0** | `pyproject.toml` declares none | none; `check_hygiene.py` enforces stdlib-only imports in the instruments regardless |
+| wheel carries the ledgers | 62 `_skills/` entries, 12 `ledger.json` | `unzip -l` the built wheel, 2026-10-02 | a packaging rule could drop them; the count is the check |
+| installed gate agrees with the repo gate | `ALL_SKILLS_PASS`, 81/81 facts, 38/38 traps, 0 unbound, exit 0 | `.venv/bin/elohim --all` run from `/tmp`, outside the repo, 2026-10-02 | none; this is the claim that would break first if the wheel shipped different code |
+| on PyPI | **no** | never published | `pip install elohim` resolves nothing today; treat it as unproven, not as working |
+
+Rows dated 2026-09-30 are measured as the header says. The five wheel rows were
+measured on **2026-10-02**, later than this file's header date, and each names
+that date rather than borrowing the older one.
+
+### The wheel is a real channel, and a narrower one than an index
+
+`pyproject.toml` builds this repository's `skills/` tree as a Python wheel with
+an `elohim` console script. The console script does not reimplement the runner;
+it delegates to the installed copy of `harness_run.py` via `runpy`, so
+`elohim --all` and `python3 tests/test_all.py` execute byte-identical instrument
+code. That equivalence is the point worth stating, because it is what makes an
+installed copy trustworthy rather than merely importable.
+
+What was verified, on 2026-10-02:
+
+```
+uv build                                   -> elohim-0.1.0.tar.gz + elohim-0.1.0-py3-none-any.whl
+pip install . (clean venv, from a clone)   -> exit 0, .venv/bin/elohim present
+elohim --all   (run from /tmp, not the repo) -> ALL_SKILLS_PASS, exit 0
+                                                 facts 81/81, traps 38/38,
+                                                 hygiene 0, claims 0 unbound
+```
+
+What was **not** verified, and must not be written down as if it were:
+
+- **Nothing is published to PyPI.** `pip install elohim` fails today. The
+  verified paths are `pip install .` from a clone and `pip install` of a
+  locally built wheel. An index name is not a distribution channel.
+- **No install has been performed by anyone but this machine.** There is no
+  download count, no first-install report, and no independent confirmation that
+  a stranger's `pip install .` works. One machine's clean venv is the whole of
+  the evidence.
+- **The wheel is not indexed anywhere**, so it cannot be discovered. It is
+  reachable only by a URL or a clone. That is strictly narrower than skills.sh
+  reach would be, and it is the same category of thing as the unindexed README
+  claim above.
+
+The `elohim --help` usage line prints `harness_run.py` rather than `elohim`,
+because the delegate hands `sys.argv[0]` to the runner. It is cosmetic, but it
+is a real wart in a shipped interface and belongs in the record rather than in
+a silent fix.
 
 ### The skills.sh measurement, and the trap in it
 
@@ -179,6 +226,15 @@ a working install:
    repo**, following only the README's instructions. If that fails, the README
    is the bug. The install path is the one surface a stranger will touch first,
    and it is the one that has never been tested by a stranger.
+4. **Decide the wheel's fate, and write the decision down before acting on it.**
+   The wheel is verified working from a clone (see above) but published to
+   nothing, so it currently reaches nobody who has not already found the repo.
+   Publishing to PyPI is a one-way door: the name is then taken, the README's
+   "not on PyPI yet" note becomes false and must be rewritten, and every later
+   release inherits the first one's reputation. That is a decision about a
+   permanent public name, not a packaging task, so it does not happen as a side
+   effect of this file existing. If it is done: trusted publishing via GitHub
+   Actions, so no long-lived API token has to exist anywhere.
 
 **Kill criterion (Week 3):** if after this phase a stranger still cannot install
 the skills by following the README, stop building distribution features and fix
@@ -191,6 +247,11 @@ analytics, no Notion, no Zapier. The measurement is installs and one number:
 
 - Week 3 target: the repository appears in a public index.
 - Week 4 target: at least one install by someone who is not the author.
+
+"By someone who is not the author" is not satisfied by this machine's clean
+venv. A local `pip install .` proves the packaging works; it says nothing about
+whether a stranger would find the thing or trust it enough to try. Those are
+two different measurements and only the second one is on the line above.
 
 Then, and only then, the money step, which is **last on purpose**:
 

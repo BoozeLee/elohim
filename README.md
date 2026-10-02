@@ -74,9 +74,11 @@ instrument and no ledger of its own, so it is not one of the six.
   part of the assertion. This repo shipped one ledger whose prose asserted the
   opposite of the numbers it was pinned to, and every gate stayed green, which
   is exactly why the rule is written down here.
-- It does not touch the network, install anything, or depend on a package. The
-  hygiene lint enforces standard-library imports only, plus a tokenizer check for
-  identifiers a shell sanitizer can rewrite.
+- It does not touch the network or depend on a package. The hygiene lint enforces
+  standard-library imports only, plus a tokenizer check for identifiers a shell
+  sanitizer can rewrite. The published wheel declares no runtime dependencies
+  either, so `pip install` moves code and never resolves a package the gate could
+  have been tampered with.
 
 ## Install
 
@@ -94,6 +96,34 @@ instrument and no ledger of its own, so it is not one of the six.
 
 `install.sh` copies the skill, then runs the **installed copy's own gate** and
 fails the install if that gate does not pass. Nothing is trusted on the way in.
+
+To run the gate as a command instead of installing a skill, install the package
+from a clone:
+
+```bash
+python3 -m pip install .
+elohim --all
+```
+
+The wheel ships this repository's own `skills/` tree and the console script
+delegates to the installed copy of `harness_run.py`, so `elohim --all` and
+`python3 tests/test_all.py` run the same instrument code. The only flags are the
+runner's own:
+
+| flag | effect |
+|---|---|
+| `--all` | every gated skill, one verdict |
+| `--skill-dir PATH` | run one skill directory |
+| `--json` | machine-readable output |
+| `--discover` | scan for unbound claims |
+| `--promote ID:PATH[:TOL]` | move a backlog measurement into the ledger |
+| `--list-backlog` | what is waiting for a human |
+| `--fail-under N` | exit non-zero below N |
+| `--max-seconds N` | budget the run |
+
+**elohim is not on PyPI yet.** `pip install .` and `pip install` of a locally
+built wheel are the only verified paths; treat `pip install elohim` as unproven
+until a release exists and the index is measured.
 
 ## Verify
 
@@ -222,7 +252,9 @@ Ask for a verdict, not a number:
 MIT. One repository, one canonical `skills/` tree, byte-identical copies per
 agent adapter. Install them with `./install.sh` from a clone, or through the
 plugin marketplaces declared here: `.agents/plugins/` for Codex and
-`.claude-plugin/` for Claude Code.
+`.claude-plugin/` for Claude Code. Separately, `pyproject.toml` builds the same
+tree as a wheel with an `elohim` console script, verified from a clone; it is
+not published to any index yet.
 
 These skills are **not yet listed in the public agent-skill indexes.** An
 earlier version of this file claimed they were, which was a claim nobody had
