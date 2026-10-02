@@ -89,8 +89,12 @@ the file.
 **3. The mutation harness is the missing instrument.** There was no way, at the
 time this was written, to ask "how much gets past the gate?" The answer was
 asserted in prose and had never been measured. It has since been measured
-exhaustively: **66 of 1,679 sites (3.93 %) pass the full gate with the seal
-forged**, and 0 of those 66 are fact-bound and outside declared tolerance. Both
+exhaustively: **63 of 1,679 sites (3.75 %) pass the full gate with the seal
+forged**, and 0 of those 63 are fact-bound and outside declared tolerance. That
+figure was 66 of 1,679 (3.93 %) when first measured at 12:55; the gap shrank
+because `114f660` added two facts pinning the continued-fraction leaves that
+three of those mutations moved, and the instrument did not change.
+Both
 earlier figures are retracted — "0 of 200" was not reproducible from this
 repository, and the 0.5 % "apparent survivor" was an artefact of the harness
 killing the child process before the gate could report, so the timeout caveat
