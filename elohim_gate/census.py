@@ -72,7 +72,7 @@ def shard_of(skill_dir: Path) -> str | None:
 def pristine_shard(skill: str, budget: int) -> tuple[str | None, str | None]:
     with tempfile.TemporaryDirectory(prefix="a2-base-") as tmp:
         work = Path(tmp) / "elohim"
-        shutil.copytree(M.REPO / "skills", work / "skills",
+        shutil.copytree(M.skills_root(), work / "skills",
                         ignore=shutil.ignore_patterns("out", "__pycache__"))
         payload = M.run_gate(work, skill, budget)
         text = shard_of(work / "skills" / skill)
@@ -91,7 +91,7 @@ def one(job: dict) -> dict:
            "site": job["site"]}
     with tempfile.TemporaryDirectory(prefix="a2-census-") as tmp:
         work = Path(tmp) / "elohim"
-        shutil.copytree(M.REPO / "skills", work / "skills",
+        shutil.copytree(M.skills_root(), work / "skills",
                         ignore=shutil.ignore_patterns("out", "__pycache__"))
         skill_dir = work / "skills" / skill
         src = M.instrument_path(skill_dir)
@@ -159,8 +159,9 @@ def build_population(skills: list[str]) -> tuple[list[dict], dict]:
     jobs: list[dict] = []
     population: dict = {}
     for skill in skills:
-        led = json.loads((M.REPO / "skills" / skill / "ledger.json").read_text())
-        src = (M.REPO / "skills" / skill / led["instrument"]["path"]).read_text()
+        root = M.skills_root()
+        led = json.loads((root / skill / "ledger.json").read_text())
+        src = (root / skill / led["instrument"]["path"]).read_text()
         enum = S.enumerate_sites(src)
         population[skill] = {op: len(rows) for op, rows in sorted(enum.items())}
         for op, rows in sorted(enum.items()):

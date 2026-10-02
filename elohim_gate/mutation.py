@@ -50,9 +50,69 @@ from typing import Any, Callable, NamedTuple, TypedDict
 # Derived from this file so the tool runs against whichever checkout holds it.
 # The previous default was an absolute path into one contributor's home
 # directory, which made every other clone measure the wrong repository.
-REPO = Path(os.environ.get("ELOHIM_REPO",
-                           str(Path(__file__).resolve().parent.parent)))
-HARNESS = REPO / "skills" / "elohim-harness" / "scripts" / "harness_run.py"
+_PKG_ROOT = Path(__file__).resolve().parent
+REPO = Path(os.environ.get("ELOHIM_REPO", str(_PKG_ROOT.parent)))
+
+
+def skills_root() -> Path:
+    """The directory holding the six instrument skills, in this installation.
+
+    Two layouts are real and neither is a defect. A wheel gets skills/ copied to
+    elohim_gate/_skills/ by the build backend; the packaged copy is inside the
+    package rather than at the top level because a top-level skills/ in
+    site-packages would shadow any other distribution shipping the same name. A
+    source checkout has no _skills/ directory at all: force-include is a build
+    step, so the mapping only ever exists inside a built artifact. Rather than
+    declare either layout unsupported, try packaged first and otherwise walk up
+    from this file to the checkout that owns it.
+
+    ELOHIM_REPO still wins outright, because a caller that names a checkout has
+    said which tree it means, and quietly falling back would measure something
+    other than what it asked for.
+
+    This exists because seven reads of REPO / "skills" and one HARNESS constant
+    were written against a layout that only exists in a checkout. Installed from
+    a wheel they resolved to site-packages/skills, which does not exist, and
+    census.run_census raised FileNotFoundError from inside shutil.copytree --
+    naming a directory the caller had never heard of, one level below the
+    package data that was sitting there the whole time. Refusing here instead
+    means the message can name every candidate actually tried.
+    """
+    override = os.environ.get("ELOHIM_REPO")
+    if override is not None:
+        named = Path(override) / "skills"
+        if named.is_dir():
+            return named
+        raise FileNotFoundError(
+            f"ELOHIM_REPO={override} names no skills tree at {named}; refusing to "
+            "measure a different tree than the one that was asked for")
+    packaged = _PKG_ROOT / "_skills"
+    if packaged.is_dir():
+        return packaged
+    for parent in _PKG_ROOT.parents:
+        candidate = parent / "skills"
+        if candidate.is_dir():
+            return candidate
+    tried = [packaged, *(p / "skills" for p in _PKG_ROOT.parents)]
+    raise FileNotFoundError(
+        "elohim: instrument skills not found; looked for "
+        + ", ".join(str(p) for p in tried))
+
+
+def harness_path() -> Path:
+    """The instrument runner inside whichever skills tree this installation has.
+
+    Checked here rather than left to the subprocess, because a missing runner
+    otherwise surfaces as an opaque "can't open file" from a child process
+    several frames away from the resolution that failed.
+    """
+    root = skills_root()
+    path = root / "elohim-harness" / "scripts" / "harness_run.py"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"elohim: instrument runner missing at {path}; the skills tree at "
+            f"{root} does not contain elohim-harness/scripts/harness_run.py")
+    return path
 
 INSTRUMENTED = ["elohim", "estimator-bias", "invariant-hunter",
                 "precision-budget", "reproducibility", "tolerance-prover"]
@@ -170,7 +230,7 @@ def run_gate(work: Path, skill: str, budget: int) -> dict:
     skill_dir = work / "skills" / skill
     try:
         proc = subprocess.run(
-            [sys.executable, str(HARNESS), "--skill-dir", str(skill_dir),
+            [sys.executable, str(harness_path()), "--skill-dir", str(skill_dir),
              "--max-seconds", str(budget), "--json"],
             capture_output=True, text=True, timeout=budget + OUTER_MARGIN, check=False,
         )
@@ -231,7 +291,7 @@ def one_mutation(job: dict) -> dict:
     }
     with tempfile.TemporaryDirectory(prefix="a2-") as tmp:
         work = Path(tmp) / "elohim"
-        shutil.copytree(REPO / "skills", work / "skills",
+        shutil.copytree(skills_root(), work / "skills",
                         ignore=shutil.ignore_patterns("out", "__pycache__"))
         skill_dir = work / "skills" / skill
         src_path = instrument_path(skill_dir)
@@ -275,8 +335,9 @@ def count_sites(skill: str, operator: str | None = None) -> int:
     """
     key = (skill, operator or "*")
     if key not in _SITE_CACHE:
-        led = json.loads((REPO / "skills" / skill / "ledger.json").read_text())
-        src = (REPO / "skills" / skill / led["instrument"]["path"]).read_text()
+        root = skills_root()
+        led = json.loads((root / skill / "ledger.json").read_text())
+        src = (root / skill / led["instrument"]["path"]).read_text()
         found = S.enumerate_sites(src)
         if operator is None:
             _SITE_CACHE[key] = sum(len(rows) for rows in found.values())
