@@ -360,14 +360,10 @@ the API cannot do it. Then `FUNDING.yml` becomes live and the claim in
 `isPrerelease: false`, and both that URL and `tree/v0.1.0` return HTTP 200. The
 `[0.1.0]` link definition in `CHANGELOG.md` line 116 points at that exact URL,
 so the 404 this item exists to fix is gone. The original instruction, to tag
-<<<<<<< 01d45da
 `7dd8915`, was followable, and its being unfollowed is not why the tag moved:
 `git merge-base --is-ancestor 7dd8915 main` succeeds, and that tree holds 5
 ledger-backed skills, 66 facts and 31 traps — exactly what the `[0.1.0]` body
 describes. What actually forced the move was the tag's own position, below.
-=======
-`7dd8915`, was unfollowable: that commit is off the branch since a rebase.
->>>>>>> 86c82cb
 
 The tag did not simply need pushing. Its annotation was a **measurement with no
 referent**: it quoted 72 facts across 7 skills, 52 pinned values, 57 mirror files
@@ -377,17 +373,10 @@ tree and its parent, and "7 skills" counts the shared harness, which has no
 ledger and so contributes no facts. It was withdrawn and rewritten rather than
 reconciled, because a figure that names no tree cannot be made true by picking a
 different tree.
-<<<<<<< 01d45da
 **Did:** move the tag to `6231e88`, push it, publish the release, and confirm the
 link resolves. It was not publishable where it pointed. It dereferenced to
 `f95f96e`, and `git log --diff-filter=A -- skills/reproducibility/SKILL.md`
 returns exactly `f95f96e`: that was the very commit that introduced
-=======
-**Do:** move the tag to `6231e88`, push it, publish the release, and confirm the
-link resolves. **Do not publish `v0.1.0` where it points.** The tag dereferences
-to `f95f96e`, and `git log --diff-filter=A -- skills/reproducibility/SKILL.md`
-returns exactly `f95f96e`: the tagged commit is the very commit that introduced
->>>>>>> 86c82cb
 the sixth instrumented skill. The `[0.1.0]` body inside that commit reads "Five
 ledger-backed skills on one shared harness, 66 pinned facts and 31 independently
 re-derived traps", so the tag and its own release note disagree on the first
@@ -511,21 +500,12 @@ is shipped: `--all`, `--fail-under` and a versioned `schema` key, with the clean
 case delegating to it instead of looping six per-skill invocations that proved
 nothing about the aggregate.
 
-<<<<<<< 01d45da
-What is left is four items: `D2`, `A2`, `C2` and `C3`. Three of them are
-=======
-What is left is five items: `D2`, `D3`, `A2`, `C2` and `C3`. Three of them are
->>>>>>> 86c82cb
+What is left is two items: `D2` and `A2`. One of them is
 code. An earlier draft of this paragraph said "three items and none of them is
 code" and then described five, two of which it called real work in the same
 breath — a count in prose that the paragraph itself contradicted, in the
 document that orders every item below it. `D2` needs a human in a browser with a
-<<<<<<< 01d45da
 2FA code and cannot be automated at all.
-=======
-2FA code and cannot be automated at all. `D3` is a push and a release page, and
-the release page needs a person to confirm it renders.
->>>>>>> 86c82cb
 
 The order after D1 is `A2`, and it changed from the order this file used to give.
 That earlier order was `C2` then `C3`, on the grounds that the cheapest way to
@@ -550,9 +530,11 @@ kill criterion reasons from cannot be reproduced from this repository — the
 saturation question is currently unanswerable, not answered. Building the tool
 first would have produced a working runner guarding a question nobody has asked.
 
-`C2` and `C3` are still worth doing, and they are now the weaker pair of the
-three. Both extend `C1`, which already gates every claim against every pinned
-value on every run. What they add is a promotion path, and the value of a
-promotion path is proportional to how often facts get promoted. At 81 facts with
-no growth, that number is near zero. That is a weaker position than "the author
-remembers", and it is a measurable one.
+`C2` and `C3` were the weaker pair of the three, and both are now shipped: the
+promotion command refuses an id whose value cannot carry it, and a promotion
+re-runs the instrument rather than trusting the backlog. Both extend `C1`, which
+already gates every claim against every pinned value on every run. What they add
+is a promotion path, and the value of a promotion path is proportional to how
+often facts get promoted. At 81 facts with no growth, that number is near zero.
+That is a weaker position than "the author remembers", and it is a measurable
+one.
