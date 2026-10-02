@@ -1,9 +1,9 @@
 # Mutation survival, measured
 
-**Status: A2 measured, and cross-checked against a second independent harness
-whose source is not yet committed — see the caveat under "Reproducing this".
-A prior claim, that 0 of 200 mutations survived, was false and is retracted
-below.**
+**Status: A2 measured, and cross-checked against a second independent harness,
+`tools/mutation_survival.py`, which is committed to this repository — see the
+caveat under "Reproducing this". A prior claim, that 0 of 200 mutations
+survived, was false and is retracted below.**
 
 **Date of measurement:** 2026-10-02.
 **Instrument under test:** the six instrumented skills at tag `v0.1.0`
@@ -280,13 +280,15 @@ This report's harness mutates the **instrument**, regenerates the shard, and ask
 whether the **full gate** notices — facts and traps both.
 
 > **A caveat on the second source, stated because it would otherwise be a
-> dangling citation.** `tools/mutation_survival.py` is present in the working
-> tree but is **not committed**, so it is not in any clone of this repository. Its
-> row in the table below is a measurement *I* ran and recorded
+> dangling citation.** `tools/mutation_survival.py` was uncommitted when this
+> report was written; it has since been committed, so it is in every clone and
+> its row below is re-derivable rather than a claim about a file nobody else
+> has. The row records the run this report was written from
 > (`seed=20261002`, `n=400`, 522 leaves decided, `MUTATION-DID-NOT-LAND=0`,
-> `ERR=0`); it is not a number a reader can currently re-derive. Until that file
-> is committed, treat the 0.8046 as reported-not-reproducible and the 0.0393 —
-> whose method is fully specified above — as the load-bearing result.
+> `ERR=0`); it has not been re-run for this document, so treat the 0.8046 as
+> one recorded run of a committed tool rather than a figure two runs have
+> agreed on, and the 0.0393 — whose method is fully specified above — as the
+> load-bearing result.
 
 Cross-checked on the same shards, seed 20261002, 522 forged leaves decided:
 
@@ -316,9 +318,9 @@ The harness for this report (`mutate.py`, `sites.py`, `census.py`, `deltas.py`,
 `binding.py`) still lives outside this tree, uses only the standard library,
 never writes to the source repository — each mutation runs in a private
 `tempfile.TemporaryDirectory` copy — and takes `--seed`, `--sample`, `--jobs`,
-`--budget` and `--out`. `tools/mutation_survival.py` is runnable in this working
-tree but, as noted above, is uncommitted; it answers the trap question, so
-promoting this harness to `tools/mutate.py` is still outstanding.
+`--budget` and `--out`. `tools/mutation_survival.py` is committed and runnable;
+it answers the trap question, so promoting this harness to `tools/mutate.py` is
+still outstanding.
 
 ## What this repository claims, stated as a boundary
 

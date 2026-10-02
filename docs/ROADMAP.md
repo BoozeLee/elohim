@@ -127,11 +127,15 @@ building**: run N=200 and N=2000, commit the report, and let the kill criterion
 below decide whether the mutator ever becomes `tools/mutate.py` or earns CI at
 N=20 per skill on a schedule. The original wording of this item was "promote
 `mutate.py` from a scratch script to `tools/mutate.py`". **No `mutate.py` exists
-in this tree** — a filesystem search for `mutate*.py` returns nothing, so the
-mutator was never committed and this item is a from-scratch build. The 0-of-200
-baseline the kill criterion reasons from cannot be reproduced from this
-repository, which means the saturation question is unanswerable today rather than
-answered. That is why the measurement comes first.
+in this tree** — a filesystem search for `mutate*.py` returns nothing, and the
+harness that produced `docs/MUTATION_SURVIVAL.md` (`mutate.py`, `sites.py`,
+`census.py`, `deltas.py`, `binding.py`) still lives outside it, so as far as
+`tools/mutate.py` goes this item is a from-scratch build. Two things have
+changed since this item was written: a second and different mutator,
+`tools/mutation_survival.py`, **is** committed, and the 0-of-200 baseline the
+kill criterion reasoned from has been retracted outright. The saturation
+question is therefore answerable and answered — 66 of 1,679 sites, 3.93 % — and
+the kill criterion below does not fire. That is why the measurement came first.
 **Decided by:** the report is committed, and a regression in survival rate turns
 CI red.
 **Kill:** if the surviving rate is 0 at N=200 and stays 0 at N=2000, the
@@ -540,11 +544,16 @@ CI gate at all. This ordering was chosen deliberately against the item's own
 written sequence, and the reason is recorded because it will look wrong later.
 
 One measured fact changed that decision. `A2` describes promoting `mutate.py`
-from a scratch script. **No `mutate.py` exists in this tree.** The mutator was
-never committed, so `A2` is a from-scratch build, and the 0-of-200 baseline its
-kill criterion reasons from cannot be reproduced from this repository — the
-saturation question is currently unanswerable, not answered. Building the tool
-first would have produced a working runner guarding a question nobody has asked.
+from a scratch script. **No `mutate.py` exists in this tree**, and the mutator
+that produced the roadmap's own numbers still lives outside it — only the
+separate trap-side `tools/mutation_survival.py` is committed — so `A2` remains
+a from-scratch build as far as `tools/mutate.py` goes. At the time of this
+decision the 0-of-200 baseline its kill criterion reasoned from could not be
+reproduced from this repository at all, which made the saturation question
+unanswerable rather than answered, and building the tool first would have
+produced a working runner guarding a question nobody had asked. That baseline
+is now retracted: `docs/MUTATION_SURVIVAL.md` puts the rate at 66 of 1,679
+(3.93 %), so the question is answered and the kill criterion does not fire.
 
 `C2` and `C3` were the weaker pair of the three, and both are now shipped: the
 promotion command refuses an id whose value cannot carry it, and a promotion
