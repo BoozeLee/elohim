@@ -28,6 +28,16 @@ Homepage = "https://github.com/BoozeLee/elohim"
 Source = "https://github.com/BoozeLee/elohim"
 Issues = "https://github.com/BoozeLee/elohim/issues"
 
+# Pinned, not ranged. A ranged pin is a measurement that changes when someone
+# else pushes, which is the failure this repository exists to catch. These are
+# the versions the tree was last checked against, recorded 2026-10-02.
+[dependency-groups]
+dev = [
+    "mypy==2.1.0",
+    "pytest==9.0.3",
+    "ruff==0.15.13",
+]
+
 [tool.hatch.build.targets.wheel]
 packages = ["elohim_gate"]
 
