@@ -89,7 +89,7 @@ jobs:
         if: always()
         run: |
           python3 - <<'PY'
-          import json, pathlib
+          import hashlib, json, pathlib
           p = pathlib.Path("census-report.json")
           if not p.exists():
               raise SystemExit("census-report.json is absent: the run died before it could write one")
@@ -139,14 +139,53 @@ jobs:
                   f"and that should turn the nightly red until a human looks, because a "
                   f"changed population is a fact a human owes a reading.")
 
+          # The three checks above prove the census ENUMERATED everything. None
+          # of them can see which sites it then concluded survive. A stale
+          # import, a module shadowed by sys.path[0], or a classification that
+          # moved produces a full, complete, entirely plausible report about the
+          # wrong sites -- which is the one failure this repository has already
+          # shipped, in a different costume: a gate that measures nothing at all
+          # and reports success.
+          #
+          # So the survivors are pinned by IDENTITY, not by count. Counting is
+          # not enough: 63 survivors is equally consistent with the right 63 and
+          # with 63 different ones. site_index identifies a site and survives
+          # being moved between files; lineno deliberately does not enter the
+          # digest, because it moves whenever an unrelated edit shifts a line,
+          # and a pin that fires on unrelated edits is a pin that gets ignored.
+          EXPECTED_ROWS_DIGEST = "9f26bde149ed0526"
+          EXPECTED_EFFECTIVE = 63
+          EXPECTED_DEFECT_ARM_N = 1598
+
+          rows = [r for r in d["rows"] if r.get("arm") == "forged" and r.get("outcome") == "EFFECTIVE"]
+          ident = sorted((r["operator"], r["skill"], r["site_index"]) for r in rows)
+          digest = hashlib.sha256(
+              "\n".join("|".join(map(str, i)) for i in ident).encode()
+          ).hexdigest()[:16]
+          if digest != EXPECTED_ROWS_DIGEST:
+              raise SystemExit(
+                  f"the {len(rows)} surviving sites are not the recorded ones: digest "
+                  f"{digest}, expected {EXPECTED_ROWS_DIGEST}. Every number above was "
+                  f"measured, the population was covered, and the report is well "
+                  f"formed -- it is about the wrong sites. The recorded survivors are "
+                  f"in docs/MUTATION_SURVIVAL.md; pinning another fact legitimately "
+                  f"removes one, and that should turn the nightly red until a human "
+                  f"confirms it, exactly as changing the population does.")
+          if t["defect_arm"]["effective"] != EXPECTED_EFFECTIVE or t["defect_arm"]["n"] != EXPECTED_DEFECT_ARM_N:
+              raise SystemExit(
+                  f"the gated rate is {t['rate_measured']} over "
+                  f"{t['defect_arm']['effective']}/{t['defect_arm']['n']}, not the "
+                  f"recorded {EXPECTED_EFFECTIVE}/{EXPECTED_DEFECT_ARM_N}, even though "
+                  f"the surviving sites matched. The rate and the sites are pinned "
+                  f"separately because they can move apart.")
+
           print(f"population {cov['population_sites']}, attempted {cov['forged_sites_attempted']}")
           print(f"GATED defect-arm rate {t['rate_measured']} "
                 f"({t['defect_arm']['effective']}/{t['defect_arm']['n']}) against threshold {t['fail_over']}")
           print(f"not gated: forged rate including inert {t['forged_including_inert']} "
                 f"-- {t['basis']}")
           print(f"equivalent {s['forged']['EQUIVALENT']} of {s['forged']['n']} -- no gate can catch these")
-          rows = [r for r in d["rows"] if r.get("arm") == "forged" and r.get("outcome") == "EFFECTIVE"]
-          print(f"effective survivors {len(rows)}")
+          print(f"effective survivors {len(rows)} -- digest {digest}, the recorded ones")
           for r in rows:
               print(f"  {r['operator']} {r['skill']} site {r['site_index']} (line {r['lineno']})")
           PY
