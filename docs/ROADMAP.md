@@ -642,8 +642,20 @@ count.
 
 **Decided by:** `run_census` and `gate_verdict` are called, not parsed for, by
 something that did not write them; `mutation.py` has the same three shapes; the
-wheel exposes both. **Two of the three now hold.** The third does not: the only
-callers are in `tests/`, which this author wrote.
+wheel exposes both. **The second and third hold; the first does not** — the only
+callers are in `tests/`, which this author wrote. Only `E3`, `E4`, or a real
+external caller closes that clause.
+
+The third clause was false until `0647cee`, and this paragraph was wrong about
+which one had failed. `pyproject.toml` claimed the installed copy ran anywhere
+because the gate "resolves everything from `Path(__file__)`". That was true of the
+console script and false of the API: eight sites read the skills tree off `REPO`,
+which in a wheel *is* `site-packages`, so installing the package and then importing
+the library raised `FileNotFoundError` on a path the caller had never heard of. One
+resolver, `skills_root()`, now serves every call site, and
+`tools/verify_wheel.py` builds the real artifact, installs it into a clean venv, and
+calls the library from outside the checkout. The clause moved because that gate
+passes, not because this file says so.
 
 ### E2. Bootstrap the ledger
 **Why:** a judgment consult was asked what stands between this tool and a caller
@@ -906,9 +918,12 @@ below is the one to argue with.
 
 **`v0.1.0`'s tag no longer points at this history.** The 2026-10-02 re-sign
 rewrote all 53 commits onto verified email addresses so GitHub would badge them,
-which necessarily produced new commit objects. The tag still resolves to
+which necessarily produced new commit objects. The tag still points at
 `6231e88`, a commit that is no longer an ancestor of `main`; its rewritten
-equivalent is `afb61a3`. The release itself is not broken — release `400397224`
+equivalent is `afb61a3`. (`v0.1.0` is an annotated tag, so `git rev-parse v0.1.0`
+returns the tag object `69526efd`, not the commit; `git rev-parse 'v0.1.0^{commit}'`
+is the one that answers the question asked here.) The release itself is not broken —
+release `400397224`
 is still published and the old commit stays reachable through the tag — but a new
 version cannot honestly name its predecessor by commit. Moving the tag is refused
 by a GitHub ruleset (`GH013: Cannot update this protected ref`) that no API
@@ -916,11 +931,12 @@ endpoint exposes. **This needs a person in Settings → Rules.** Until it is
 resolved, `v0.2.0` either ships without a resolvable predecessor or ships
 against a tag that points into a rewritten history.
 
-**45 commits are unreleased against 9 changelog bullets.** `git rev-list --count
-afb61a3..main` was 45 when this section was written on 2026-10-03, and it grows
-with every commit — re-measure it rather than trusting the number here. It
+**54 commits are unreleased against 9 changelog bullets.** `git rev-list --count
+afb61a3..main` was 54 when this section was last measured on 2026-10-03, and it
+grows with every commit — re-measure it rather than trusting the number here. It
 already closes nine roadmap items (`A2`, `A3`, `B1`, `B2`, `C2`, `C3`, `D1`,
-`V1`, `E1`). The `[Unreleased]` section holds 9 bullets. The changelog has not
+`V1`, and both `E1` slices — whose third clause is still open, see `E2`). The
+`[Unreleased]` section holds 9 bullets. The changelog has not
 been kept up with the tree, and this project is unusually well placed to notice
 that and unusually bad at noticing it, because the whole argument is that a
 claim nobody re-derives is not a fact.
@@ -940,7 +956,7 @@ Each line is written as the condition that closes it, not as a task.
 | Item | Done when |
 |---|---|
 | The tag | `v0.1.0` points at `afb61a3`, or the decision to leave it orphaned is recorded in the changelog with the reason. |
-| `[Unreleased]` rewritten | Every one of the 45 commits is either a changelog entry or explicitly out of scope. |
+| `[Unreleased]` rewritten | Every unreleased commit is either a changelog entry or explicitly out of scope. |
 | The semver sentence | Corrected, as its own commit, because a changelog that denies its own version numbers is the same defect class this project exists to catch. |
 | `elohim_gate` recorded | The `tools/` → `elohim_gate/` move is in the changelog under Changed, with the breaking-ness stated. |
 | A changelog for the viewer | `BoozeLee/elohim-gate-viewer` shipped a report page and a Pages workflow with no CHANGELOG at all. A release with no release record is the failure mode, not the exception. |

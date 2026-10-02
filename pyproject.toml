@@ -42,7 +42,11 @@ dev = [
 packages = ["elohim_gate"]
 
 # The instruments and their ledger.json files ship as package data. The gate
-# resolves everything from Path(__file__), so the installed copy runs anywhere.
+# locates that tree with skills_root() -- the packaged copy first, then a checkout,
+# refusing loudly and naming every candidate -- so the installed copy runs anywhere.
+# tools/verify_wheel.py is the gate for that claim: it builds this artifact,
+# installs it into a clean venv, and calls the library from outside the checkout.
+# It used to be false for the API, which is what `pip install elohim` is for.
 [tool.hatch.build.targets.wheel.force-include]
 "skills" = "elohim_gate/_skills"
 "adapters" = "elohim_gate/_adapters"
