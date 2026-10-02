@@ -43,6 +43,82 @@ HARNESS_RELATIVE = Path("elohim-harness") / "scripts" / "harness_run.py"
 # instead of quietly comparing None to None and passing.
 EXPECTED_SCHEMA = "elohim.gate/1"
 
+# The full key set of every shape this version promises, so a consumer written
+# against it cannot be broken by a rename that no other gate would notice.
+#
+# Only the shapes the harness itself builds are listed. Traps, ``hygiene`` and
+# ``claim_binding`` are deliberately absent: trap keys belong to each skill's
+# author and the other two are a sub-suite's JSON passed through, so neither is
+# a set this repository can keep still. Traps are checked for the two keys a
+# counter may rely on instead, in trap_required_keys.
+#
+# Keyed by schema version, not read off the payload. An unknown version fails
+# with a message naming the bump, rather than being compared against a set
+# chosen by whatever the payload happened to contain today.
+SCHEMA_KEY_SETS: dict[str, dict[str, frozenset[str]]] = {
+    "elohim.gate/1": {
+        "aggregate": frozenset({
+            "schema", "run", "skills_root", "budget_seconds", "fail_under",
+            "skills", "summary", "verdict",
+        }),
+        # Identical for a measured skill and an unmeasured one. That equality is
+        # the contract: a renderer reads either without branching.
+        "skill": frozenset({
+            "schema", "skill", "run", "instrument", "instrument_source",
+            "instrument_pin", "verdict", "facts", "traps", "hygiene",
+            "claim_binding", "seal", "stdout_tail", "budget_seconds",
+            "runtime", "timed_out", "timed_out_phase", "instrument_error",
+        }),
+        "summary": frozenset({
+            "skills", "passed", "failed", "unlocated", "facts",
+            "facts_verified", "facts_drifted", "traps", "traps_holding",
+            "hygiene_findings", "unbound_claims", "timed_out",
+            "runtime_seconds", "verdict",
+        }),
+        "fact": frozenset({"id", "claim", "status", "detail", "residual"}),
+        "instrument_pin": frozenset({
+            "path", "source", "pinned", "expected_sha256", "actual_sha256",
+            "expected_bytes", "actual_bytes", "status", "detail",
+        }),
+    },
+}
+
+# The keys every trap must carry. The rest of a trap is its author's, and the
+# harness's own summary counts ``pass`` alone, so a consumer may too.
+#
+# This is a backstop, not the detector, and the distinction was measured rather
+# than assumed: every trap suite in the tree reads ``result["pass"]`` outside its
+# try block, so a trap missing the key crashes the suite and the harness already
+# fails closed on the exit code before this check is reached. It stays because
+# the promise it enforces is one contract.md now makes to a consumer, and a
+# documented promise with nothing behind it is what this repository exists to
+# stop shipping. A new skill whose suite used ``.get("pass")`` would reach it.
+trap_required_keys = frozenset({"pass", "measured"})
+
+# One key that ``summary`` carries only in the branch where the tree held no
+# gated skill at all. Named rather than allowed unconditionally: a summary that
+# grew ``error`` on a normal run would still fail, because a consumer reading it
+# would have no way to know whether the field meant "no skills" or "this run
+# broke".
+summary_conditional_keys = frozenset({"error"})
+
+
+def check_key_set(label: str, shape: str, obj: dict, sets: dict) -> list[str]:
+    """Every difference between obj's keys and the promised set, as sentences.
+
+    Returns the problems rather than printing them so the caller reports all of
+    them at once: a payload that renamed six keys would otherwise take six
+    editing rounds to find.
+    """
+    promised = sets[shape]
+    present = set(obj)
+    problems = []
+    for key in sorted(promised - present):
+        problems.append(f"{label} is missing promised key {key!r}")
+    for key in sorted(present - promised):
+        problems.append(f"{label} carries unpromised key {key!r}")
+    return problems
+
 # Appended as a comment, never as code: a tamper that breaks syntax is
 # rejected because the instrument will not run, which proves nothing about
 # the checksum.
@@ -286,6 +362,50 @@ def case_clean() -> bool:
             return False
         if payload.get("verdict") != "PASS":
             print(f"clean    FAIL  --all verdict {payload.get('verdict')!r}")
+            return False
+
+        # The key set, asserted rather than documented. contract.md now lists
+        # what a consumer may rely on, which means a rename has a second place
+        # to be made and one of them is a test that fails. The trap direction is
+        # the one that matters here: an unpromised key means the harness grew a
+        # field no consumer has agreed to, and a consumer that ignores it may be
+        # the only thing still reading the payload correctly.
+        sets = SCHEMA_KEY_SETS.get(payload.get("schema", ""))
+        if sets is None:
+            known = ", ".join(sorted(SCHEMA_KEY_SETS)) or "none"
+            print(f"clean    FAIL  schema {payload.get('schema')!r} has no promised "
+                  f"key set here; this file is written against {known}. Bump "
+                  f"EXPECTED_SCHEMA and add the version's key sets deliberately.")
+            return False
+        shape_problems = check_key_set("the aggregate", "aggregate", payload, sets)
+        for entry in payload.get("skills", []):
+            label = f"skill {entry.get('skill')!r}"
+            shape_problems += check_key_set(label, "skill", entry, sets)
+            shape_problems += check_key_set(
+                f"{label} instrument_pin", "instrument_pin",
+                entry.get("instrument_pin") or {}, sets)
+            for fact in entry.get("facts", []):
+                shape_problems += check_key_set(
+                    f"{label} fact {fact.get('id')!r}", "fact", fact, sets)
+            for trap in entry.get("traps", []):
+                absent = sorted(trap_required_keys - set(trap))
+                if absent:
+                    shape_problems.append(
+                        f"{label} trap {trap.get('id')!r} is missing {absent}")
+        if payload.get("skills"):
+            promised_summary = sets["summary"]
+            summary_absent = sorted(promised_summary - summary_conditional_keys - set(payload["summary"]))
+            shape_problems += [f"the aggregate summary is missing promised key {k!r}"
+                               for k in summary_absent]
+            shape_problems += [f"the aggregate summary carries unpromised key {k!r}"
+                               for k in sorted(set(payload["summary"]) - promised_summary)]
+        if shape_problems:
+            print(f"clean    FAIL  the payload shape does not match "
+                  f"{payload.get('schema')!r}:")
+            for problem in shape_problems[:12]:
+                print(f"  {problem}")
+            if len(shape_problems) > 12:
+                print(f"  ... and {len(shape_problems) - 12} more")
             return False
 
         # The aggregate's discovery and this file's must name the same skills.

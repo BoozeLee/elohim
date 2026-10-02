@@ -214,6 +214,76 @@ wants facts the gate actually re-measured this run.
 `--all` and `--skill-dir` are exclusive. `--all` already means the tree, and
 accepting both would leave the question of which one wins unanswered.
 
+## The single-skill payload
+
+An aggregate shows you that something is wrong. A consumer that renders one has
+to read an entry, so the entry is specified here in full rather than by the
+abbreviation above. These are the keys, for both a measured skill and one that
+could not be measured:
+
+| key | what it holds |
+|---|---|
+| `schema` | `elohim.gate/1`, carried so a lifted entry still says what it is |
+| `skill` | directory name |
+| `run` | ISO-8601 UTC, second resolution |
+| `instrument` | absolute path to the script that ran, or null |
+| `instrument_source` | `bundled`, `override`, `legacy`, or `missing` |
+| `instrument_pin` | see below |
+| `verdict` | `PASS` or `FAIL` |
+| `facts` | one outcome per ledger fact |
+| `traps` | one outcome per trap |
+| `hygiene` | the hygiene suite's own report |
+| `claim_binding` | the claim-binding suite's own report |
+| `seal` | the shard's seal, or null when nothing was measured |
+| `stdout_tail` | last 2000 bytes of instrument stdout |
+| `budget_seconds` | the per-skill budget this run was given |
+| `runtime` | seconds per phase, plus `total` |
+| `timed_out` | whether any phase hit the budget |
+| `timed_out_phase` | which one, or null |
+| `instrument_error` | why there is no shard, or null |
+
+The key set is identical whether or not the skill was measured, and that is the
+point of it: a renderer does not branch on which kind of payload it received. A
+skill whose instrument never ran is not an entry with empty lists. It is an
+entry with `verdict: FAIL`, `instrument_source: missing`, a pin whose `status`
+is `UNLOCATED`, and a `traps` value that is a failing report rather than a list
+of traps that trivially held — because "no traps ran" and "the traps passed" are
+the same JSON to anyone not checking.
+
+`instrument_pin` carries `path`, `source`, `pinned`, `expected_sha256`,
+`actual_sha256`, `expected_bytes`, `actual_bytes`, `status` and `detail`.
+`status` is `PASS`, `DRIFT`, `unpinned` or `UNLOCATED`.
+
+A fact outcome carries `id`, `claim`, `status`, `detail` and `residual`.
+`status` is `verified` or `drifted`, and `residual` is the measured distance
+from `expect`, so a consumer can show how close a hold is rather than only that
+it held.
+
+Three things in here are deliberately not specified as fixed key sets, because
+they are not fixed and pinning them would be a promise this harness cannot keep:
+
+- **Traps** are authored per skill. Every trap carries `pass` and `measured`,
+  and those two are what a counter may rely on — the harness's own summary
+  reads only `pass`. Beyond that the keys are the trap author's: `residual`,
+  `expected` and `why` appear where a trap has something to say, and a new trap
+  may carry neither.
+- **`hygiene` and `claim_binding`** are the sub-suites' own JSON passed through,
+  plus `ok`, `status`, `returncode` and `runtime_seconds`. Read the two fields
+  that mean a verdict, not the rest.
+- **`runtime`** is keyed by phase, and a phase that timed out is present with a
+  null value rather than absent.
+
+### Paths in this payload are not portable
+
+`skills_root`, `instrument` and `instrument_pin.path` are absolute paths on
+whatever machine ran the gate. They are for a human reading a report and for
+diffing two runs from one machine. A consumer must not key anything on them:
+the same checkout at a different path, a different user, or an installed copy in
+a virtualenv all produce different strings for the same tree. `skill` is the
+portable identity. Pin status travels with the payload precisely so that
+`pinned`/`status`/`expected_sha256` can be compared across machines without
+resolving a path at all.
+
 ## Overrides
 
 Each skill's instrument override is derived from its directory name:
