@@ -377,9 +377,9 @@ The 47 % of fact-bound leaves that slip the traps are still caught downstream by
 verification against `expect`. Only an unbound leaf is invisible to both halves
 of the gate — and those are what the 0.0375 consists of.
 
-The harness for this report is now **committed**: `tools/mutate.py`,
-`tools/sites.py` and `tools/census.py`. It uses only the standard library, never
-writes to the source repository — each mutation runs in a private
+The harness for this report is now **committed**: `elohim_gate/mutation.py`,
+`elohim_gate/sites.py` and `elohim_gate/census.py`. It uses only the standard
+library, never writes to the source repository — each mutation runs in a private
 `tempfile.TemporaryDirectory` copy — and takes `--seed`, `--sample`, `--jobs`,
 `--budget` and `--out`. `census.py` is the exhaustive entry point and reports real
 coverage (`1679/1679`); `mutate.py --sample N` is the sampled runner, and its own

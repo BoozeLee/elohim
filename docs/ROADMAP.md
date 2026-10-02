@@ -132,7 +132,8 @@ below decide whether the mutator ever becomes `tools/mutate.py` or earns CI at
 N=20 per skill on a schedule.
 
 **Status: the instrument is built and the measurement is committed; the CI half
-is not decided.** `tools/mutate.py`, `tools/census.py` and `tools/sites.py`
+is not decided.** `elohim_gate/mutation.py`, `elohim_gate/census.py` and
+`elohim_gate/sites.py`
 ship, stdlib-only, and `census.py` is the exhaustive entry point — it enumerates
 the population of (operator × site) pairs and mutates each one, whereas
 `mutate.py --sample N` is the sampled runner. The three files are promoted
@@ -598,7 +599,9 @@ order is fixed and the reasoning is recorded, because two of the four are the
 wrong order intuitively.
 
 ### E1. The measurement core, callable rather than runnable
-**Status: first slice shipped 2026-10-02 (`1c7c6c6`); one entry point of three done.**
+**Status: both slices shipped 2026-10-02 (`1c7c6c6`, `90f02a8`, and the
+relocation that moved all three into the package); every entry point is done and
+installed, and nothing outside this repository calls them yet.**
 
 **Why:** `census.py`'s `main()` parsed arguments, measured, and printed, so a
 caller who wanted a measurement had only a report file and a transcript to
@@ -623,14 +626,24 @@ wrote no report — every one of which is what a passing run looks like from the
 outside. It was caught only because a comparison step tried to read a file that
 did not exist. The generator now refuses to emit a file without that guard.
 
-**Not yet done:** `tools/mutate.py` has the same shape and has not been touched,
-so the two entry points still differ. A judgment consult placed the whole of
-Track E at **1.44 of 4** — between "a working first cut" and "done" — and refused
-the word "done" for this reason, not because the numbers were missing.
+**Now done:** `elohim_gate/mutation.py` was given the same three shapes, and the
+two entry points no longer differ. Neither carries its own copy of the exit
+policy any more: `mutation.verdict()` is the single home for it, and
+`census.gate_verdict()` only maps its own report shape and delegates. `Verdict` is
+one type, re-exported, so the two modules cannot drift apart through a type fork.
+A judgment consult put the risk at **2.96 of 4** — "could silently alter a
+reported survival rate while still publishing a plausible report" at 97 % of the
+mass — because that is the failure the repository had already shipped once, when
+`census.py` kept `return 0` for a release while the nightly died on "unrecognized
+arguments". Two guards were shipped before the move, because the move is only
+safe once silence is loud: the reporting step refuses a census that covered less
+ground than the last one, and it pins the 63 survivors **by identity**, not by
+count.
 
 **Decided by:** `run_census` and `gate_verdict` are called, not parsed for, by
-something that did not write them; `mutate.py` has the same three shapes; the
-wheel exposes both.
+something that did not write them; `mutation.py` has the same three shapes; the
+wheel exposes both. **Two of the three now hold.** The third does not: the only
+callers are in `tests/`, which this author wrote.
 
 ### E2. Bootstrap the ledger
 **Why:** a judgment consult was asked what stands between this tool and a caller
