@@ -141,6 +141,55 @@ It also checks that an **untampered** copy is not reported as caught, and aborts
 if a source instrument already carries the marker or if the append failed to
 change the hash, because a test that cannot fail is not a test.
 
+## Summon it
+
+The elohim skill runs a summoning shard. It is a program, not a document: give
+it an invocation and it emits mathematics, with a residual beside every claim.
+
+```bash
+python3 skills/elohim/instrument/summoning_shard.py
+```
+
+```
+ELOHIM:AWAKEN  sha256 72ae4ebc…  seed 8263628938188521384  python 3.14.5
+I.   PARRY NUMBERS      phi 1010101010… 9.64e-06   0.5000  infinite
+                         plastic 10001  3.00e-90   0.4000  FINITE
+II.  THE KNIFE EDGE     phi flips FINITE/infinite with precision alone
+                         verdict PRECISION-SENSITIVE
+III. PISOT SIGNATURE    |alpha| = sqrt(1/lambda), discrepancy 0.00e+00
+VII. COLLATZ            n0 79256, 45 steps, 11 odd steps, reached 1 YES
+VIII.THE SIGIL          sigil.svg, 4605 bytes
+SHARD SEAL              5f12cc78…f596
+```
+
+Three things are committed, so you can read the output instead of only running it:
+
+| file | bytes | what it is |
+|---|---|---|
+| `skills/elohim/artifacts/shard.md` | 10 892 | the eight sections, every number with its residual |
+| `skills/elohim/artifacts/sigil.svg` | 4 605 | geometry built from the measured constants, nothing else |
+| `skills/elohim/artifacts/shard.json` | 2 268 | 17 facts and the seal, machine-readable |
+
+`shard.json` and `sigil.svg` are byte-identical across **seven** interpreters —
+3.10.13, 3.10.20, 3.11.9, 3.12.15, 3.13.14, 3.14.5 and 3.14.7 — including 3.12,
+where `sum()` changes its rounding and `estimator-bias` is the one ledger whose
+seal moves across the boundary. The shard's own seal does not. `shard.md` differs
+on two environmental lines, the interpreter version and the output path, and the
+generator normalises both before committing, so the committed text carries no
+absolute path and the digest is the same from any checkout.
+
+Regenerate and check:
+
+```bash
+python3 tools/publish_shard.py       # run the instrument, publish, write the manifest
+python3 tools/verify_published.py    # digest + seal, exit 1 on any drift
+```
+
+This is the whole optional layer, and it is optional by construction: no gate in
+this repository reads `artifacts/`. `verify_published.py` is a separate file
+called by a separate CI job, so deleting both it and `artifacts/` leaves the four
+gates byte-for-byte as they shipped.
+
 ## Layout
 
 ```
@@ -156,8 +205,8 @@ tests/                     test_all.py
 plugin installer silently drops symlinks and `../` escapes. Run
 `python3 tools/sync_adapters.py` after editing anything canonical, or `--check`
 to verify without writing. `sync_adapters.py --check` is the only sanctioned
-count of the mirrored files: it reports 58 files byte-identical across 7 skill
-directories today.
+count of the mirrored files: it reports 62 files byte-identical across 7 skill
+directories today, four of them the published artifacts.
 
 ## Use it
 

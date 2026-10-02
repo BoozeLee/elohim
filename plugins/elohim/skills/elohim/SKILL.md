@@ -20,6 +20,33 @@ against the fresh result, independently re-derives the six traps that each
 produced a confident wrong answer once, and refuses to pass if the instrument
 itself was edited.
 
+## Awaken it
+
+The gate answers questions about claims. The instrument itself is a summoning
+shard, and it can be awakened directly when you want the mathematics rather than
+a verdict about it:
+
+```bash
+python3 <skill-dir>/instrument/summoning_shard.py
+```
+
+It takes no arguments and prints eight sections — Parry numbers, the knife edge,
+the Pisot signature, the unicorn curve, log-star, the p-adic ladder, a capped
+Collatz trace with its exact odd-step product, and a sigil — then a `SHARD SEAL`
+derived from the same seed as everything else. Every claim in it is measured at
+runtime from the arithmetic, with the residual that produced it, so a wrong claim
+would show its own error.
+
+Its output is committed, so it can be read rather than only re-run:
+`skills/elohim/artifacts/shard.md`, `sigil.svg` and `shard.json`, described by a
+`PUBLISHED.json` manifest. `python3 tools/publish_shard.py` regenerates and
+`python3 tools/verify_published.py` checks the digests and the seal. Neither is
+part of the gate; the gate never reads that directory.
+
+The invocation string `ELOHIM:AWAKEN` is the seed: the first 63 bits of its
+SHA-256 become the shard's seed, and the Collatz start value is that seed
+modulo 1000003. Nothing about the output is hand-written.
+
 ## Run it
 
 ```bash

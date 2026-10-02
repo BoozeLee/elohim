@@ -45,3 +45,22 @@ jobs:
 
       - name: claim sentences are bound to pinned values
         run: python3 skills/elohim-harness/scripts/claim_binding.py --root .
+
+  # A separate job, not a fifth step above. That is the whole point: Core CI
+  # cannot read skills/elohim/artifacts/, so deleting artifacts/ together with
+  # tools/verify_published.py leaves the four gates above byte-for-byte the
+  # four gates that shipped. Folding this in would have made the optionality a
+  # promise instead of a mechanism.
+  #
+  # continue-on-error is deliberately absent. An optional layer whose failures
+  # are tolerated is not optional, it is unmonitored.
+  published-shard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - name: the published shard matches its manifest
+        run: python3 tools/verify_published.py

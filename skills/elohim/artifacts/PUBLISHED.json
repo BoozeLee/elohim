@@ -1,0 +1,42 @@
+{
+  "schema": "elohim.published/1",
+  "why_this_exists": "The four gates measure the instrument. This measures the instrument's output. Deleting artifacts/ and this script leaves all four gates unchanged, which is the whole of the optionality claim.",
+  "instrument": "skills/elohim/instrument/summoning_shard.py",
+  "invocation": "ELOHIM:AWAKEN",
+  "seal": "5f12cc7825b595a0df7bf5b97ae471b0bda4d3408474890d2d63548e93ebf596",
+  "normalizer": {
+    "why": "shard.md records the interpreter that produced it and the absolute path of the directory it was written to. Both are properties of the machine, not of the arithmetic; every line between them is a measured quantity that must survive byte-for-byte.",
+    "steps": [
+      {
+        "pattern": "^python[ \\t]*:.*$",
+        "replacement": "python     : <interpreter>",
+        "why": "the version is which interpreter ran, not what it measured"
+      },
+      {
+        "pattern": "^wrote .*/(sigil\\.svg|shard\\.json|shard\\.md)  \\(([0-9]+) bytes\\)$",
+        "replacement": "wrote \\1  (\\2 bytes)",
+        "why": "the absolute output path is the checkout location; keeping the filename and the byte count keeps the line's content while dropping the part that is this machine's home directory"
+      }
+    ]
+  },
+  "files": [
+    {
+      "name": "shard.json",
+      "bytes": 2268,
+      "sha256": "50a79c91e17eed9451f7b9661d1b1b1a74e0434737baa5366392de2e88e8df08",
+      "normalised_at_publish": false
+    },
+    {
+      "name": "sigil.svg",
+      "bytes": 4605,
+      "sha256": "eed8cfa8eee19277e46252d5354687f496929ee37719341fc3774db2173de477",
+      "normalised_at_publish": false
+    },
+    {
+      "name": "shard.md",
+      "bytes": 10892,
+      "sha256": "36de23400f517193eddca3cd5d0033be975ec8d99bc7e78c15ae34f31e472048",
+      "normalised_at_publish": true
+    }
+  ]
+}
