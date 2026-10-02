@@ -235,22 +235,46 @@ correctly calls it nothing. Byte-equality is the weaker test and it overcounts.
 > instrument has saturated as a signal. Then it is a release gate, not a CI gate,
 > and it stops earning runner time.
 
-**The criterion does not fire.** The rate is 3.5 % at N=200 and 3.93 % across the
-whole population. The instrument has not saturated. It is still producing signal
+**The criterion does not fire.** The rate is 3.5 % at N=200 and 3.75 % across the
+whole population, recomputed from the committed tool on 2026-10-02. The
+instrument has not saturated. It is still producing signal
 that this repository's own standing table got wrong.
 
 The fate of the mutator follows from the criterion rather than from taste, as the
 item requires:
 
-- It **earns CI**, at the item's stated N=20 per skill on a schedule. That is
-  120 sites, roughly 35 s at 11 workers — affordable. The full 1,679-site census
+- It **qualifies for** CI, at the item's stated N=20 per skill on a schedule. That
+  is 120 sites, roughly 35 s at 11 workers — affordable. The full 1,679-site census
   is a release-grade measurement at 497 s and does not belong on every run.
-- The **decided-by is not yet met and this report does not meet it.** It
-  requires "the report is committed, and a regression in survival rate turns CI
-  red." The report can be committed. Nothing turns red: there is no `tools/`
-  mutator, so there is no CI job, so a regression in this rate is currently
-  invisible. Promoting the mutator is the remaining half of A2, and it is not
-  done here.
+  **Qualifies for is not granted.** The kill clause above is written only as a
+  retiring clause; it names no gating rate, so a non-zero rate is not an
+  affirmative grant and the rate to gate at is not this document's to invent.
+- The **decided-by is half met.** It requires "the report is committed, and a
+  regression in survival rate turns CI red." The report is committed. A CI job is
+  not, and cannot be yet: `tools/mutate.py` exits 1 whenever any fact-bound
+  survivor exists, and this tree has 63 of them, so wiring it today would make CI
+  permanently red. It takes `--fail-over RATE` to decide what rate is acceptable,
+  and no such rate has been decided. What did change is that a regression is now
+  *expressible* — before this commit the tool ended in an unconditional `return 0`
+  under the comment "a complete census must not read as a clean one", so it could
+  not fail at all.
+
+### Why the count moved from 66 to 63
+
+The earlier figure is not wrong; it is dated. The census first ran at 12:55 on
+2026-10-02 against a tree that reported 66 effective survivors. `114f660`, two
+hours later, added the `plastic_parry_digits` and `tribonacci_parry_digits` facts,
+which pin exactly the continued-fraction leaves that three mutations in
+`summoning_shard.py` move — `if frac < 1e-10:` at line 649 and `x = 1.0 / frac` at
+line 651. Those three rows moved `EFFECTIVE → CAUGHT` and nothing else did.
+
+The instrument did not change to produce that. `git log -- skills/elohim/instrument/summoning_shard.py`
+returns a single commit and its sha256 still equals the ledger pin
+`a920cdd5dd51f732129aa67b607cc59d9718a50aadb89c90ec397480c69cbd9b`. Both runs
+report the equivalent count at exactly 572, which is the evidence that they are
+the same instrument measured twice. **The gap shrank because the gate got
+stronger**, which is the outcome this measurement exists to produce: a survivor
+list is a to-do list for the ledger.
 
 ## What this does not show
 
@@ -287,15 +311,17 @@ whether the **full gate** notices — facts and traps both.
 > (`seed=20261002`, `n=400`, 522 leaves decided, `MUTATION-DID-NOT-LAND=0`,
 > `ERR=0`); it has not been re-run for this document, so treat the 0.8046 as
 > one recorded run of a committed tool rather than a figure two runs have
-> agreed on, and the 0.0393 — whose method is fully specified above — as the
-> load-bearing result.
+> agreed on, and the 0.0375 — whose method is fully specified above — as the
+> load-bearing result. That figure was 0.0393 when this table was first written;
+> it is 0.0375 now, and "Why the count moved from 66 to 63" above is the
+> reconciliation.
 
 Cross-checked on the same shards, seed 20261002, 522 forged leaves decided:
 
 | stratum | outcome | n | rate |
 |---|---|---|---|
 | traps only, seal forged | survived | 420 / 522 | **0.8046** |
-| full gate, seal forged (this report) | effective | 66 / 1679 sites | **0.0393** |
+| full gate, seal forged (this report) | effective | 63 / 1679 sites | **0.0375** |
 
 Joined per leaf, by whether any ledger fact path reaches it:
 
@@ -312,15 +338,32 @@ The 0.8046 and the 0.0393 are not in conflict, and the gap between them is the
 result: the trap-only harness has no fact check behind it, so it over-reports.
 The 47 % of fact-bound leaves that slip the traps are still caught downstream by
 verification against `expect`. Only an unbound leaf is invisible to both halves
-of the gate — and those are what the 0.0393 consists of.
+of the gate — and those are what the 0.0375 consists of.
 
-The harness for this report (`mutate.py`, `sites.py`, `census.py`, `deltas.py`,
-`binding.py`) still lives outside this tree, uses only the standard library,
-never writes to the source repository — each mutation runs in a private
+The harness for this report is now **committed**: `tools/mutate.py`,
+`tools/sites.py` and `tools/census.py`. It uses only the standard library, never
+writes to the source repository — each mutation runs in a private
 `tempfile.TemporaryDirectory` copy — and takes `--seed`, `--sample`, `--jobs`,
-`--budget` and `--out`. `tools/mutation_survival.py` is committed and runnable;
-it answers the trap question, so promoting this harness to `tools/mutate.py` is
-still outstanding.
+`--budget` and `--out`. `census.py` is the exhaustive entry point and reports real
+coverage (`1679/1679`); `mutate.py --sample N` is the sampled runner, and its own
+report now states that `sample` counts cells visited rather than sites mutated.
+`deltas.py` and `binding.py` were analysis scratch for writing this document and
+are not part of the measurement path, so they are not promoted.
+
+Three defects in the promoted code were fixed rather than carried across, and
+each is recorded because each one made a claim in this document untrue:
+
+- `count_sites()` returned **0 for every skill**, because it built an
+  `ast.NodeTransformer` and never visited the tree with it. Coverage was therefore
+  structurally incapable of being non-zero, and `plan()` hardcoded `"n_sites": 0`
+  to match.
+- `main()` ended in an **unconditional `return 0`**, so the tool could not fail on
+  a regression at all — the opposite of what this report needs.
+- `mutate.py` carried a **duplicate of the whole operator table** that `sites.py`
+  already owned, so it could enumerate one population and mutate another.
+
+`tools/mutation_survival.py` remains the trap-side half and is committed and
+runnable; it answers the trap question.
 
 ## What this repository claims, stated as a boundary
 

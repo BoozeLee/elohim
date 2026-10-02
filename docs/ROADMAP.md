@@ -31,7 +31,7 @@ Measured, not asserted:
 | instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** |
 | recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** |
 | instrument mutation sites enumerated exhaustively, seal forged | **1,679** |
-| mutations that passed the full gate | **66 of 1,679 (3.93 %)** |
+| mutations that passed the full gate | **63 of 1,679 (3.75 %)** |
 | survivors that were fact-bound and outside declared tolerance | **0** |
 | runs left undetermined by a harness artefact | 1 of 1,679 (reported, not counted) |
 | shipped ledgers whose prose contradicted their pins | 1 (`precision-budget`, fixed) |
@@ -125,19 +125,45 @@ the seconds are a measurement, not a fact.
 code, `--sample N` and `--seed`, and a JSON report. Then **measure before
 building**: run N=200 and N=2000, commit the report, and let the kill criterion
 below decide whether the mutator ever becomes `tools/mutate.py` or earns CI at
-N=20 per skill on a schedule. The original wording of this item was "promote
-`mutate.py` from a scratch script to `tools/mutate.py`". **No `mutate.py` exists
-in this tree** — a filesystem search for `mutate*.py` returns nothing, and the
-harness that produced `docs/MUTATION_SURVIVAL.md` (`mutate.py`, `sites.py`,
-`census.py`, `deltas.py`, `binding.py`) still lives outside it, so as far as
-`tools/mutate.py` goes this item is a from-scratch build. Two things have
-changed since this item was written: a second and different mutator,
-`tools/mutation_survival.py`, **is** committed, and the 0-of-200 baseline the
-kill criterion reasoned from has been retracted outright. The saturation
-question is therefore answerable and answered — 66 of 1,679 sites, 3.93 % — and
-the kill criterion below does not fire. That is why the measurement came first.
+N=20 per skill on a schedule.
+
+**Status: the instrument is built and the measurement is committed; the CI half
+is not decided.** `tools/mutate.py`, `tools/census.py` and `tools/sites.py`
+ship, stdlib-only, and `census.py` is the exhaustive entry point — it enumerates
+the population of (operator × site) pairs and mutates each one, whereas
+`mutate.py --sample N` is the sampled runner. The three files are promoted
+together because `census.py` imports the other two; a census-only promotion does
+not import.
+
+The measurement, run from the committed code on 2026-10-02 under Python 3.13.13:
+population **1,679**, coverage **1,679/1,679**, caught 1,043, equivalent 572,
+**effective survivors 63 (3.75 %)**, artefacts 1. The earlier figure of 66 was
+true of the tree at 12:55 that day and is retired by a ledger strengthening, not
+by a change to the instrument: `114f660` added the `plastic_parry_digits` and
+`tribonacci_parry_digits` facts at 14:56, and those are precisely the leaves that
+the three reclassified mutations move. The instrument's own sha256 is unchanged,
+and both runs agree on the equivalent count at 572, which is what makes them the
+same instrument.
+
+**The kill criterion does not fire, and that is not the same as earning CI.** It
+is written only as a retiring clause — a rate of 0 at N=200 and still 0 at
+N=2000 makes the instrument a release gate and stops it earning runner time. It
+names no gating rate, so a 3.75 % rate cannot be read as an affirmative grant.
+The mutator can therefore fail today: `tools/mutate.py --fail-over RATE` exits 1
+above `RATE`, and it also exits 1 whenever any fact-bound survivor exists, which
+on this tree it does. **That is deliberate.** A CI job that cannot go red is not a
+gate, and the rate to gate at is a decision this document does not make.
+
+**Why this is not a second mutator, recorded because the objection is
+reasonable.** `tools/mutation_survival.py` is **trap-side**: it forges the shard
+seal and asks whether a trap fires. This harness is **fact-side**: it mutates the
+instrument, regenerates the shard, and asks whether the full gate notices. They
+mutate different units and answer different questions, so the "a second mutator
+is a second thing whose behaviour nobody has checked" objection does not reach
+this one.
 **Decided by:** the report is committed, and a regression in survival rate turns
-CI red.
+CI red. **Half met.** The report is committed; nothing is wired to CI, and by the
+preceding paragraph the tool cannot be wired green.
 **Kill:** if the surviving rate is 0 at N=200 and stays 0 at N=2000, the
 instrument has saturated as a signal. Then it is a release gate, not a CI gate,
 and it stops earning runner time.
@@ -564,6 +590,11 @@ code" and then described five, two of which it called real work in the same
 breath — a count in prose that the paragraph itself contradicted, in the
 document that orders every item below it. `D2` needs a human in a browser with a
 2FA code and cannot be automated at all.
+
+`A2` is no longer "is there a mutator" — there is one, it is committed, and it
+measured itself. What remains on it is a decision, not code: the kill clause
+retires the instrument at a rate of 0 and names no gating rate, so nothing here
+states what rate should turn CI red. Until someone states one, `A2` stays open.
 
 `B2` is not in that count, and until 2026-10-02 it should have been: it was the
 one item in this file with no status marker, no measurement and exactly one
