@@ -56,6 +56,7 @@ CASES = [
     ("tampered", test_all.case_tampered),
     ("claim", test_all.case_claim_binding),
     ("index", test_all.case_index_drift),
+    ("compare", test_all.case_compare),
 ]
 
 
@@ -76,7 +77,7 @@ def test_case_passes(name, case):
 
 
 def test_the_script_has_a_case_for_every_name_it_names():
-    """The six cases above are the six the script runs; keep them in step.
+    """The seven cases above are the seven the script runs; keep them in step.
 
     If someone adds a `case_` function to the script and forgets it here, the
     new check runs in the script and silently does not run under pytest. This

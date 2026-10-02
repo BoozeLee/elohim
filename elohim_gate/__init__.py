@@ -9,5 +9,8 @@ __all__ = [
     "mutation",
     # The mutation operator table. Both halves read it; neither redefines it.
     "sites",
+    # Comparison machinery. Refuses to report agreement it did not measure, so a
+    # check that matched nothing fails loudly instead of comparing equal forever.
+    "compare",
 ]
 __version__ = "0.1.0"

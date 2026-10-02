@@ -444,7 +444,7 @@ def case_clean() -> bool:
             if traps_script.is_file():
                 standalone = run([sys.executable, str(traps_script)], cwd=copied_root)
                 held_line = next(
-                    (l.strip() for l in standalone.stdout.splitlines() if "traps hold" in l),
+                    (line.strip() for line in standalone.stdout.splitlines() if "traps hold" in line),
                     "no trap summary",
                 )
                 if standalone.returncode != 0:
@@ -569,6 +569,133 @@ def case_index_drift() -> bool:
     return True
 
 
+def case_compare() -> bool:
+    """The comparison machinery must refuse every input that cannot mean anything.
+
+    Four comparisons in this repository's history reported a verdict where the
+    reporter was wrong and the thing measured was fine: a digest taken over zero
+    rows, which is a constant and so equals itself forever; a volatile-field
+    exclusion naming the top-level `wall_seconds` and not the nested per-row
+    `seconds`, so forty rows "differed" only in how long they took; two raw
+    `key == value` dumps compared as strings, whose file paths differed by
+    construction while every measurement matched; and a wrap width asserted from
+    a few sampled lines of a file whose longest line was 151 columns.
+
+    Every control below corrupts one input and requires the refusal. A control
+    that stops firing is printed by name and fails this case, because a control
+    that has quietly stopped firing is the same defect in a different hat.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    try:
+        from elohim_gate import compare as C
+    except Exception as exc:
+        print(f"compare   FAIL  elohim_gate.compare could not be imported: {exc}")
+        return False
+
+    ok = True
+    fired = 0
+
+    def refuses(label, fn):
+        nonlocal ok, fired
+        try:
+            value = fn()
+        except C.VacuousComparison:
+            fired += 1
+            print(f"compare   control fired   {label}")
+            return
+        except Exception as exc:
+            ok = False
+            print(f"compare   FAIL  control {label!r} raised {type(exc).__name__}, "
+                  f"which is not the refusal it was written to provoke: {exc}")
+            return
+        ok = False
+        print(f"compare   FAIL  control {label!r} did NOT fire — it returned "
+              f"{value!r}. A refusal that returns a value has become a sentinel, and a "
+              f"sentinel is what a caller forgets to check.")
+
+    refuses("zero rows digest to a constant",
+            lambda: C.digest_of([], ["operator"], what="control"))
+    refuses("duplicate identities mean the keys do not identify",
+            lambda: C.digest_of([{"operator": "a"}, {"operator": "a"}], ["operator"],
+                                what="control"))
+    refuses("a row missing its identity field",
+            lambda: C.digest_of([{"operator": "a"}], ["operator", "skill"], what="control"))
+    refuses("a field carrying a file path",
+            lambda: C.compare_documents("rate: 0.5\nreport: /tmp/a.json",
+                                        "rate: 0.5\nreport: /tmp/b.json", what="control"))
+    refuses("a separator with no field name",
+            lambda: C.compare_documents("== /tmp/a.json", "== /tmp/b.json", what="control"))
+    refuses("one side parses to no fields",
+            lambda: C.compare_documents("", "rate: 0.5", what="control"))
+    refuses("every field declared volatile",
+            lambda: C.compare_documents("wall_seconds: 3\nrate: 1", "wall_seconds: 4\nrate: 1",
+                                        volatile=("wall_seconds", "rate"), what="control"))
+
+    if fired != 7:
+        ok = False
+        print(f"compare   FAIL  {fired} of 7 refusal controls fired, so the "
+              f"negative-control set changed shape without anyone noticing")
+
+    try:
+        stripped = C.volatile_subtree(
+            {"wall_seconds": 1.0, "rows": [{"seconds": 0.1, "operator": "a"}]},
+            ("seconds",),
+        )
+        if stripped != {"rows": [{"operator": "a"}]}:
+            ok = False
+            print(f"compare   FAIL  a 'seconds' marker left {stripped!r}; the nested "
+                  f"per-row timing field is the one that produced a false "
+                  f"behavioural-change report")
+        else:
+            print("compare   nested timing field stripped by substring marker")
+
+        rows = [{"operator": "b", "skill": "y"}, {"operator": "a", "skill": "x"}]
+        reordered = list(reversed(rows))
+        one = C.digest_of(rows, ["operator", "skill"], what="control")
+        two = C.digest_of(reordered, ["operator", "skill"], what="control")
+        three = C.digest_of([{"operator": "a", "skill": "z"}, {"operator": "a", "skill": "x"}],
+                            ["operator", "skill"], what="control")
+        if one != two:
+            ok = False
+            print(f"compare   FAIL  digest depends on row order ({one} != {two}); it must "
+                  f"be over the sorted identities")
+        elif one == three:
+            ok = False
+            print("compare   FAIL  digest is the same for different rows, so it "
+                  "discriminates nothing")
+        else:
+            print(f"compare   digest {one} is order-independent and discriminates")
+
+        measured = C.observed_widths("short\n" + "x" * 151 + "\nshort again\n")
+        if measured.longest != 151 or C.is_wrap_width("x" * 151, 79):
+            ok = False
+            print(f"compare   FAIL  a 151-column line measured as longest={measured.longest} "
+                  f"and is_wrap_width(79)={C.is_wrap_width('x' * 151, 79)}; the point is "
+                  f"that the standard is measured rather than assumed")
+        else:
+            print(f"compare   measured longest={measured.longest} at line "
+                  f"{measured.longest_at}, over 79: {measured.over[79]}")
+
+        agree = C.compare_documents("rate: 0.5\nn: 63", "rate: 0.5\nn: 63", what="control")
+        differ = C.compare_documents("rate: 0.5\nn: 63", "rate: 0.6\nn: 63", what="control")
+        if agree.differences or agree.compared != 2 or len(differ.differences) != 1:
+            ok = False
+            print(f"compare   FAIL  identical documents reported {agree.differences!r} and "
+                  f"a changed field reported {differ.differences!r}")
+        else:
+            print(f"compare   {agree.compared} field(s) compared; one difference found "
+                  f"when one exists")
+    except Exception as exc:
+        ok = False
+        print(f"compare   FAIL  the positive checks raised {type(exc).__name__}: {exc}")
+
+    if ok:
+        print(f"compare   exit 0  {fired} refusal control(s) fired; measurements "
+              f"discriminate")
+    return ok
+
+
 def main() -> int:
     cases = [
         ("mirror", case_mirror),
@@ -577,6 +704,7 @@ def main() -> int:
         ("tampered", case_tampered),
         ("claim", case_claim_binding),
         ("index", case_index_drift),
+        ("compare", case_compare),
     ]
     failures = []
     for name, func in cases:
