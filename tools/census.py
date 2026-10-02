@@ -40,6 +40,7 @@ import tempfile
 import time
 from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
+from typing import NamedTuple
 from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -222,6 +223,173 @@ def summarise(rows: list[dict], population_size: int) -> dict:
     return out
 
 
+class ControlFailed(RuntimeError):
+    """The census refused to classify at all.
+
+    Distinct from a run that measured something and found survivors: a caller
+    that receives a report is holding a measurement, and one that receives this
+    exception is holding nothing. Collapsing the two would let a refusal read
+    as a clean run, which is the failure A1 exists to prevent.
+    """
+
+
+def run_census(*, seed: int = 1, skills: list[str] | None = None,
+               workers: int | None = None, budget: int | None = None,
+               stale_cap: int = 60, limit: int = 0,
+               fail_over: float | None = None, progress=None) -> dict:
+    """Measure the census and return the report.
+
+    `progress` receives each line the CLI would have printed; the library
+    default is silence, because a library that writes to stdout is a library
+    nobody can nest. `fail_over` is RECORDED in the report and never applied
+    here: judging the measurement is gate_verdict's job, so that a policy number
+    never becomes part of the thing that measures it.
+
+    Raises ControlFailed rather than returning a sentinel, so "measured and
+    found survivors" can never be confused with "measured nothing".
+    """
+    skills = list(skills) if skills is not None else list(M.INSTRUMENTED)
+    workers = workers if workers is not None else max(1, (os.cpu_count() or 4) - 2)
+    budget = budget if budget is not None else M.DEFAULT_BUDGET
+
+    def emit(line: str, flush: bool = False) -> None:
+        # flush stays out of the callback's contract: it is a property of a
+        # terminal, not of a measurement, and a library caller should not have
+        # to think about it.
+        if progress is not None:
+            progress(line)
+
+
+    emit("=== control: is the pristine shard reproducible? ===", flush=True)
+    baselines: dict[str, str] = {}
+    control = []
+    for skill in skills:
+        a, err_a = pristine_shard(skill, budget)
+        b, err_b = pristine_shard(skill, budget)
+        agree = a is not None and a == b
+        control.append({"skill": skill, "agree": agree, "error": err_a or err_b,
+                        "digest": digest(a) if a else None})
+        emit(f"  {skill:<18} two pristine runs agree: {agree}  digest "
+              f"{digest(a) if a else '-'}", flush=True)
+        if a is not None:
+            baselines[skill] = a
+    if skills and not all(c["agree"] for c in control):
+        raise ControlFailed(
+            "the pristine shard is not reproducible, so shard equality cannot "
+            "classify anything")
+
+    jobs, population = build_population(skills)
+    population_size = len(jobs)
+    emit(f"\n=== population: {population_size} (operator x site) pairs ===")
+    for skill, counts in population.items():
+        emit(f"  {skill:<18} {sum(counts.values()):>5}  "
+              + " ".join(f"{k}={v}" for k, v in counts.items()))
+
+    rng = random.Random(seed)
+    rng.shuffle(jobs)
+    stale = []
+    if stale_cap:
+        # stale arm: same sites, but the ledger pin is left stale.
+        by_op: dict[str, int] = {}
+        for j in jobs:
+            k = j["operator"]
+            by_op[k] = by_op.get(k, 0) + 1
+            if sum(by_op.values()) > stale_cap:
+                break
+            stale.append(dict(j, arm="stale"))
+    forged = [dict(j, arm="forged") for j in jobs]
+    if limit:
+        forged = forged[:limit]
+    plan = forged + stale
+    for j in plan:
+        j["budget"] = budget
+        j["_baseline"] = baselines.get(j["skill"])
+    if any(j["_baseline"] is None for j in plan):
+        raise ControlFailed(
+            "no pristine baseline for every planned skill; refusing to classify")
+    emit(f"\nplan: {len(forged)} forged (without replacement) + {len(stale)} stale "
+          f"= {len(plan)} gate runs\n", flush=True)
+
+    t0 = time.time()
+    rows = []
+    with ProcessPoolExecutor(max_workers=workers) as pool:
+        for i, row in enumerate(pool.map(one, plan), 1):
+            rows.append(row)
+            if i % 100 == 0 or i == len(plan):
+                s = summarise(rows, population_size)
+                f = s["forged"]
+                emit(f"  {i}/{len(plan)}  forged n={f['n']:<5} caught {f['CAUGHT']:<5} "
+                      f"equivalent {f['EQUIVALENT']:<4} effective {f['EFFECTIVE']:<3} "
+                      f"artefacts {f['ARTEFACT']:<3} {round(time.time()-t0)}s", flush=True)
+
+    summary = summarise(rows, population_size)
+    gate = summary["defect_arm_total"]
+    # Compare on the integer counts, not the rounded rate block() publishes, so a
+    # threshold sitting on a rounding boundary cannot be crossed by rounding alone.
+    gate_rate = (gate["EFFECTIVE"] / gate["n"]) if gate["n"] else None
+
+    report = {"schema": SCHEMA, "seed": seed, "skills": skills,
+              "budget_seconds": budget, "outer_margin_seconds": M.OUTER_MARGIN,
+              "control": control, "population": population,
+              "population_sites": population_size,
+              "wall_seconds": round(time.time() - t0, 1),
+              "threshold": {
+                  "fail_over": fail_over,
+                  "rate_measured": gate_rate,
+                  "defect_arm": {"n": gate["n"], "effective": gate["EFFECTIVE"]},
+                  "forged_including_inert": summary["forged"]["effective_rate"],
+                  "basis": "defect_arm_total: inert sites are declared undetectable, "
+                           "so they are excluded from numerator and denominator alike"},
+              "summary": summary, "rows": rows}
+    return report
+
+
+class Verdict(NamedTuple):
+    """A gate decision and the words that justify it."""
+    passed: bool
+    exit_code: int
+    stderr: str
+    note: str
+
+
+def gate_verdict(summary: dict, fail_over: float | None = None) -> Verdict:
+    """Decide pass/fail from a summary. Pure: no I/O, no arguments, no clock.
+
+    Two questions, and they are not the same question:
+
+      fail_over given  -> is the rate WORSE than the threshold? (change)
+      fail_over absent -> is the gap non-zero at all?        (absolute gap)
+
+    Returns exit_code 0 or 1; 2 is reserved for refusing to classify, which is
+    raised by run_census instead and never reaches here.
+    """
+    gate = summary["defect_arm_total"]
+    n, eff = gate["n"], gate["EFFECTIVE"]
+    rate = (eff / n) if n else None
+    detail = (f"defect-arm survival rate {rate} ({eff}/{n}, inert excluded); "
+              f"forged including inert {summary['forged']['effective_rate']} "
+              f"({summary['forged']['EFFECTIVE']}/{summary['forged']['n']})")
+    if fail_over is None:
+        if eff:
+            return Verdict(False, 1,
+                           f"FAIL: no threshold given and the gate has survivors. "
+                           f"{detail}", "")
+        return Verdict(True, 0, "", "")
+    if not n:
+        return Verdict(False, 1,
+                       "FAIL: no defect-arm rows decided, so nothing was measured. "
+                       "An empty run is not a passing run.", "")
+    if rate is not None and rate > fail_over:
+        return Verdict(False, 1,
+                       f"FAIL: {detail} exceeds the threshold {fail_over}.", "")
+    if eff:
+        return Verdict(True, 0, "",
+                       f"note: {eff} survivors at rate {rate} against a threshold "
+                       f"of {fail_over}. These are the recorded gap rather than a "
+                       f"regression; docs/MUTATION_SURVIVAL.md accounts for each.")
+    return Verdict(True, 0, "", "")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -232,174 +400,95 @@ def main() -> int:
     ap.add_argument("--stale-cap", type=int, default=60,
                     help="stale arm is near-trivial; sample it, do not census it")
     ap.add_argument("--limit", type=int, default=0, help="0 = whole population")
-    ap.add_argument("--fail-over", type=float, default=None,
-                    metavar="RATE",
+    ap.add_argument("--fail-over", type=float, default=None, metavar="RATE",
                     help="fail when the defect-arm survival rate exceeds RATE. "
                          "Omit it and any survivor at all is a failure.")
     ap.add_argument("--out", default="")
+    ap.add_argument("--quiet", action="store_true",
+                    help="suppress progress and the report; only the exit code speaks")
     args = ap.parse_args()
 
+    def emit(line: str) -> None:
+        if not args.quiet:
+            print(line, flush=True)
+
     skills = [s for s in args.skills.split(",") if s]
-
-    print("=== control: is the pristine shard reproducible? ===", flush=True)
-    baselines: dict[str, str] = {}
-    control = []
-    for skill in skills:
-        a, err_a = pristine_shard(skill, args.budget)
-        b, err_b = pristine_shard(skill, args.budget)
-        agree = a is not None and a == b
-        control.append({"skill": skill, "agree": agree, "error": err_a or err_b,
-                        "digest": digest(a) if a else None})
-        print(f"  {skill:<18} two pristine runs agree: {agree}  digest "
-              f"{digest(a) if a else '-'}", flush=True)
-        if a is not None:
-            baselines[skill] = a
-    if skills and not all(c["agree"] for c in control):
-        print("\nCONTROL FAILED: the pristine shard is not reproducible, so shard "
-              "equality cannot classify anything. Stop.")
+    try:
+        report = run_census(seed=args.seed, skills=skills, workers=args.jobs,
+                            budget=args.budget, stale_cap=args.stale_cap,
+                            limit=args.limit, fail_over=args.fail_over,
+                            progress=emit)
+    except ControlFailed as exc:
+        print(f"\nCONTROL FAILED: {exc}", file=sys.stderr)
         return 2
 
-    jobs, population = build_population(skills)
-    population_size = len(jobs)
-    print(f"\n=== population: {population_size} (operator x site) pairs ===")
-    for skill, counts in population.items():
-        print(f"  {skill:<18} {sum(counts.values()):>5}  "
-              + " ".join(f"{k}={v}" for k, v in counts.items()))
-
-    rng = random.Random(args.seed)
-    rng.shuffle(jobs)
-    stale = []
-    if args.stale_cap:
-        # stale arm: same sites, but the ledger pin is left stale.
-        by_op: dict[str, int] = {}
-        for j in jobs:
-            k = j["operator"]
-            by_op[k] = by_op.get(k, 0) + 1
-            if sum(by_op.values()) > args.stale_cap:
-                break
-            stale.append(dict(j, arm="stale"))
-    forged = [dict(j, arm="forged") for j in jobs]
-    if args.limit:
-        forged = forged[:args.limit]
-    plan = forged + stale
-    for j in plan:
-        j["budget"] = args.budget
-        j["_baseline"] = baselines.get(j["skill"])
-    if any(j["_baseline"] is None for j in plan):
-        print("\nno pristine baseline for every planned skill; refusing to classify")
-        return 2
-    print(f"\nplan: {len(forged)} forged (without replacement) + {len(stale)} stale "
-          f"= {len(plan)} gate runs\n", flush=True)
-
-    t0 = time.time()
-    rows = []
-    with ProcessPoolExecutor(max_workers=args.jobs) as pool:
-        for i, row in enumerate(pool.map(one, plan), 1):
-            rows.append(row)
-            if i % 100 == 0 or i == len(plan):
-                s = summarise(rows, population_size)
-                f = s["forged"]
-                print(f"  {i}/{len(plan)}  forged n={f['n']:<5} caught {f['CAUGHT']:<5} "
-                      f"equivalent {f['EQUIVALENT']:<4} effective {f['EFFECTIVE']:<3} "
-                      f"artefacts {f['ARTEFACT']:<3} {round(time.time()-t0)}s", flush=True)
-
-    summary = summarise(rows, population_size)
-    gate = summary["defect_arm_total"]
-    # Compare on the integer counts, not the rounded rate block() publishes, so a
-    # threshold sitting on a rounding boundary cannot be crossed by rounding alone.
-    gate_rate = (gate["EFFECTIVE"] / gate["n"]) if gate["n"] else None
-    report = {"schema": SCHEMA, "seed": args.seed, "skills": skills,
-              "budget_seconds": args.budget, "outer_margin_seconds": M.OUTER_MARGIN,
-              "control": control, "population": population,
-              "population_sites": population_size,
-              "wall_seconds": round(time.time() - t0, 1),
-              "threshold": {
-                  "fail_over": args.fail_over,
-                  "rate_measured": gate_rate,
-                  "defect_arm": {"n": gate["n"], "effective": gate["EFFECTIVE"]},
-                  "forged_including_inert": summary["forged"]["effective_rate"],
-                  "basis": "defect_arm_total: inert sites are declared undetectable, "
-                           "so they are excluded from numerator and denominator alike"},
-              "summary": summary, "rows": rows}
+    summary = report["summary"]
+    rows = report["rows"]
     if args.out:
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-        print(f"\nreport -> {args.out}")
+        emit(f"\nreport -> {args.out}")
 
-    print("\n=== forged arm: every site, once ===")
+    emit("\n=== forged arm: every site, once ===")
     for arm in ("forged", "stale", "all"):
         c = summary[arm]
-        print(f"{arm:<7} n={c['n']:<5} caught {c['CAUGHT']:<5} "
+        emit(f"{arm:<7} n={c['n']:<5} caught {c['CAUGHT']:<5} "
               f"equivalent {c['EQUIVALENT']:<4} effective {c['EFFECTIVE']:<3} "
               f"artefacts {c['ARTEFACT']:<3} skipped {c['SKIPPED']:<3} "
               f"gap rate {c['effective_rate']}")
     cov = summary["coverage"]
-    print(f"\ncoverage: {cov['forged_sites_attempted']}/{cov['population_sites']} sites "
+    emit(f"\ncoverage: {cov['forged_sites_attempted']}/{cov['population_sites']} sites "
           f"({cov['share_of_population']})")
-    print(f"inert class (docstring_kill), reported not counted: "
+    emit(f"inert class (docstring_kill), reported not counted: "
           f"{summary['inert_class']['EQUIVALENT']} equivalent, "
           f"{summary['inert_class']['EFFECTIVE']} effective, of "
           f"{summary['inert_class']['n']}")
 
-    print("\n=== per operator (forged, every site, inert excluded) ===")
-    print(f"  {'operator':<16} {'n':>5} {'caught':>7} {'equiv':>6} {'eff':>4} {'rate':>8}")
+    emit("\n=== per operator (forged, every site, inert excluded) ===")
+    emit(f"  {'operator':<16} {'n':>5} {'caught':>7} {'equiv':>6} {'eff':>4} {'rate':>8}")
     for name, o in summary["defect_arm"].items():
-        print(f"  {name:<16} {o['n']:>5} {o['caught']:>7} {o['equivalent']:>6} "
+        emit(f"  {name:<16} {o['n']:>5} {o['caught']:>7} {o['equivalent']:>6} "
               f"{o['effective']:>4} {o['effective_rate']:>8}")
-    print("\n=== per skill (forged) ===")
-    print(f"  {'skill':<20} {'n':>5} {'caught':>7} {'equiv':>6} {'eff':>4} {'rate':>8}")
+    emit("\n=== per skill (forged) ===")
+    emit(f"  {'skill':<20} {'n':>5} {'caught':>7} {'equiv':>6} {'eff':>4} {'rate':>8}")
     for name, o in summary["by_skill"].items():
-        print(f"  {name:<20} {o['n']:>5} {o['caught']:>7} {o['equivalent']:>6} "
+        emit(f"  {name:<20} {o['n']:>5} {o['caught']:>7} {o['equivalent']:>6} "
               f"{o['effective']:>4} {o['effective_rate']:>8}")
 
     eff = [r for r in rows if r["outcome"] == "EFFECTIVE"]
-    print(f"\n=== EFFECTIVE survivors: {len(eff)} (the shard moved and the gate passed) ===")
+    emit(f"\n=== EFFECTIVE survivors: {len(eff)} (the shard moved and the gate passed) ===")
     by_site = Counter((r["operator"], r["skill"], r["lineno"]) for r in eff)
     for (op, skill, line), n in by_site.most_common():
-        print(f"  {n:>3}x {op:<14} {skill:<18} L{line}")
+        emit(f"  {n:>3}x {op:<14} {skill:<18} L{line}")
     seen = set()
     for r in eff:
         key = (r["operator"], r["skill"], r["lineno"])
         if key in seen:
             continue
         seen.add(key)
-        print(f"\n  --- {r['operator']} {r['skill']} L{r['lineno']} ---")
-        print(f"      site: {r['site']}")
+        emit(f"\n  --- {r['operator']} {r['skill']} L{r['lineno']} ---")
+        emit(f"      site: {r['site']}")
         for dl in r.get("deltas", [])[:6]:
-            print(f"      {dl['path']}:")
-            print(f"        pristine: {dl['pristine']}")
-            print(f"        mutant  : {dl['mutant']}")
+            emit(f"      {dl['path']}:")
+            emit(f"        pristine: {dl['pristine']}")
+            emit(f"        mutant  : {dl['mutant']}")
 
     # A census that cannot fail is a census that reports a clean run whether or not
     # it measured one. This is the same rule mutate.py applies, kept identical so
     # the two entry points cannot drift apart on what a pass means.
-    print("\n=== gate ===")
-    print(f"defect-arm survival rate {gate_rate} "
-          f"({gate['EFFECTIVE']}/{gate['n']}, inert excluded)")
-    print(f"forged rate including inert {summary['forged']['effective_rate']} "
-          f"({summary['forged']['EFFECTIVE']}/{summary['forged']['n']}) -- not the "
-          f"gated quantity, printed so the two cannot be confused")
+    emit("\n=== gate ===")
+    g = summary["defect_arm_total"]
+    emit(f"defect-arm survival rate {(g['EFFECTIVE'] / g['n']) if g['n'] else None} "
+         f"({g['EFFECTIVE']}/{g['n']}, inert excluded)")
+    emit(f"forged rate including inert {summary['forged']['effective_rate']} "
+         f"({summary['forged']['EFFECTIVE']}/{summary['forged']['n']}) -- not the "
+         f"gated quantity, printed so the two cannot be confused")
 
-    if args.fail_over is None:
-        if gate["EFFECTIVE"]:
-            print("\nFAIL: no threshold given and the gate has survivors. Pass "
-                  "--fail-over RATE to gate on change instead of on the absolute "
-                  "gap, or accept this rate as the recorded one.", file=sys.stderr)
-            return 1
-        return 0
-
-    if not gate["n"]:
-        print("\nFAIL: no defect-arm rows decided, so nothing was measured. An empty "
-              "run is not a passing run.", file=sys.stderr)
-        return 1
-    if gate_rate > args.fail_over:
-        print(f"\nFAIL: defect-arm survival rate {gate_rate} exceeds the threshold "
-              f"{args.fail_over}.", file=sys.stderr)
-        return 1
-    if gate["EFFECTIVE"]:
-        print(f"\nnote: {gate['EFFECTIVE']} survivors at rate {gate_rate} against a "
-              f"threshold of {args.fail_over}. These are the recorded gap rather "
-              f"than a regression; docs/MUTATION_SURVIVAL.md accounts for each.")
-    return 0
+    verdict = gate_verdict(report["summary"], args.fail_over)
+    if verdict.stderr:
+        print("\n" + verdict.stderr, file=sys.stderr)
+    if verdict.note:
+        print("\n" + verdict.note)
+    return verdict.exit_code
 
 
 if __name__ == "__main__":

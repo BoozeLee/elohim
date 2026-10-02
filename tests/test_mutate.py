@@ -449,24 +449,83 @@ def test_census_can_fail_a_clean_run_when_the_threshold_says_so():
 
 
 def test_census_treats_an_empty_run_as_a_failure_not_a_pass():
-    """A reminder, not a behavioural test, and labelled as one.
+    """An empty run must fail under a threshold.
 
     mutate.py learned this the hard way: an empty run previously returned 0, so
     a harness dying on every single mutation looked identical to a clean one.
-    census.py's equivalent guard cannot be reached cheaply -- every forged row
-    that gets as far as being planned also gets decided -- so this asserts the
-    guard is present rather than provoking it. The exit machinery itself is
-    covered behaviourally by the `--fail-over -1` test above.
 
-    Whitespace is normalised first because the message is wrapped across two
-    source lines, which is not a defect worth a failing test.
+    This was a source-text reminder until gate_verdict was extracted, at which
+    point the empty case became the cheapest possible real test: a summary with
+    zero defect-arm rows, no subprocess, no repo, no clock.
     """
-    flat = " ".join((REPO_ROOT / "tools" / "census.py").read_text().split())
-    # Matched inside one source literal, not across the implicit concatenation of
-    # the two the message is wrapped over -- normalisation joins the text but not
-    # away the quote characters that sit between them.
-    assert "run is not a passing run" in flat
-    assert 'if not gate["n"]' in (REPO_ROOT / "tools" / "census.py").read_text()
+    empty = census.summarise([], population_size=0)
+    assert empty["defect_arm_total"]["n"] == 0
+    assert empty["defect_arm_total"]["EFFECTIVE"] == 0
+
+    gated = census.gate_verdict(empty, fail_over=0.05)
+    assert gated.passed is False
+    assert gated.exit_code == 1
+    assert "empty run is not a passing run" in gated.stderr
+
+    # Without a threshold the question is different: is the gap non-zero? It is
+    # zero, so this passes. The two modes must not collapse into each other.
+    ungated = census.gate_verdict(empty, fail_over=None)
+    assert ungated.passed is True
+    assert ungated.exit_code == 0
+
+
+def test_gate_verdict_is_pure():
+    """gate_verdict must decide without touching anything.
+
+    It is the one piece of this tool a caller can reason about without a repo, a
+    subprocess and ten minutes, so it has to be a function and not a script. The
+    same summary must produce the same verdict every time, and passing the same
+    object twice must not mutate it -- a decision that edited its own input
+    would make a second call on the same report answer a different question.
+    """
+    rows = [_row("num_add", "CAUGHT"), _row("num_add", "EFFECTIVE")]
+    summary = census.summarise(rows, population_size=2)
+    before = repr(summary)
+
+    first = census.gate_verdict(summary, fail_over=0.9)
+    second = census.gate_verdict(summary, fail_over=0.9)
+
+    assert first == second, "gate_verdict is not deterministic"
+    assert repr(summary) == before, "gate_verdict mutated its input"
+    assert first.passed is True and second.passed is True
+    assert first.exit_code == 0
+
+    # And it really is a decision: the same summary, a tighter threshold.
+    tight = census.gate_verdict(summary, fail_over=0.1)
+    assert tight.passed is False and tight.exit_code == 1
+
+
+def test_run_census_returns_a_report_and_prints_nothing():
+    """The library contract: a report in hand, silence on stdout.
+
+    A library that writes to stdout is a library nobody can nest, and this is
+    the defect that made the extraction worth doing. `progress` is the only way
+    output leaves, so silence by default is the thing being asserted.
+    """
+    import io
+    import contextlib
+
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        report = census.run_census(skills=["elohim"], workers=2, stale_cap=0,
+                                   limit=1, budget=45)
+    assert buf.getvalue() == "", f"run_census wrote to stdout: {buf.getvalue()[:200]}"
+    assert report["schema"] == census.SCHEMA
+    assert "summary" in report and "threshold" in report
+    assert report["population_sites"] == 612, (
+        "elohim alone is 612 sites; 1679 is the whole six-skill population, and "
+        "asserting the wrong one would pass for the wrong reason")
+
+    # `progress` receives the lines instead.
+    seen: list[str] = []
+    census.run_census(skills=["elohim"], workers=2, stale_cap=0, limit=1,
+                      budget=45, progress=seen.append)
+    assert seen, "progress was never called"
 
 
 def test_census_excludes_the_inert_class_from_the_gated_rate():
