@@ -142,7 +142,7 @@ facts 25/25 verified, traps 6/6 hold, hygiene 0 findings
 verdict PASS
 ```
 
-The whole repository, every skill, four ways:
+The whole repository, every skill, five ways:
 
 ```bash
 python3 tests/test_all.py             # mirror, text lint, clean run, tamper
@@ -150,7 +150,11 @@ python3 tools/check_text.py           # shipped-text lint
 python3 tools/sync_adapters.py        # regenerate the derived plugin copies
 python3 tools/sync_adapters.py --check
 python3 tools/submit.py --check       # 10 distribution checks
+python3 -m pytest -q                  # the 43-test unit suite
 ```
+
+The first four need nothing installed. The fifth is the only command here
+that reaches outside the standard library, and it needs `pytest==9.0.3`.
 
 `tests/test_all.py` is the real gate, and it ends in `ALL_SKILLS_PASS`. It
 copies each skill to a fresh temporary directory, proves the gate passes there

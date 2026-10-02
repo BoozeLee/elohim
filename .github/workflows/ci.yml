@@ -46,6 +46,28 @@ jobs:
       - name: claim sentences are bound to pinned values
         run: python3 skills/elohim-harness/scripts/claim_binding.py --root .
 
+      # The 43-test unit suite, and the reason this step exists: until it was
+      # added, pytest was wired to nothing. Every gate above reported rc=0 at a
+      # point in this repository's history while pytest had a genuine failure,
+      # because a case had been added to tests/test_all.py's list but not to
+      # tests/test_gate_suite.py's own. That file guards the gate case list, and
+      # this step is the only thing that runs it.
+      #
+      # It goes last so that if the install fails the four gates have already
+      # run and reported their own results. It is not continue-on-error: a layer
+      # whose failures are tolerated is not optional, it is unmonitored.
+      #
+      # The pin is written here as well as in pyproject.toml. That is a second
+      # place to move, deliberately: `pip install --group` needs pip >= 25.1,
+      # which the 3.10 leg of this matrix cannot promise, and tomllib does not
+      # exist on 3.10 either, so the pin cannot be read from the one canonical
+      # table. The two must move together.
+      - name: install the unit-test runner
+        run: python3 -m pip install --disable-pip-version-check "pytest==9.0.3"
+
+      - name: the unit suite is green
+        run: python3 -m pytest -q
+
   # A separate job, not a fifth step above. That is the whole point: Core CI
   # cannot read skills/elohim/artifacts/, so deleting artifacts/ together with
   # tools/verify_published.py leaves the four gates above byte-for-byte the

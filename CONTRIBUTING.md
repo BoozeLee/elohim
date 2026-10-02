@@ -9,7 +9,13 @@ adding a check that can fail, not adding a sentence.
 python3 tools/check_text.py            # shipped text is clean
 python3 tools/sync_adapters.py --check # derived mirrors are byte-identical
 python3 tests/test_all.py              # every gated skill is green
+python3 -m pytest -q                   # the unit suite is green
 ```
+
+The first three are stdlib-only and run on a clean checkout. The fourth is
+the only thing in this repository that needs a third-party package, and
+CI installs its pinned version before running it: `python3 -m pip install
+pytest==9.0.3`.
 
 `tests/test_all.py` is the gate. It copies each skill to a temp directory,
 runs it there with no prior output, then appends one comment line to the
