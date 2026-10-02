@@ -236,12 +236,41 @@ def main(argv=None):
               f"rate={(s / d if d else float('nan')):.4f}")
     report["incomplete"] = incomplete
 
+    REFERENCE = {
+        "leaves": 522,
+        "unforged_survivors": 16,
+        "forged_survivors": 420,
+    }
+    report["reference"] = REFERENCE
+
+    def survivors(key):
+        return sum(
+            e[key]["counts"]["SURVIVED"]
+            for e in report["skills"].values()
+            if isinstance(e, dict) and key in e
+        )
+
+    print("\n=== CROSS-CHECK against docs/MUTATION_SURVIVAL.md ===")
+    checks = (
+        ("leaves decided", total["decided"] // 2, REFERENCE["leaves"]),
+        ("unforged survivors", survivors("unforged"), REFERENCE["unforged_survivors"]),
+        ("forged survivors", survivors("forged"), REFERENCE["forged_survivors"]),
+    )
+    report["cross_check"] = [
+        {"label": label, "measured": got, "reference": want, "match": got == want}
+        for label, got, want in checks
+    ]
+    for label, got, want in checks:
+        print(f"  {label:20s} measured {got:5d}  reference {want:5d}  "
+              f"{'MATCH' if got == want else 'DRIFT'}")
+
     if args.json:
         out = Path(args.json)
         if not out.is_absolute():
             out = Path(__file__).resolve().parent.parent / out
         out.write_text(json.dumps(report, indent=2, sort_keys=True))
         print(f"wrote {out}")
+
     print("INCOMPLETE — a mutation did not land or a suite errored" if incomplete else "COMPLETE")
     return EXIT_INCOMPLETE if incomplete else EXIT_OK
 
