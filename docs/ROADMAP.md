@@ -149,10 +149,42 @@ same instrument.
 is written only as a retiring clause — a rate of 0 at N=200 and still 0 at
 N=2000 makes the instrument a release gate and stops it earning runner time. It
 names no gating rate, so a 3.75 % rate cannot be read as an affirmative grant.
-The mutator can therefore fail today: `tools/mutate.py --fail-over RATE` exits 1
-above `RATE`, and it also exits 1 whenever any fact-bound survivor exists, which
-on this tree it does. **That is deliberate.** A CI job that cannot go red is not a
-gate, and the rate to gate at is a decision this document does not make.
+The mutator can therefore fail today: with no `--fail-over`, `tools/mutate.py`
+exits 1 whenever any fact-bound survivor exists, which on this tree it does.
+**That is deliberate.** A CI job that cannot go red is not a gate, and the rate
+to gate at is a decision this document does not make.
+
+**The two exit modes measure different things, and which one runs depends only
+on whether a rate is given.** `--fail-over RATE` exits 1 when the measured rate
+exceeds `RATE` — that measures the **change**. With no flag, the tool exits 1 on
+any fact-bound survivor — that measures the **absolute gap**. Both were verified
+in all eight directions against the recorded 0.037522. The distinction matters
+because the default is what keeps the tool red at 63 survivors, while an explicit
+rate would let a tree that pinned two more leaves and fell to 40 pass. This
+repository has been making exactly that progress: `114f660` moved three
+survivors without touching the instrument. A gate that stayed red through it
+would be reporting the past rather than the present, so the choice between them
+is a real decision and not a formatting preference.
+
+What makes the choice harder to decide from the outside is that the sampled arm
+cannot stand in for the census here. `docs/MUTATION_SURVIVAL.md` records a
+26.86 % rate at N=200 against 3.75 % across the population, because 200 draws
+reach only 47 (operator × skill) cells and always take site #1 of each. That is
+not sampling noise to be averaged out; it is a structurally biased estimator, so
+a per-PR sample threshold would be set against a number that does not converge on
+the quantity it is supposed to guard. The population is finite, enumerable and
+takes about ten minutes, which is the argument for running it exhaustively rather
+than sampling it.
+
+**Still the user's decision, on 2026-10-02.** A judgment consult was asked
+whether an absolute threshold or a regression-relative one is right, whether the
+63 survivors are reducible by adding pins, and where the instrument belongs. It
+declined all of them — its confidence ran 0.00–0.38 against a 0.5 bar — so
+nothing here rests on it. The three facts that bear on the decision are instead
+measured: the population is enumerable and the full census is ten minutes; the
+survivors are reducible, demonstrated by `114f660`; and a regression-relative
+gate is only as trustworthy as its baseline, which is one recorded run on one
+interpreter of a 17-interpreter matrix.
 
 **Why this is not a second mutator, recorded because the objection is
 reasonable.** `tools/mutation_survival.py` is **trap-side**: it forges the shard
@@ -162,8 +194,10 @@ mutate different units and answer different questions, so the "a second mutator
 is a second thing whose behaviour nobody has checked" objection does not reach
 this one.
 **Decided by:** the report is committed, and a regression in survival rate turns
-CI red. **Half met.** The report is committed; nothing is wired to CI, and by the
-preceding paragraph the tool cannot be wired green.
+CI red. **Half met.** The report is committed, and the tool can turn CI red on a
+regression — verified in both directions, with an empty run counted as a failure
+rather than a pass. Nothing is wired to CI, and the wiring needs a rate this
+document does not name.
 **Kill:** if the surviving rate is 0 at N=200 and stays 0 at N=2000, the
 instrument has saturated as a signal. Then it is a release gate, not a CI gate,
 and it stops earning runner time.
