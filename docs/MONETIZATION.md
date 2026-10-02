@@ -5,9 +5,16 @@
 **GitHub Sponsors from launch. MIT for the software. Paid enterprise support and
 a signed manifest, sold, only when someone asks.**
 
-No hosted service. No account. No telemetry. The gate is a local process the
+No hosted execution. No account. No telemetry. The gate is a local process the
 user can read, and keeping it that way is what makes the licence and the
 business the same decision rather than two.
+
+One exception, and it is narrow. A static, read-only report of a single gate run
+may be published at a public URL. It runs nothing, has no backend and takes no
+input. It renders a JSON file that the publisher generated from their own local
+run, with local paths removed and no telemetry of any kind. A visitor cannot
+change a result, and the numbers are re-derivable by anyone who runs the gate
+themselves.
 
 ## Why nothing is sold as a service
 
@@ -16,6 +23,14 @@ of the product is that the measurement is locally re-derivable. Selling a
 service that re-implements the gate would mean the consumer could no longer
 verify the thing they bought. That is the failure mode this product was built
 to prevent.
+
+A published report is not that, which is why the exception above is not a walk
+back of this paragraph. A hosted oracle replaces the local measurement with a
+remote one you must trust. A published report is the local measurement, on a
+page: it carries the per-run `seal` and the per-skill residuals, so a reader
+checks it against a run they make themselves rather than taking it on faith. The
+objection was never to having a URL. It was to the measurement leaving the
+machine that made it.
 
 It would also put a payment processor, a privacy policy, a data-retention
 question and a compliance surface between the user and a Python script that
@@ -67,3 +82,6 @@ one-person operation.
 No passive revenue. No "it runs while you sleep". Sponsorship is a person
 choosing to fund maintenance, and it stops the day they stop. Any statement
 about income from this repository needs a date and a source.
+
+The published report page is not an offer and earns nothing. It carries no
+advertising and no tracking, so it does not change any figure on this page.

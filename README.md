@@ -267,7 +267,11 @@ in this repository but have not been verified to resolve; until both are
 measured, treat "it is on an index" as unproven.
 
 There is no hosted service, no account, and no telemetry. The gate is a local
-process you can read.
+process you can read. One narrow exception: a static, read-only report of a
+single gate run may be published at a public URL. It renders a payload the
+publisher generated from their own local run, runs nothing, takes no input, and
+carries no tracking. A visitor cannot change a result, and anyone can re-derive
+the numbers by running the gate themselves.
 
 ## Support
 

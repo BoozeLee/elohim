@@ -270,7 +270,11 @@ it is cheaper than six more weeks of the same.
 ## What this plan deliberately does not do
 
 - No hosted service, no account system, no telemetry. The README promises a
-  local process you can read; this plan does not weaken that.
+  local process you can read; this plan does not weaken that. The narrow
+  exception already recorded in `docs/MONETIZATION.md` and `docs/ROADMAP.md` — a
+  static, read-only report of one locally-produced run, published with no
+  backend, no input and no telemetry — is not part of this plan and does not
+  extend it.
 - No branch protection, no sixth instrument, no new skill. The roadmap's own
   list of what is not on it held against the baseline above; that baseline is a
   dated snapshot, not a live reading. Two of its entries have since been

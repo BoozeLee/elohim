@@ -685,16 +685,56 @@ where the position moved, what moved it. Nothing here was deleted silently.
 - **A non-CLI surface.** There was none — no library API, no service, no UI. The
   census orchestration is now callable (`run_census`, `gate_verdict`,
   `ControlFailed`), which is the first step and is only the first.
+- **A published report, as the one surface that is not the CLI.** Committed
+  2026-10-02, in a separate repository
+  (`BoozeLee/elohim-gate-viewer`), because the viewer is a build target and this
+  repository is the thing being measured. It renders one run of the
+  `elohim.gate/1` payload as a static page, and it runs nothing — see the
+  hosted-service entry below for exactly where that line sits. The scrubber
+  that has to run before a payload is publishable lives with the viewer, not
+  here, which is a deliberate split: the gate cannot emit a safe-to-publish
+  payload by accident, because nothing in this repository emits one.
 
 ### Still off the list, and why the reasoning has not moved
 
 - **A hosted service.** The gate is a local process you can read. That is the
-  product, and `SECURITY.md` says so. This is the one entry where reopening
-  pressed hardest and the answer stayed no: hosting the census makes the
-  measurement somebody else's black box, which is the thing the whole design
-  refuses. Everything else on this list was safe to reopen; this one is a
-  different kind of item, because it is not a feature but a retraction of the
-  thesis.
+  product, and this is the one entry where reopening pressed hardest and the
+  answer stayed no: hosting the census makes the measurement somebody else's
+  black box, which is the thing the whole design refuses. Everything else on
+  this list was safe to reopen; this one is a different kind of item, because it
+  is not a feature but a retraction of the thesis.
+
+  **The position on 2026-10-02 is unchanged, and the boundary around it is now
+  drawn.** What is refused is hosting the *execution* — anything that re-runs
+  the gate on someone else's machine and hands back a number. What is
+  permitted is publishing one run's *output*: a static, read-only page that
+  renders a JSON file the publisher generated from their own local run, with
+  local paths removed, no backend, no input and no telemetry. It executes
+  nothing.
+
+  **What moved it was a distinction this paragraph had been collapsing.** "A
+  hosted service" was used here to mean any measurement reachable by URL, and a
+  published report is reachable by URL. The paragraph's actual argument is about
+  trust and re-derivability, and that argument survives: a hosted oracle
+  replaces the local measurement with a remote one the consumer must take on
+  faith, while a published report is the local measurement on a page, carrying
+  the per-run `seal` and the per-skill residuals so a reader checks it against a
+  run they make themselves. `docs/MONETIZATION.md` records the same carve-out in
+  the same terms.
+
+  **One weakening is real and is not argued away.** Publishing a figure does
+  make it possible for a reader to accept that figure instead of re-deriving
+  it, which is strictly less friction than this project would prefer. The
+  mitigations are that the page earns nothing, sells nothing, takes no input,
+  and carries no tracking — so nothing on the measurement path can be bought,
+  and there is no result a visitor can influence.
+
+  **`SECURITY.md` is not cited for this, because it does not say it.** An
+  earlier draft of this entry read "and `SECURITY.md` says so". Grepping it
+  finds no claim about hosted services, accounts or telemetry at all, so the
+  support was attributed to a document that does not carry it. The claim stands
+  on its own reasoning; it never stood on that file.
+
 - **More skills.** Six skills, 81 facts, 38 traps is already more surface than
   anyone has verified. A seventh skill is a worse use of a week than C1 was. The
   sixth — `reproducibility` — was added under this item, on the grounds that it was
