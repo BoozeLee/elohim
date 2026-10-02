@@ -335,6 +335,17 @@ and the honest way to state the tool's scope is narrower than that:
   "an item without a pinnable number is a preference, not a task". Those numbers
   exist so a human can read the run; they were never promoted, so verification
   has nothing to compare them to.
+- **One leaf cannot be claimed at all, and the defect is in the path syntax.**
+  `log_star` is keyed by the string rendering of each iterated input —
+  `shard["log_star"]` holds keys like `"10.0"`, with a point inside them — while
+  `harness_run.dotted()` splits a fact path on `.` and walks one segment at a
+  time. `dotted(shard, "log_star.10.0.0")` therefore raises `KeyError`, so no
+  ledger fact can name that leaf, so `claim_binding` is never asked to bind the
+  figure the published shard prints for it. The number is asserted in shipped
+  prose and pinned by nothing, and nothing can drift that nothing can address.
+  This was found by attempting the pin: the gate refused with "is absent from
+  the fresh shard", and the honest response was to drop the pin and record
+  the hole here rather than widen `dotted()` until the gate agreed.
 - **The real finding, stated so it is not mistaken for a defect in the gate:**
   the gap is not "the gate computed a wrong answer" — it is that **the gate
   reports values it never promised to pin, and nothing requires it to notice when
