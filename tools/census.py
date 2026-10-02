@@ -212,10 +212,13 @@ def summarise(rows: list[dict], population_size: int) -> dict:
     inert = [r for r in rows if r["arm"] == "forged" and r["outcome"] in live
              and r["operator"] in S.INERT_OPERATORS]
     out["inert_class"] = block(inert)
-    out["defect_arm"] = group(
-        lambda r: r["operator"],
-        [r for r in rows if r["arm"] == "forged" and r["outcome"] in live
-         and r["operator"] not in S.INERT_OPERATORS])
+    defect = [r for r in rows if r["arm"] == "forged" and r["outcome"] in live
+              and r["operator"] not in S.INERT_OPERATORS]
+    out["defect_arm"] = group(lambda r: r["operator"], defect)
+    # The gate thresholds this total, not forged.effective_rate. The inert class is
+    # declared undetectable, so leaving it in the denominator credits the population
+    # with sites the gate never claimed to cover, and flatters the rate.
+    out["defect_arm_total"] = block(defect)
     return out
 
 
@@ -229,6 +232,10 @@ def main() -> int:
     ap.add_argument("--stale-cap", type=int, default=60,
                     help="stale arm is near-trivial; sample it, do not census it")
     ap.add_argument("--limit", type=int, default=0, help="0 = whole population")
+    ap.add_argument("--fail-over", type=float, default=None,
+                    metavar="RATE",
+                    help="fail when the defect-arm survival rate exceeds RATE. "
+                         "Omit it and any survivor at all is a failure.")
     ap.add_argument("--out", default="")
     args = ap.parse_args()
 
@@ -297,11 +304,22 @@ def main() -> int:
                       f"artefacts {f['ARTEFACT']:<3} {round(time.time()-t0)}s", flush=True)
 
     summary = summarise(rows, population_size)
+    gate = summary["defect_arm_total"]
+    # Compare on the integer counts, not the rounded rate block() publishes, so a
+    # threshold sitting on a rounding boundary cannot be crossed by rounding alone.
+    gate_rate = (gate["EFFECTIVE"] / gate["n"]) if gate["n"] else None
     report = {"schema": SCHEMA, "seed": args.seed, "skills": skills,
               "budget_seconds": args.budget, "outer_margin_seconds": M.OUTER_MARGIN,
               "control": control, "population": population,
               "population_sites": population_size,
               "wall_seconds": round(time.time() - t0, 1),
+              "threshold": {
+                  "fail_over": args.fail_over,
+                  "rate_measured": gate_rate,
+                  "defect_arm": {"n": gate["n"], "effective": gate["EFFECTIVE"]},
+                  "forged_including_inert": summary["forged"]["effective_rate"],
+                  "basis": "defect_arm_total: inert sites are declared undetectable, "
+                           "so they are excluded from numerator and denominator alike"},
               "summary": summary, "rows": rows}
     if args.out:
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -350,6 +368,37 @@ def main() -> int:
             print(f"      {dl['path']}:")
             print(f"        pristine: {dl['pristine']}")
             print(f"        mutant  : {dl['mutant']}")
+
+    # A census that cannot fail is a census that reports a clean run whether or not
+    # it measured one. This is the same rule mutate.py applies, kept identical so
+    # the two entry points cannot drift apart on what a pass means.
+    print("\n=== gate ===")
+    print(f"defect-arm survival rate {gate_rate} "
+          f"({gate['EFFECTIVE']}/{gate['n']}, inert excluded)")
+    print(f"forged rate including inert {summary['forged']['effective_rate']} "
+          f"({summary['forged']['EFFECTIVE']}/{summary['forged']['n']}) -- not the "
+          f"gated quantity, printed so the two cannot be confused")
+
+    if args.fail_over is None:
+        if gate["EFFECTIVE"]:
+            print("\nFAIL: no threshold given and the gate has survivors. Pass "
+                  "--fail-over RATE to gate on change instead of on the absolute "
+                  "gap, or accept this rate as the recorded one.", file=sys.stderr)
+            return 1
+        return 0
+
+    if not gate["n"]:
+        print("\nFAIL: no defect-arm rows decided, so nothing was measured. An empty "
+              "run is not a passing run.", file=sys.stderr)
+        return 1
+    if gate_rate > args.fail_over:
+        print(f"\nFAIL: defect-arm survival rate {gate_rate} exceeds the threshold "
+              f"{args.fail_over}.", file=sys.stderr)
+        return 1
+    if gate["EFFECTIVE"]:
+        print(f"\nnote: {gate['EFFECTIVE']} survivors at rate {gate_rate} against a "
+              f"threshold of {args.fail_over}. These are the recorded gap rather "
+              f"than a regression; docs/MUTATION_SURVIVAL.md accounts for each.")
     return 0
 
 

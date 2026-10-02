@@ -390,3 +390,126 @@ def test_census_does_not_shadow_stdlib_inspect():
     import inspect as stdlib_inspect
 
     assert hasattr(stdlib_inspect, "signature")
+
+
+# ------------------------------------------- the census can fail, like mutate.py
+
+def _row(operator: str, outcome: str, arm: str = "forged") -> dict:
+    return {"arm": arm, "operator": operator, "skill": "s",
+            "outcome": outcome, "lineno": 1, "index": 0, "site": "x", "deltas": []}
+
+
+def test_census_accepts_fail_over_and_has_no_default():
+    """census.py must take the flag the workflow passes it.
+
+    It did not, for one release of this workflow: `--fail-over` was built into
+    mutate.py, the workflow invoked census.py, and the two entry points have
+    separate argparse blocks. The nightly job failed with "unrecognized
+    arguments" and nothing about the census was ever measured on a runner.
+    """
+    out = subprocess.run(
+        [sys.executable, str(REPO_ROOT / "tools" / "census.py"), "--help"],
+        capture_output=True, text=True, check=True)
+    assert "--fail-over" in out.stdout
+
+    src = (REPO_ROOT / "tools" / "census.py").read_text()
+    # The default must stay absent: a threshold the tool invents is a threshold
+    # no document chose, and the kill clause names none.
+    assert 'ap.add_argument("--fail-over", type=float, default=None' in src
+
+
+def test_census_can_fail_a_clean_run_when_the_threshold_says_so():
+    """A census that cannot fail cannot report that it measured anything.
+
+    census.py ended at an unconditional `return 0` -- the D1 defect that was
+    fixed in mutate.py and left here. An earlier version of this test asserted
+    on the *text* of the file and passed against exactly that defect, which is
+    the same class of error as the bug: checking the shape of the source rather
+    than what the program does.
+
+    `--fail-over -1` is the discriminator. A clean run has a survival rate of
+    0.0, and 0.0 > -1, so a census that honours its threshold must exit 1. One
+    that returns 0 unconditionally exits 0 on the identical measurement.
+    """
+    def run(*extra: str) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            [sys.executable, str(REPO_ROOT / "tools" / "census.py"),
+             "--skills", "elohim", "--limit", "2", "--jobs", "2",
+             "--stale-cap", "0", "--budget", "45", *extra],
+            capture_output=True, text=True, cwd=REPO_ROOT)
+
+    clean = run()
+    assert clean.returncode == 0, f"a clean run should pass: {clean.stderr[-400:]}"
+    assert "no rows decided" not in clean.stderr
+
+    gated = run("--fail-over", "-1")
+    assert gated.returncode == 1, (
+        "the census ignored a threshold it was given -- it cannot fail")
+    assert "exceeds the threshold" in gated.stderr, gated.stderr[-400:]
+
+
+def test_census_treats_an_empty_run_as_a_failure_not_a_pass():
+    """A reminder, not a behavioural test, and labelled as one.
+
+    mutate.py learned this the hard way: an empty run previously returned 0, so
+    a harness dying on every single mutation looked identical to a clean one.
+    census.py's equivalent guard cannot be reached cheaply -- every forged row
+    that gets as far as being planned also gets decided -- so this asserts the
+    guard is present rather than provoking it. The exit machinery itself is
+    covered behaviourally by the `--fail-over -1` test above.
+
+    Whitespace is normalised first because the message is wrapped across two
+    source lines, which is not a defect worth a failing test.
+    """
+    flat = " ".join((REPO_ROOT / "tools" / "census.py").read_text().split())
+    # Matched inside one source literal, not across the implicit concatenation of
+    # the two the message is wrapped over -- normalisation joins the text but not
+    # away the quote characters that sit between them.
+    assert "run is not a passing run" in flat
+    assert 'if not gate["n"]' in (REPO_ROOT / "tools" / "census.py").read_text()
+
+
+def test_census_excludes_the_inert_class_from_the_gated_rate():
+    """The gated rate must not be flattered by sites nobody claims to cover.
+
+    `docstring_kill` is declared inert: every one of its 81 sites comes back
+    EQUIVALENT. Leaving them in the denominator credits the population with
+    coverage the gate never asserted, and drops the reported rate from
+    63/1598 = 0.0394 to 63/1679 = 0.0375 -- a nicer number that measures less.
+    """
+    rows = [_row("num_add", "CAUGHT"), _row("num_add", "CAUGHT"),
+            _row("num_add", "EFFECTIVE"),
+            _row("docstring_kill", "EQUIVALENT"), _row("docstring_kill", "EQUIVALENT")]
+    s = census.summarise(rows, population_size=5)
+    assert s["defect_arm_total"]["n"] == 3, "inert sites reached the gated total"
+    assert s["defect_arm_total"]["EFFECTIVE"] == 1
+    assert s["forged"]["n"] == 5, "the forged block should still count everything"
+    # 1/3 gated against 1/5 forged: the exclusion has to change the number, or
+    # it is decoration. (An earlier fixture here had 1/2 and 2/4, which are both
+    # 0.5 -- a rate that cannot distinguish the two quantities.)
+    assert s["defect_arm_total"]["effective_rate"] == round(1 / 3, 6)
+    assert s["forged"]["effective_rate"] == round(1 / 5, 6)
+    assert s["defect_arm_total"]["effective_rate"] > s["forged"]["effective_rate"], (
+        "excluding the inert class must RAISE the reported rate, since it removes "
+        "denominator the gate never covered")
+
+
+def test_census_gated_rate_matches_mutate_rate_excluding_inert():
+    """Both entry points must gate the same quantity.
+
+    mutate.py reports `rate_excluding_inert`; census.py must gate that same
+    number, or a threshold tuned against one tool silently means something
+    else when the workflow runs the other.
+    """
+    rows = [_row("num_add", "CAUGHT"), _row("num_add", "CAUGHT"),
+            _row("num_add", "EFFECTIVE"), _row("docstring_kill", "EQUIVALENT")]
+    s = census.summarise(rows, population_size=4)
+    assert s["defect_arm_total"]["EFFECTIVE"] / s["defect_arm_total"]["n"] == 1 / 3
+
+
+def test_census_publishes_the_threshold_it_was_given():
+    """The report must carry the rate it was gated on, or the artifact cannot
+    be checked against the decision that gated it."""
+    assert '"threshold"' in (REPO_ROOT / "tools" / "census.py").read_text()
+    for field in ("fail_over", "rate_measured", "forged_including_inert", "basis"):
+        assert field in (REPO_ROOT / "tools" / "census.py").read_text()

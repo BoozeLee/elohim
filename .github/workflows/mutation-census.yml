@@ -96,9 +96,18 @@ jobs:
           d = json.loads(p.read_text())
           s = d["summary"]
           cov = s["coverage"]
-          rate = s["forged"]["effective_rate"]
+          if "threshold" not in d:
+              raise SystemExit(
+                  f"census-report.json has no threshold block, so it was not written "
+                  f"by the census.py in this tree (schema {d.get('schema')}). This is "
+                  f"version skew, not a measurement: refuse to report a gated rate "
+                  f"the report does not carry.")
+          t = d["threshold"]
           print(f"population {cov['population_sites']}, attempted {cov['forged_sites_attempted']}")
-          print(f"forged survival rate {rate} (threshold 0.05)")
+          print(f"GATED defect-arm rate {t['rate_measured']} "
+                f"({t['defect_arm']['effective']}/{t['defect_arm']['n']}) against threshold {t['fail_over']}")
+          print(f"not gated: forged rate including inert {t['forged_including_inert']} "
+                f"-- {t['basis']}")
           print(f"equivalent {s['forged']['EQUIVALENT']} of {s['forged']['n']} -- no gate can catch these")
           rows = [r for r in d["rows"] if r.get("arm") == "forged" and r.get("outcome") == "EFFECTIVE"]
           print(f"effective survivors {len(rows)}")
