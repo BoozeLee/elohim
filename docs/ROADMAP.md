@@ -591,14 +591,116 @@ already known to hold is a gate with an untested half.
 
 ---
 
+### Track E — the engineering layers
+
+Commissioned 2026-10-02, after `A2` closed and the list above was reopened. The
+order is fixed and the reasoning is recorded, because two of the four are the
+wrong order intuitively.
+
+### E1. The measurement core, callable rather than runnable
+**Status: first slice shipped 2026-10-02 (`1c7c6c6`); one entry point of three done.**
+
+**Why:** `census.py`'s `main()` parsed arguments, measured, and printed, so a
+caller who wanted a measurement had only a report file and a transcript to
+scrape. This is the domain/infrastructure split, and it is the same work as the
+non-CLI surface above: you cannot test a core you can only invoke as a script.
+
+**Do, as built:** `ControlFailed` (a refusal to classify, raised rather than
+returned, so "measured and found survivors" can never be read as "measured
+nothing"), `run_census(...) -> dict` (prints only through a `progress`
+callback), `gate_verdict(...) -> Verdict` (a pure decision — no I/O, no clock),
+and a `main()` that is argparse and exit code only. Behaviour-preserving, and
+measured rather than asserted: same seed and `--limit 40` before and after,
+**deep dict equality** on the summary, same `population_sites`, same row count,
+same threshold block.
+
+**Three of the author's own mistakes passed a check first, and the third is
+worth naming.** Re-indenting the printing region broke the file. Renaming the
+`jobs` parameter collided with a local, and mypy found ten errors that were all
+introduced by the refactor. Then the rebuild **dropped the `if __name__ ==
+"__main__"` guard**: the module imported cleanly, exited 0, printed nothing and
+wrote no report — every one of which is what a passing run looks like from the
+outside. It was caught only because a comparison step tried to read a file that
+did not exist. The generator now refuses to emit a file without that guard.
+
+**Not yet done:** `tools/mutate.py` has the same shape and has not been touched,
+so the two entry points still differ. A judgment consult placed the whole of
+Track E at **1.44 of 4** — between "a working first cut" and "done" — and refused
+the word "done" for this reason, not because the numbers were missing.
+
+**Decided by:** `run_census` and `gate_verdict` are called, not parsed for, by
+something that did not write them; `mutate.py` has the same three shapes; the
+wheel exposes both.
+
+### E2. Bootstrap the ledger
+**Why:** a judgment consult was asked what stands between this tool and a caller
+who has never seen it, and answered that authoring a correct `ledger.json` by
+hand *is* the user experience. Everything else in Track E is packaging around
+that manual step. Distribution cannot be finished while the first thing a new
+user must do is the hardest thing in the repository.
+
+**Do:** `elohim init <skill>` generates a ledger skeleton from an instrument —
+the instrument checksum, the publishable values it emits, the tolerances — with
+every generated value marked as unverified until the gate has run it once. The
+distinction matters: a bootstrapped ledger that looked trusted on creation would
+be the repository's own failure reproduced in a convenience feature.
+
+**Decided by:** `elohim init` on a skill with no ledger produces one that passes
+`verify_published` and is refused by `claim_binding` until promoted.
+
+### E3. PyPI
+**Why:** mechanical, and the wheel is already verified byte-identical. Last of
+the four because publishing an API that E1 has not finished stabilising is a
+version promise made twice.
+
+**Decided by:** `pip install elohim` in a clean environment runs `elohim --all`
+to `verdict PASS` from outside the checkout.
+
+### E4. A GitHub Action
+**Why:** the same product on a different surface. Read-only with respect to the
+committed tree — mutations happen in a temporary copy.
+
+**Decided by:** the Action runs the census on a repository with no checkout of
+this one, and a red run names the survivors the way `MUTATION_SURVIVAL.md` does.
+
+---
+
 ## What is deliberately not on this list
 
+**This section was reopened on 2026-10-02, deliberately and by the user, after
+`A2` closed.** It is a statement of what the project does not do, and leaving it
+standing unchanged while four engineering layers were commissioned would have made
+it the kind of document this repository exists to catch: one asserting the
+opposite of what the code does. Each entry below carries what it says now and,
+where the position moved, what moved it. Nothing here was deleted silently.
+
+### Reopened and now in scope
+
+- **Distribution.** The `elohim` console script, the wheel, and the nightly
+  mutation census were all reachable only from inside this checkout. Packaging
+  them for a caller who did not write them is now an explicit goal. The measured
+  constraint that shapes it: **the ledger is the blocker, not the packaging.**
+  Without a per-skill `ledger.json` there is nothing to check, and authoring one
+  by hand is currently the entire user experience.
+- **A non-CLI surface.** There was none — no library API, no service, no UI. The
+  census orchestration is now callable (`run_census`, `gate_verdict`,
+  `ControlFailed`), which is the first step and is only the first.
+
+### Still off the list, and why the reasoning has not moved
+
 - **A hosted service.** The gate is a local process you can read. That is the
-  product, and `SECURITY.md` says so.
+  product, and `SECURITY.md` says so. This is the one entry where reopening
+  pressed hardest and the answer stayed no: hosting the census makes the
+  measurement somebody else's black box, which is the thing the whole design
+  refuses. Everything else on this list was safe to reopen; this one is a
+  different kind of item, because it is not a feature but a retraction of the
+  thesis.
 - **More skills.** Six skills, 81 facts, 38 traps is already more surface than
   anyone has verified. A seventh skill is a worse use of a week than C1 was. The
   sixth — `reproducibility` — was added under this item, on the grounds that it was
   B1, it corrected a false claim, and it was a tripwire rather than a new subject.
+  Reopening distribution did not reopen this: a seventh skill multiplies the
+  surface that has to be verified, and distribution does not need one.
 - **Changing the branch protection on `main`.** This entry used to read
   "Branch protection on `main`", and justified leaving it off by the user's
   other public repos not protecting theirs. Measured on 2026-09-30, that was
@@ -621,6 +723,15 @@ already known to hold is a gate with an untested half.
   and a snapshot is not a measurement.
 
 ## The order, and why
+
+**Track E was commissioned after this paragraph was written, and it is not
+counted here.** The sentence that used to read "what is left is one item, and it
+is not code" was true of `A1`–`A3`, `B1`–`B2`, `C1`–`C3`, `D1`–`D3` and `V1`, and
+`D2` remains the only open item among them. Track E is a different kind of work —
+four engineering layers the user commissioned, one of which has a first slice
+shipped — so folding it into that count would make the count mean two things. It
+is stated as its own track above instead, and this paragraph is left describing
+what it described.
 
 `C1` first, and it is done. It was the smallest item on this list and it
 prevents the specific failure this project has already shipped once. `A1`
