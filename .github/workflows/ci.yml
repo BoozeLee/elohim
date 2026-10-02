@@ -86,3 +86,58 @@ jobs:
 
       - name: the published shard matches its manifest
         run: python3 tools/verify_published.py
+
+  # The third job, for the same reason the second is a separate job: adding a
+  # step to `core` would make this gate part of the thing every PR waits on, and
+  # it does not belong in that unit. Building a wheel and installing it into a
+  # fresh venv costs far more than the four steps above, so it runs here, in
+  # parallel, on its own runner. Wall-clock cost to a PR is therefore about
+  # zero, which is what makes it affordable to run on every push rather than on
+  # release day.
+  #
+  # What it checks is a sentence in pyproject.toml that was false: "The gate
+  # resolves everything from Path(__file__), so the installed copy runs anywhere."
+  # True of the console script, false of the Python API -- seven reads went
+  # straight to REPO / "skills", which inside a wheel is site-packages/skills,
+  # a directory that does not exist. `pip install elohim` is the distribution
+  # form E3 depends on, and an external caller is the only thing that closes
+  # E1's third clause, so the check is: build the artifact, install it, call the
+  # API from outside the checkout.
+  #
+  # continue-on-error is deliberately absent, for the same reason as above. A
+  # layer whose failures are tolerated is not optional, it is unmonitored -- and
+  # this one is not optional anyway, since a wheel that cannot find its own
+  # package data is a release that raises FileNotFoundError on first use.
+  #
+  # 3.14 only, and that is a real limit rather than a rounding. The matrix in
+  # `core` spans 3.10 to 3.14 because the mathematics moves across that range.
+  # What this job checks is a directory layout, which does not vary by
+  # interpreter version, so a second leg would cost a minute to re-measure the
+  # same force-include mapping. What it therefore does NOT prove: that the wheel
+  # installs and runs on 3.10, which pyproject declares as its floor. That is an
+  # open gap, stated here so nobody reads this job as having closed it.
+  #
+  # Both pins live here and nowhere else. build invokes the backend declared in
+  # pyproject.toml, and --no-isolation means that backend must already be
+  # importable here -- so hatchling is pinned by this job rather than resolved
+  # from pyproject's `requires = ["hatchling"]`. That is deliberate in both
+  # directions: this job's wheel is then built by a recorded version rather than
+  # by whatever was newest, while pyproject stays unpinned because it describes
+  # the backend for anyone installing the package, which is a different
+  # question from reproducing one build. They cannot drift against each other
+  # because one of them names no version.
+  wheel:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - name: install the wheel builder
+        run: >-
+          python3 -m pip install --disable-pip-version-check
+          "build==1.5.0" "hatchling==1.32.4"
+
+      - name: the installed wheel runs the API
+        run: python3 tools/verify_wheel.py

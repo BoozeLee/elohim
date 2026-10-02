@@ -39,7 +39,6 @@ job so it runs in parallel with the unit gates instead of extending them.
 import ast
 import subprocess
 import sys
-
 import tempfile
 import venv
 from pathlib import Path
