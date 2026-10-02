@@ -360,10 +360,14 @@ the API cannot do it. Then `FUNDING.yml` becomes live and the claim in
 `isPrerelease: false`, and both that URL and `tree/v0.1.0` return HTTP 200. The
 `[0.1.0]` link definition in `CHANGELOG.md` line 116 points at that exact URL,
 so the 404 this item exists to fix is gone. The original instruction, to tag
+<<<<<<< 01d45da
 `7dd8915`, was followable, and its being unfollowed is not why the tag moved:
 `git merge-base --is-ancestor 7dd8915 main` succeeds, and that tree holds 5
 ledger-backed skills, 66 facts and 31 traps — exactly what the `[0.1.0]` body
 describes. What actually forced the move was the tag's own position, below.
+=======
+`7dd8915`, was unfollowable: that commit is off the branch since a rebase.
+>>>>>>> 86c82cb
 
 The tag did not simply need pushing. Its annotation was a **measurement with no
 referent**: it quoted 72 facts across 7 skills, 52 pinned values, 57 mirror files
@@ -373,10 +377,17 @@ tree and its parent, and "7 skills" counts the shared harness, which has no
 ledger and so contributes no facts. It was withdrawn and rewritten rather than
 reconciled, because a figure that names no tree cannot be made true by picking a
 different tree.
+<<<<<<< 01d45da
 **Did:** move the tag to `6231e88`, push it, publish the release, and confirm the
 link resolves. It was not publishable where it pointed. It dereferenced to
 `f95f96e`, and `git log --diff-filter=A -- skills/reproducibility/SKILL.md`
 returns exactly `f95f96e`: that was the very commit that introduced
+=======
+**Do:** move the tag to `6231e88`, push it, publish the release, and confirm the
+link resolves. **Do not publish `v0.1.0` where it points.** The tag dereferences
+to `f95f96e`, and `git log --diff-filter=A -- skills/reproducibility/SKILL.md`
+returns exactly `f95f96e`: the tagged commit is the very commit that introduced
+>>>>>>> 86c82cb
 the sixth instrumented skill. The `[0.1.0]` body inside that commit reads "Five
 ledger-backed skills on one shared harness, 66 pinned facts and 31 independently
 re-derived traps", so the tag and its own release note disagree on the first
@@ -406,15 +417,9 @@ page renders.
   anyone has verified. A seventh skill is a worse use of a week than C1 was. The
   sixth — `reproducibility` — was added under this item, on the grounds that it was
   B1, it corrected a false claim, and it was a tripwire rather than a new subject.
-- **Changing the branch protection on `main`.** This entry used to read
-  "Branch protection on `main`", and justified leaving it off by the user's
-  other public repos not protecting theirs. Measured on 2026-09-30, that was
-  false: a direct push to `main` is refused with `GH006: Protected branch
-  update failed for refs/heads/main`. Which rules are enforced is not readable
-  from here — `branches/main/protection` and `/rulesets` both return 404 under
-  the scopes this machine's `gh` token carries — so what is claimed here is the
-  refusal and nothing about the rule set. What stays off the list is changing
-  any of it.
+- **Branch protection on `main`.** Neither of the user's other public repos
+  protects `main`. Matching the precedent is the right call until there is a
+  stated reason to diverge.
 - **Adversarial security.** The pin is integrity by visibility. Making it
   tamper-proof against a consistent hostile edit is a different project.
 - **A commit sha in this file.** A sha names a tree, and a rebase renames that
@@ -441,12 +446,21 @@ is shipped: `--all`, `--fail-under` and a versioned `schema` key, with the clean
 case delegating to it instead of looping six per-skill invocations that proved
 nothing about the aggregate.
 
+<<<<<<< 01d45da
 What is left is four items: `D2`, `A2`, `C2` and `C3`. Three of them are
+=======
+What is left is five items: `D2`, `D3`, `A2`, `C2` and `C3`. Three of them are
+>>>>>>> 86c82cb
 code. An earlier draft of this paragraph said "three items and none of them is
 code" and then described five, two of which it called real work in the same
 breath — a count in prose that the paragraph itself contradicted, in the
 document that orders every item below it. `D2` needs a human in a browser with a
+<<<<<<< 01d45da
 2FA code and cannot be automated at all.
+=======
+2FA code and cannot be automated at all. `D3` is a push and a release page, and
+the release page needs a person to confirm it renders.
+>>>>>>> 86c82cb
 
 The order after D1 is `A2`, and it changed from the order this file used to give.
 That earlier order was `C2` then `C3`, on the grounds that the cheapest way to
