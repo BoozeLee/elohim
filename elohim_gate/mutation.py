@@ -73,8 +73,7 @@ OUTER_MARGIN = 45
 # population and mutate another. `sites.py` says why the population is finite:
 # `enumerate_sites()` is the census, and N draws are only ever a sample of it.
 
-sys.path.insert(0, str(Path(__file__).resolve().parent))
-import sites as S          # noqa: E402
+from . import sites as S
 
 
 class _FirstSite:

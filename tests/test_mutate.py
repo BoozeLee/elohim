@@ -32,11 +32,16 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(REPO_ROOT / "tools"))
+# The checkout, not an installed copy: this gate deliberately measures the
+# committed tree. Inserting REPO_ROOT (rather than REPO_ROOT/"tools") is what
+# makes `elohim_gate` importable; the three modules moved out of tools/ into
+# the package, and importing them as top-level names is what let sys.path[0]
+# shadow an unrelated system module.
+sys.path.insert(0, str(REPO_ROOT))
 
-mutate = importlib.import_module("mutate")
-sites = importlib.import_module("sites")
-census = importlib.import_module("census")
+mutate = importlib.import_module("elohim_gate.mutation")
+sites = importlib.import_module("elohim_gate.sites")
+census = importlib.import_module("elohim_gate.census")
 
 SKILLS = ["elohim", "estimator-bias", "invariant-hunter", "precision-budget",
           "reproducibility", "tolerance-prover"]
@@ -290,9 +295,9 @@ def test_plan_records_a_real_site_count_and_respects_the_stale_cap():
 def test_list_operators_exits_zero_and_names_all_eight():
     """The cheapest end-to-end check that the module imports and its CLI parses."""
     proc = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "tools" / "mutate.py"),
+        [sys.executable, "-m", "elohim_gate.mutation",
          "--list-operators"],
-        capture_output=True, text=True)
+        capture_output=True, text=True, cwd=REPO_ROOT)
     assert proc.returncode == 0, proc.stderr
     for op in sites.OPERATORS:
         assert op["name"] in proc.stdout
@@ -309,8 +314,8 @@ def test_fail_over_is_absent_by_default_because_the_roadmap_names_no_rate():
     rate is written down.
     """
     proc = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "tools" / "mutate.py"), "--help"],
-        capture_output=True, text=True)
+        [sys.executable, "-m", "elohim_gate.mutation", "--help"],
+        capture_output=True, text=True, cwd=REPO_ROOT)
     assert proc.returncode == 0
     assert "--fail-over" in proc.stdout
     assert "default" not in proc.stdout.split("--fail-over")[1].split("\n")[0]
@@ -356,7 +361,7 @@ def test_the_repo_path_is_derived_not_hardcoded(monkeypatch):
         importlib.reload(mutate)
 
     # The module must not name an absolute path into a home directory.
-    assert "/home/" not in (REPO_ROOT / "tools" / "mutate.py").read_text()
+    assert "/home/" not in (REPO_ROOT / "elohim_gate" / "mutation.py").read_text()
 
 
 # --------------------------------------------------------- the census wrapper
@@ -371,7 +376,7 @@ def test_census_reports_coverage_against_a_named_population():
     """
     assert hasattr(census, "build_population")
     assert hasattr(census, "summarise")
-    src = (REPO_ROOT / "tools" / "census.py").read_text()
+    src = (REPO_ROOT / "elohim_gate" / "census.py").read_text()
     assert "population_sites" in src
     assert "share_of_population" in src
     assert "forged_sites_attempted" in src
@@ -387,6 +392,7 @@ def test_census_does_not_shadow_stdlib_inspect():
     asserts it stays omitted.
     """
     assert not (REPO_ROOT / "tools" / "inspect.py").exists()
+    assert not (REPO_ROOT / "elohim_gate" / "inspect.py").exists()
     import inspect as stdlib_inspect
 
     assert hasattr(stdlib_inspect, "signature")
@@ -406,13 +412,13 @@ def test_census_accepts_fail_over_and_has_no_default():
     mutate.py, the workflow invoked census.py, and the two entry points have
     separate argparse blocks. The nightly job failed with "unrecognized
     arguments" and nothing about the census was ever measured on a runner.
-    """
+"""
     out = subprocess.run(
-        [sys.executable, str(REPO_ROOT / "tools" / "census.py"), "--help"],
-        capture_output=True, text=True, check=True)
+        [sys.executable, "-m", "elohim_gate.census", "--help"],
+        capture_output=True, text=True, check=True, cwd=REPO_ROOT)
     assert "--fail-over" in out.stdout
 
-    src = (REPO_ROOT / "tools" / "census.py").read_text()
+    src = (REPO_ROOT / "elohim_gate" / "census.py").read_text()
     # The default must stay absent: a threshold the tool invents is a threshold
     # no document chose, and the kill clause names none.
     assert 'ap.add_argument("--fail-over", type=float, default=None' in src
@@ -433,7 +439,7 @@ def test_census_can_fail_a_clean_run_when_the_threshold_says_so():
     """
     def run(*extra: str) -> subprocess.CompletedProcess:
         return subprocess.run(
-            [sys.executable, str(REPO_ROOT / "tools" / "census.py"),
+            [sys.executable, "-m", "elohim_gate.census",
              "--skills", "elohim", "--limit", "2", "--jobs", "2",
              "--stale-cap", "0", "--budget", "45", *extra],
             capture_output=True, text=True, cwd=REPO_ROOT)
@@ -569,9 +575,9 @@ def test_census_gated_rate_matches_mutate_rate_excluding_inert():
 def test_census_publishes_the_threshold_it_was_given():
     """The report must carry the rate it was gated on, or the artifact cannot
     be checked against the decision that gated it."""
-    assert '"threshold"' in (REPO_ROOT / "tools" / "census.py").read_text()
+    assert '"threshold"' in (REPO_ROOT / "elohim_gate" / "census.py").read_text()
     for field in ("fail_over", "rate_measured", "forged_including_inert", "basis"):
-        assert field in (REPO_ROOT / "tools" / "census.py").read_text()
+        assert field in (REPO_ROOT / "elohim_gate" / "census.py").read_text()
 
 
 # ------------------------------------------- one policy, two entry points

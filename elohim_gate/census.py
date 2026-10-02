@@ -42,9 +42,8 @@ from collections import Counter
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import mutate as M          # noqa: E402  (instrument_path, repin, run_gate, classify)
-import sites as S           # noqa: E402
+from . import mutation as M   # instrument_path, repin, run_gate, classify
+from . import sites as S
 
 SCHEMA = "elohim.mutation-census/2"
 # The shard carries a seal over its own content, so `seal` moves whenever

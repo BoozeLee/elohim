@@ -65,7 +65,12 @@ jobs:
           else
             args="--fail-over 0.05"
           fi
-          python3 tools/census.py \
+          # -m, not a path to tools/census.py: the census now lives inside the
+          # elohim_gate package, so `tools/census.py` no longer exists. There is no
+          # install step above, so python -m resolves against the checkout via cwd
+          # on sys.path -- which is what a nightly gate wants. It also means this job
+          # measures the committed tree, never an installed copy that could differ.
+          python3 -m elohim_gate.census \
             --seed 1 \
             --limit 0 \
             --jobs 2 \
