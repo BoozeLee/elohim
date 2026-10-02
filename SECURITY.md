@@ -42,8 +42,9 @@ the skill name, and the command you ran.
 
 - an instrument that passes its gate with a modified instrument
 - a trap that can no longer fail
-- a `check_text` false negative — shipped text carrying a corrupted token
-  that the lint does not catch
+- a `check_text` false negative — a shipped text file carrying an artefact of
+  its authoring that the lint does not catch: a word the log-sanitising shell
+  rewrote in place, or an unresolved merge conflict marker left by a merge
 - a path in the tree that escapes its skill directory
 
 ## What does not
