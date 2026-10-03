@@ -97,10 +97,29 @@ jobs:
       # one fewer skill than it was asked about is the exact failure this
       # repository shipped in census.py when a dropped __main__ guard made the
       # module import cleanly, exit 0, print nothing and write no report.
+      #
+      # `uses: ./instrument`, not `uses: ./`. This is the workflow's second
+      # never-executed defect, found on the run above: `uses: ./` resolves at
+      # the WORKSPACE ROOT, and the header's whole design is that the workspace
+      # root holds no checkout of this repository. The two are incompatible, and
+      # the failure is immediate and unambiguous:
+      #
+      #   Can't find 'action.yml', 'action.yaml' or 'Dockerfile' under
+      #   '/home/runner/work/elohim/elohim'. Did you forget to run
+      #   actions/checkout before running your local action?
+      #
+      # The fix is one path segment and it does not weaken the seam. A local
+      # action reference only decides where the Action's OWN manifest is read
+      # from; `ELOHIM_TREE` is `${{ github.workspace }}`, which is unaffected and
+      # still points at the synthetic caller tree holding six skills and no
+      # harness. What is measured and what supplies the instrument code are still
+      # two different places, which is the entire claim this job exists to test.
+      # The instrument code still arrives as an installed distribution from
+      # `git+...@<ref>`, never read out of `instrument/`.
       - name: the Action refuses a skill this tree does not hold
         id: refusal
         continue-on-error: true
-        uses: ./
+        uses: ./instrument
         with:
           ref: ${{ github.sha }}
           skills: not-a-skill-this-tree-holds
@@ -118,7 +137,7 @@ jobs:
 
       - name: the census, through the Action, on a tree with no checkout of this one
         id: census
-        uses: ./
+        uses: ./instrument
         with:
           ref: ${{ github.sha }}
           fail-over: ${{ inputs.fail_over || '0.05' }}
