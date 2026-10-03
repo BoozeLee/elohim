@@ -4,17 +4,19 @@ Every item below names the measurement that decides it. An item without a
 pinnable number is a preference, not a task. Nothing here is scheduled against a
 week that has not been agreed.
 
-Status: **2026-09-30**, all six instrumented skills green, public and pushed
-at `github.com/BoozeLee/elohim`, CI green on Python 3.10, 3.12 and 3.14. A1 is
+Status: **2026-10-03**, all eight ledger-bearing skills green, public, with
+`claim-ledger` and the harness fix on `claim-ledger` awaiting review, at
+`github.com/BoozeLee/elohim`, CI green on Python 3.10, 3.12 and 3.14. A1 is
 shipped; the measurement it was going to pin killed the pin. B1 is shipped;
 the measurement it was going to pin found a second, differently-shaped thing —
 a real interpreter boundary — so B1 pins two named classes and fails on a
 third instead of pretending there is one. A3 is shipped, and its measurement
 went the other way from the item's framing: 25 of 38 traps are provably
 independent of the checksum, and 77 % of all tampers are caught by nothing but
-the sha256. D1 is shipped: `--all` gates the whole tree under one payload, the
-clean case delegates to it, and a fourth exit code now separates "the tree is
-clean" from "the tree is too small".
+the sha256 — both † rows, measured over six skills, see the table below. D1 is
+shipped: `--all` gates the whole tree under one payload, the clean case
+delegates to it, and a fourth exit code now separates "the tree is clean" from
+"the tree is too small".
 
 ---
 
@@ -22,43 +24,64 @@ clean" from "the tree is too small".
 
 Measured, not asserted:
 
+A row marked † is **not** a count of the tree as it stands. It is a snapshot of a
+deliberate manual run, taken over the **6 ledger-bearing skills that existed
+before `c06d0b2` added `pay-signal`**, and it is scoped here rather than left to
+drift silently. The tree has held 8 ledger-bearing skills since `e27d9bc` added
+`claim-ledger`, so a † row is under-scoped by exactly those two skills.
+
+Three tools produce them and **CI runs none of them** —
+`tools/seal_independence.py` (rows marked with the census and sweep figures),
+`tools/mutation_survival.py` and `tools/matrix.py`. `matrix.yml` installs the
+interpreters and runs four verifiers, but never invokes `matrix.py`; the census
+row comes from `elohim_gate.census`, which `mutation-census.yml` does run, so
+that population is re-enumerated on every push while the survival and sweep
+figures are not. Each is declared `UNVERIFIED:` in
+`skills/elohim-harness/scripts/claim_binding_exemptions.json`, so the debt is
+counted and printed on every `claim_binding.py` run rather than living only in
+this sentence.
+
+To refresh them, re-run the three tools against the current tree and update the
+† rows together — not one at a time, since rows 39–42 are four views of a single
+sweep and are only meaningful as a set.
+
 | claim | measurement |
 |---|---|
-| facts promoted | 81 across 6 instrumented skills |
-| traps re-derived independently | 38 |
-| instrument checksums pinned | 6, all PASS |
-| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** |
-| instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** |
-| recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** |
-| instrument mutation sites enumerated exhaustively, seal forged | **1,679** |
-| mutations that passed the full gate | **63 of 1,679 (3.75 %)** |
-| survivors that were fact-bound and outside declared tolerance | **0** |
-| runs left undetermined by a harness artefact | 1 of 1,679 (reported, not counted) |
+| facts promoted | 103 across 8 ledger-bearing skills |
+| traps re-derived independently | 51 |
+| instrument checksums pinned | 8, all PASS |
+| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** † |
+| instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** † |
+| recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** † |
+| instrument mutation sites enumerated exhaustively, seal forged | **1,679** † |
+| mutations that passed the full gate | **63 of 1,679 (3.75 %)** † |
+| survivors that were fact-bound and outside declared tolerance | **0** † |
+| runs left undetermined by a harness artefact | 1 of 1,679 (reported, not counted) † |
 | shipped ledgers whose prose contradicted their pins | 1 (`precision-budget`, fixed) |
-| shard leaves swept twice, once with the seal forged and once left stale | **522, across 6 skills** |
-| traps measured to fire without the checksum | **25 of 38** |
-| traps that are the checksum | 5, exactly the 5 seal checks |
-| tampers caught by a seal-independent trap | **118 of 522 (22.6 %)** |
-| tampers caught by nothing but the sha256 | **404 of 522 (77.4 %)** |
+| shard leaves swept twice, once with the seal forged and once left stale | **522, across 6 skills** † |
+| traps measured to fire without the checksum | **25 of 38** † |
+| traps that are the checksum | 5, exactly the 5 seal checks † |
+| tampers caught by a seal-independent trap | **118 of 522 (22.6 %)** † |
+| tampers caught by nothing but the sha256 | **404 of 522 (77.4 %)** † |
 | CLI exit codes, each measured rather than assumed | 4 (0, 1, 2, 3) |
 | JSON payload contract version | `elohim.gate/1` |
 | tools importing a third-party package — stdlib, the pinned dev group, and the first-party siblings loaded off `skills/` excluded | 0 |
 
 The last row is scoped because the scope is the measurement. Every import in
 every `*.py` outside the mirrored tree, resolved against
-`sys.stdlib_module_names`, leaves six files carrying a non-stdlib name, and not
-one of them is a third-party package at runtime. `harness_run.py` and
+`sys.stdlib_module_names`, leaves fifteen files carrying a non-stdlib name, and
+not one of them is a third-party package at runtime. `harness_run.py` and
 `tools/claim_binding_selftest.py` import `claim_binding`, and
 `tools/mutation_survival.py` imports `seal_independence` — first-party siblings
 that each put `skills/` on `sys.path` and read from there. `tests/test_all.py`
-imports `submit` the same way, and two other test modules import `pytest`, which
+imports `submit` the same way, and nine test modules import `pytest`, which
 is a pin in the dev group. The shipped package `elohim_gate/` imports nothing
-outside the stdlib at all. `tools/sync_adapters.py` now imports
-`elohim_gate.compare` — the package under test, off `sys.path`, and first-party
-for the same reason the others are — which is what took its byte-identity verdict
-out of its own hands. Left unscoped the row reads `0` and is simply false the
-moment `pytest` is counted, with nothing in the document to say which counting
-was meant.
+outside the stdlib at all; `elohim_gate/cli.py` names `elohim_gate`, which is
+itself. `tools/sync_adapters.py` imports `elohim_gate.compare` — the package
+under test, off `sys.path`, and first-party for the same reason the others are —
+which is what took its byte-identity verdict out of its own hands. Left unscoped
+the row reads `0` and is simply false the moment `pytest` is counted, with
+nothing in the document to say which counting was meant.
 
 The strongest result is the interpreter matrix, and it needed correcting before
 it could be called one. A 4-year span of CPython produces byte-identical
@@ -336,7 +359,7 @@ fact that passes *barely* is distinguishable from one that passes *comfortably*.
 **Measured on CPython 3.14.5 before deciding anything, which cost nothing** —
 the harness already computes a residual for every fact on every run and
 discards it (`skills/elohim-harness/scripts/harness_run.py:285`), so this item
-was answerable without writing a line of it. Of the 81 facts, **52 are exact
+was answerable without writing a line of it. Of the 103 facts, **74 are exact
 comparisons** — no tolerance, or a tolerance of 0 — for which `compare()`
 returns `0.0` by construction, so the field would record a constant. Of the
 **29 that carry a tolerance, 25 measured a residual of exactly 0.0** and
@@ -352,8 +375,8 @@ criterion as written asks whether the distribution is uniformly ~0 *or*
 nothing anywhere near the far mode — so reporting "the kill fired" would be
 reading the criterion in whichever direction retires the item, which is the
 failure this file exists to catch. The field is dropped for three measured
-reasons rather than one convenient one: the criterion's premise is wrong, 52 of
-81 facts have no residual to record, and the residual is a pure function of
+reasons rather than one convenient one: the criterion's premise is wrong, 74 of
+103 facts have no residual to record, and the residual is a pure function of
 three values that are already pinned — the fresh measurement, `expect` and
 `tolerance` — so a ledger field would add a fourth thing that can be wrong
 without adding a byte the gate does not already carry.
@@ -1196,10 +1219,11 @@ where the position moved, what moved it. Nothing here was deleted silently.
   support was attributed to a document that does not carry it. The claim stands
   on its own reasoning; it never stood on that file.
 
-- **More skills.** Six skills, 81 facts, 38 traps is already more surface than
-  anyone has verified. A seventh skill is a worse use of a week than C1 was. The
-  sixth — `reproducibility` — was added under this item, on the grounds that it was
-  B1, it corrected a false claim, and it was a tripwire rather than a new subject.
+- **More skills.** At the time this was written: six skills, 81 facts, 38 traps
+  is already more surface than anyone has verified. A seventh skill is a worse
+  use of a week than C1 was. The sixth — `reproducibility` — was added under
+  this item, on the grounds that it was B1, it corrected a false claim, and it
+  was a tripwire rather than a new subject.
   Reopening distribution did not reopen this: a seventh skill multiplies the
   surface that has to be verified, and distribution does not need one.
 - **Changing the branch protection on `main`.** This entry used to read
@@ -1240,10 +1264,11 @@ second, and it is done: a gate with an unbounded runtime is a gate that can be
 made to lie by making it wait. `B1` third, and it is done: it turned a README
 sentence into a ledger fact, and the fact it found was the opposite of the one
 the sentence asserted. `A3` fourth, and it is done: 25 of the 38 traps are
-provably independent of the checksum, the 5 that are not are exactly the 5
-checksums, and the motivating number — eleven of fifteen tampers in
-`tolerance-prover` caught by the seal alone — was not folklore, measuring at
-177 of 203 once the sweep could forge the seal instead of deleting it. Three
+provably independent of the checksum † (a six-skill measurement; see the †
+preamble above), the 5 that are not are exactly the 5 checksums, and the
+motivating number — eleven of fifteen tampers in `tolerance-prover` caught by
+the seal alone — was not folklore, measuring at 177 of 203 once the sweep could
+forge the seal instead of deleting it. Three
 false claims in `elohim`'s oldest traps died on the way. Then `D1`, because a
 gate nothing outside the repository can consume is a gate with no users, and it
 is shipped: `--all`, `--fail-under` and a versioned `schema` key, with the clean
