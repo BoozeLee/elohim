@@ -46,6 +46,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 PYPROJECT = REPO_ROOT / "pyproject.toml"
 CLI = REPO_ROOT / "elohim_gate" / "cli.py"
 RUNNER = REPO_ROOT / "skills" / "elohim-harness" / "scripts" / "harness_run.py"
+PUBLISH = REPO_ROOT / ".github" / "workflows" / "publish.yml"
 
 
 def _text() -> str:
@@ -261,6 +262,159 @@ def test_the_harness_does_not_import_the_package():
     assert not re.search(r"^\s*(import|from)\s+elohim_gate\b", body, re.MULTILINE), (
         "the harness now imports elohim_gate; a standalone "
         "`python3 harness_run.py` in a bare checkout would break"
+    )
+
+
+
+# --- the dry run -----------------------------------------------------------
+#
+# The publish workflow is `workflow_dispatch`-only, which means its first
+# execution is also its first opportunity to be wrong, in the one step that
+# writes to a public index and cannot be undone. This repository has shipped two
+# workflows that had never executed; both were defective -- one in 12 seconds,
+# one in 8 -- and both read as correct in review. A flag that is wired but
+# untyped is that same class of defect, and worse, because it fails open:
+#
+#   inputs:
+#     dry_run:            # no `type:`
+#       default: false
+#
+# dispatches `dry_run` as the *string* "false", which is truthy in a GitHub
+# expression, so `!inputs.dry_run` is false and the upload runs anyway. The
+# safety control silently becomes its own inverse. So the type is asserted
+# rather than assumed, and the last test here is the control that proves these
+# assertions can fail.
+
+# `type: boolean` at the input's own indentation, with only the input's own keys
+# allowed between the name and the type.
+DRY_RUN_TYPE = re.compile(
+    r"^[ \t]+dry_run:[ \t]*\n(?:^[ \t]+.*\n)*?^[ \t]+type:[ \t]*boolean[ \t]*$",
+    re.MULTILINE,
+)
+
+# A step begins at a `- name:` / `- uses:` / `- run:` line.
+STEP_START = re.compile(r"^[ \t]*(?:-[ \t]+)?(?:name|uses|run):", re.MULTILINE)
+
+# The guard, wherever it sits. Counted as well as matched, because a condition
+# on the *job* is satisfied by a dry run that skipped the build.
+GUARD = re.compile(r"^[ \t]*if:[ \t]*\$\{\{[^\n]*!inputs\.dry_run[^\n]*$",
+                   re.MULTILINE)
+
+
+def _workflow() -> str:
+    return PUBLISH.read_text(encoding="utf-8")
+
+
+def _publish_step(text: str) -> str:
+    """The lines of the `publish to PyPI` step, or "" if there is no such step.
+
+    Scoped by *step*, not by file. Every assertion below is about where the
+    `if:` sits: a condition anywhere in publish.yml that mentions `dry_run` is
+    satisfied by an upload that is ungated.
+    """
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if re.match(r"^[ \t]*(?:-[ \t]+)?name:[ \t]*publish to PyPI[ \t]*$", line):
+            indent = len(line) - len(line.lstrip())
+            rest = []
+            for nxt in lines[i + 1:]:
+                if STEP_START.match(nxt) and \
+                        len(nxt) - len(nxt.lstrip()) == indent:
+                    break
+                rest.append(nxt)
+            return "\n".join(rest)
+    return ""
+
+
+def test_the_dry_run_input_is_declared():
+    """Without the input there is no way to run the workflow without its one
+    irreversible step, so 'first run' and 'first publish' stay the same event."""
+    assert "dry_run:" in _workflow(), (
+        "publish.yml declares no dry_run input; the workflow can then only be "
+        "exercised by actually publishing"
+    )
+
+
+def test_the_dry_run_input_is_typed_boolean():
+    """The load-bearing assertion. An untyped input is the string "false",
+    which is truthy, so `!inputs.dry_run` is false and the upload happens on the
+    run that asked it not to."""
+    assert DRY_RUN_TYPE.search(_workflow()), (
+        "the dry_run input must declare `type: boolean`; without it GitHub "
+        "dispatches the default as a string and the guard inverts"
+    )
+
+
+def test_the_upload_step_is_gated_on_the_dry_run():
+    """The step that writes to PyPI, and only that step, must refuse to run
+    under a dry run."""
+    step = _publish_step(_workflow())
+    assert step, "publish.yml has no `publish to PyPI` step to gate"
+    assert GUARD.search(step), (
+        "the publish step must carry `if: ${{ !inputs.dry_run }}`; found no "
+        "such condition on that step:\n%s" % step
+    )
+
+
+def test_the_dry_run_still_builds_and_verifies():
+    """A dry run that skips the work is not a dry run, it is a green check that
+    checked nothing. So the guard must appear exactly once, and on the upload
+    step: a second occurrence would most likely be a job-level condition that
+    skipped the build and the verification along with the upload."""
+    found = GUARD.findall(_workflow())
+    assert len(found) == 1, (
+        "expected exactly one `!inputs.dry_run` condition in publish.yml, found "
+        "%d: %r. A second one is most likely a job-level `if:`, which skips the "
+        "build and the verification too, so the dry run reports success without "
+        "having checked the artifact." % (len(found), found)
+    )
+    assert "uses: pypa/gh-action-pypi-publish" in _publish_step(_workflow()), (
+        "the publish step no longer uses the trusted-publishing action, so this "
+        "section is asserting about a workflow that publishes another way"
+    )
+
+
+def test_these_assertions_can_fail():
+    """The control. Every assertion above is a regular expression over a file,
+    and a regular expression that cannot fail proves nothing. Deleting the
+    guard from the publish step -- the exact defect the third test exists to
+    catch -- must make it fail, and doubling it must make the fourth fail too.
+    Without this, a typo in GUARD or in _publish_step would leave the whole
+    section reporting success unconditionally.
+    """
+    text = _workflow()
+    guard_lines = [ln for ln in text.splitlines() if GUARD.match(ln)]
+    assert len(guard_lines) == 1, "expected exactly one guard line to manipulate"
+
+    # Control 1: the publish step carries no guard at all.
+    ungated = re.sub(
+        r"^[ \t]*if:[ \t]*\$\{\{[^\n]*!inputs\.dry_run[^\n]*\n", "",
+        text, count=1, flags=re.MULTILINE)
+    assert ungated != text, "the control removed nothing"
+    assert not GUARD.search(_publish_step(ungated)), (
+        "GUARD still matches a publish step with its if: deleted, so the "
+        "gated-step assertion cannot tell a gated workflow from an ungated one"
+    )
+    assert len(GUARD.findall(ungated)) == 0
+
+    # Control 2: a second guard, the "dry run that checks nothing" defect.
+    # The duplicate is the guard line itself; appending a bare key after it
+    # would not be a second guard, which is what the first run of this control
+    # accidentally tried.
+    duplicated = text.replace(guard_lines[0],
+                              guard_lines[0] + "\n" + guard_lines[0], 1)
+    assert len(GUARD.findall(duplicated)) == 2, (
+        "duplicating the guard did not produce two, so the exactness assertion "
+        "in the fourth test is not measuring what it claims to"
+    )
+
+    # Control 3: the untyped input, the failure mode that inverts the flag.
+    untyped = re.sub(r"^[ \t]+type:[ \t]*boolean[ \t]*\n", "", text, count=1,
+                     flags=re.MULTILINE)
+    assert untyped != text, "the control found no `type: boolean` to remove"
+    assert not DRY_RUN_TYPE.search(untyped), (
+        "DRY_RUN_TYPE still matches with the `type: boolean` line removed, so it "
+        "is matching something other than the type it claims to require"
     )
 
 
