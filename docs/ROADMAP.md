@@ -874,6 +874,62 @@ invisible while no foreign tree was reachable; it is the substance of `E2`'s
 difficulty, and it is why the refusal now names the per-skill reason instead of
 saying only that a shard was not reproducible.
 
+**How the coupling was ruled on, 2026-10-03, and one verdict overruled.** A
+judgment consult was asked whether to scope each skill's facts to its own
+ledger's universe — the aggressive fix, which would make a skill's verdict
+independent of its neighbours — and returned 0.70 at confidence 0.40. That is
+below the bar this repository treats as a decision, so it was reasoned out
+rather than executed, and it is recorded here because the reasoning goes the
+other way. `_cite_universe` pools every fact's cited numbers across every ledger
+in the tree *so that one skill's claim can be resolved by another skill's pinned
+value*; that is cross-skill claim binding, and it is the mechanism, not an
+accident. Scoping the universe per skill would turn every currently-passing
+cross-skill citation into an `unclassified number` FAIL across all six skills —
+the opposite of a fix, and one that would have broken the repository's own gates
+to make a hypothetical caller's tree tidier.
+
+What was built instead is the half of the question that survives the reasoning:
+make the coupling impossible to hit silently. The payload `run_gate` returns
+already carried the reason — `claim_binding`'s `failures`, each with the fact,
+the literal and the problem — and nothing read it. Measured on a one-skill caller
+tree, the refusal was `pristine tree is not PASS (FAIL)`; it now reads
+`pristine tree is not PASS (FAIL) -- claim binding: 1 unbound claim(s) --
+unclassified number '192': closest pinned value 183.0 at relative gap 0.0492.
+Bind it, mark it structural, or declare it in claim_binding_exemptions.json with
+a reason.` A FAIL nobody explained stays unexplained rather than being given an
+invented cause.
+
+**Two infrastructure decisions taken the same day, and one declined.** A second
+consult was asked three questions about the repository's own plumbing. The first,
+whether CI should execute `action.yml` rather than only reading it as text, came
+back 0.86 at confidence 0.72 — the only verdict in the batch that cleared the
+bar, and it was executed:
+`.github/workflows/action.yml` checks this repository out into a subdirectory,
+assembles a caller tree at the workspace root holding the six instrument skills
+and not the harness, and runs the Action against it. Checked out at the root
+instead, the run would pass whether or not the seam worked. Its first act is a
+negative control that must fail the step, and a following step fails the job if
+it succeeded.
+
+The second, whether the declared version should be gated against the newest
+changelog section rather than corrected once, came back 0.72 at confidence 0.44 —
+a prior, agreed with on the evidence rather than on the number.
+`tests/test_version_agreement.py` reads `pyproject.toml`,
+`elohim_gate/__init__.py` and `uv.lock` and requires all three to equal the
+newest released section. It fired on the tree it was written for: two of the
+three said `0.1.0` while the tag said `v0.2.0`, so a wheel built from the
+released tree installed as something other than what it was released as, and
+`docs/DISTRIBUTION.md` had documented that filename as the expected output.
+
+The third, whether to add release automation, came back at exactly 0.50 with
+confidence 0.00. A distribution with no spread in it is not a judgment, so it was
+declined locally and the reasoning is written down rather than left as a silence:
+`E3` defers the version promise on purpose, a build-on-tag workflow would itself
+go unexercised until the next tag, and the defect it would most plausibly catch
+— a version that disagrees with the tag — is now covered by a gate that runs on
+every commit. Nothing is deleted silently here; this is the entry recording that
+the question was asked and answered no.
+
 ---
 
 ## What is deliberately not on this list
