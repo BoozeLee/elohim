@@ -1,0 +1,94 @@
+# Publish to PyPI — by hand, never by tag
+
+# This exists because PyPI Trusted Publishing's security model requires it, and
+# saying that is the whole reason this file is here rather than a design choice.
+#
+# Trusted Publishing works by PyPI trusting ONE workflow file, on ONE repository,
+# on ONE branch, optionally inside ONE named environment. There is no other
+# mechanism: a long-lived API token is the alternative, and a token is a
+# credential that outlives the thing it was issued for. So a publish workflow is
+# not optional infrastructure for this mode -- it IS the trust boundary. The
+# earlier planning round was wrong to say Trusted Publishing "needs no such
+# workflow", and it was wrong in a way only a measurement could have caught:
+# there was no publish workflow in the tree to be configured against.
+#
+# What this deliberately is NOT, because a build-on-tag workflow was declined at
+# 0.29 and that decline still stands:
+#
+#   * It does not run on a tag push. `on:` is `workflow_dispatch` and nothing
+#     else. Pushing v0.3.0 publishes nothing.
+#   * It does not decide the version. The version comes from `pyproject.toml`,
+#     which a human edits.
+#   * It does not decide that a release happens. A human runs it.
+#
+# So the earlier reasoning holds in the form it was meant to: publishing is a
+# human decision about WHAT to release, and this workflow is CI executing a
+# decision already made rather than making one. The refusal was to automation
+# choosing the moment, not to CI existing.
+#
+# The `environment` line is load-bearing and is the one thing a human must get
+# right on the PyPI side. An environment is what stops a workflow on a feature
+# branch from publishing, because a run must be approved for that environment
+# first. It is named `pypi`; the trusted publisher on PyPI must name the same
+# string or every publish fails at upload with an opaque OIDC error.
+
+name: Publish to PyPI
+
+on:
+  # Only this. A tag push publishes nothing, and that is the point.
+  workflow_dispatch:
+
+# `contents: read` matches every other workflow in this repository.
+# `id-token: write` is what mints the OIDC token PyPI exchanges for a
+# short-lived upload credential. It is the entire basis of the trust, and it is
+# why no secret is stored anywhere: a leak of this repository's CI cannot mint a
+# PyPI credential, because minting one requires a real run of this file on the
+# protected branch inside the `pypi` environment.
+permissions:
+  contents: read
+  id-token: write
+
+# One job. A publish is a single irreversible act, and splitting it across jobs
+# would mean a partial release: built but not uploaded, or uploaded but not
+# verified.
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    # See the note above. A run must be approved for this environment, which is
+    # what makes a feature-branch workflow unable to publish.
+    environment: pypi
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # 3.14 only, and for the same reason the `wheel` job in ci.yml is 3.14
+      # only: this is a packaging operation, and the directory layout it produces
+      # does not vary by interpreter. The mathematics is what varies across
+      # 3.10-3.14, and `ci.yml`'s `core` job is what measures that.
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      - name: install the wheel builder
+        run: >-
+          python3 -m pip install --disable-pip-version-check
+          "build==1.5.0" "hatchling==1.32.4"
+
+      # The same two pins as the `wheel` job in ci.yml, deliberately. They are
+      # duplicated rather than read from a table because a workflow cannot
+      # import a value from another workflow, and because a pin that drifts
+      # between the job that proves the artifact and the job that uploads it
+      # proves it for one build and ships another.
+      - name: build the distribution
+        run: python3 -m build --outdir dist/
+
+      # v1.14.2. The sha is the commit the annotated tag v1.14.2 resolves to,
+      # dereferenced rather than copied from the tag object, so it names code
+      # rather than a name that can be moved.
+      - name: publish to PyPI
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+
+      # The upload succeeding is not the same as the artifact being installable,
+      # and only the second is what anyone consumes. This is the same proof
+      # `tools/verify_wheel.py` gives, run against what was actually published.
+      - name: the published artifact installs and its API runs
+        run: python3 tools/verify_wheel.py

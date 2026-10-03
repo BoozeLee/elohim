@@ -26,6 +26,91 @@ sibling repository that has moved since the sentence was written.
 
 ---
 
+## What happened — 2026-10-03, same day
+
+Every phase below was executed rather than planned. Three findings changed the
+plan while it was running, and two of them are the reason it is worth reading.
+
+| phase | outcome |
+|---|---|
+| **F.1** mirror decline on a measurement | done — `Found 7 skills`, replacing a citation |
+| **F.2** collision refuted | done — the two rules never meet; counterfactual is 7 false duplicates |
+| **F.3** two false viewer claims | done — corrected, and the surviving limit kept |
+| **G.1** budget measured | done — ~30 s of gates against 900 s; `timeout-minutes` left alone |
+| **G.2** first CI execution | done — **and it found a real defect in twelve seconds** |
+| **G.3** 19 commits accounted | done — grouped, prose left to release day |
+| **D.1** `allowed-tools` | done — opencode parses and type-checks it, then discards it |
+| **D.2** adapter | done — after the first attempt used a directory convention that 1.18.32 does not have |
+| **E** Trusted Publishing | premise **failed**; the fix is in `publish.yml`, and the PyPI side needs a person |
+
+### Three findings that changed the plan
+
+**1. The workflow had been failing since it was written.** `matrix.yml` said
+`uv python install 3.10 3.11 3.12 3.13 3.14`, which resolves each minor to
+whatever is newest *today*. On 2026-10-03 that is 3.11.15, while all six
+documented surfaces name **3.11.9** — the patch that was actually measured. The
+gate refused in twelve seconds:
+
+```
+verify_interpreter_claim: the documented range names ['3.11.9'], which is not
+installed here.
+```
+
+The other four minors still matched, which is why exactly one was reported
+missing and why this looked like a slow time bomb rather than a line that had
+already failed. The old comment argued the minors were correct — "a workflow
+that dictated the answer would remove the need for the check rather than
+performing it." That is sound about the wrong claim: a minor-only spec is still
+a claim, and it is a claim that drifts. Fixed by pinning the five exact patches;
+run 37103114108 then passed the whole job in **39 s**.
+
+**2. `allowed-tools` is neither honoured nor ignored.** Measured against
+opencode 1.18.32, and neither source had it:
+
+- the **string** form (`allowed-tools: read, bash`, the common convention) raises
+  `Invalid frontmatter … allowed-tools: Expected array, received string`. So it
+  is emphatically **not** "silently ignored";
+- the **array** form loads cleanly, and the value then appears **nowhere** — not
+  in `opencode debug skill`'s object, not anywhere in the resolved
+  `opencode debug config`.
+
+So: **opencode parses and type-checks the field, then discards it.** The
+compatibility matrix's "OpenCode: Yes" is right that it is supported; the earlier
+research's "silently ignored" is right about the effect and wrong about the
+silence. Consequence: elohim does not ship `allowed-tools` expecting it to
+restrict anything, because a field that parses and does nothing is worse than one
+that errors.
+
+**3. Trusted Publishing's premise was false.** The plan said it "needs no such
+workflow", because a build-on-tag workflow had been declined at 0.29. But
+Trusted Publishing works *by* trusting one specific workflow file on one
+repository, branch and environment — with no publish workflow in the tree, there
+was nothing to configure. Verified: `elohim` is not on PyPI at all (HTTP 404),
+and the repository has exactly four workflows, none of which publishes. Jev
+settled the way out at **0.99 / confidence 0.99**: a `workflow_dispatch`-only
+`publish.yml`, which leaves the build-on-tag decline untouched. The PyPI-side
+registration still needs a person.
+
+### The credibility claim, now tested on a real runner
+
+```
+verify_interpreter_claim: OK  5 interpreter(s), 6 surface(s) agree
+verify_skill_roots:      OK  no duplicated name across 0 project-local roots
+verify_skill_roots:      OK  1 duplicate(s) still caught
+verify_skill_frontmatter: OK 14 skill(s) well-formed across 2 root(s)
+verify_skill_frontmatter: OK 2 defect(s) still caught
+verify_agents_drift:     OK  5 command(s) in job 'core' named by 2 document(s)
+verify_agents_drift:     OK  1 drift(s) still caught
+```
+
+All four gates, each in both directions, on a runner that had never executed any
+of them before. Interpreter Matrix 43 s, CodeQL 56 s, Core CI 5 m 43 s. Before
+this, that claim was untested — which is precisely the state the previous plan
+recorded about the 43-test suite no CI job ran.
+
+
+---
+
 ## Decisions this plan rests on, and where they came from
 
 Six questions went to Jev. Two were settled by taking a measurement instead of
@@ -517,22 +602,40 @@ skills@1.7.0 add BoozeLee/elohim --list` and gets a different count, the count i
 
 ## Open questions for the owner
 
-**Q1 — do the committed fixtures get a `ROADMAP` line?**
-Jev: `add_the_line` 0.54 / conf 0.39, against `no_line_needed` 0.43. The closest
-call of the six. Both are defensible; the `ROADMAP` already says each gate ships
-with a fixture run in the opposite direction.
+**All four are answered.** What remains needs a person in a browser, not a
+judgement.
 
-**Q2 — what happens to the 18 unpushed commits?**
-Jev: `push_to_a_branch` 0.49 / conf 0.32, against `local_measure_first` 0.37 and
-`push_now` 0.14. Jev has never been asked to act here and cannot: it judges, it
-does not push, and the account holds an always-bypass on the only ruleset, so a
-push from this host is not a test of the rule either. Four gates have never run.
-The user has, in this project's whole history, only ever said "commit".
+**Q1 — do the committed fixtures get a `ROADMAP` line? — ANSWERED: yes.**
+Jev: `add_the_line` 0.54 / conf 0.39, against `no_line_needed` 0.43. Written
+into `docs/ROADMAP.md`: inert text, deliberately malformed, no real skill name,
+five or more levels deep.
 
-**Q3 — is Phase D authorised at all?**
-It writes to `~/.config/opencode/`, which does not currently exist, and installs
-an adapter that claims a guard it cannot enforce.
+**Q2 — what happens to the 18 unpushed commits? — ANSWERED: push to a branch,
+and open a pull request.** Jev: `push_to_a_branch` 0.49 / conf 0.32. The branch
+push alone triggers nothing — `matrix.yml` and `ci.yml` both fire on
+`pull_request:` and `push: branches: [main]`, so **the PR is what runs them**.
+That was worth establishing before pushing, because a branch push and a PR are
+different acts with different effects and only one of them is a measurement.
 
-**Q4 — is Phase E authorised at all?**
-It is PyPI account configuration and an irreversible public artefact. Test-mode
-payments only until a first real transaction, per the standing rule.
+**Q3 — is Phase D authorised? — ANSWERED: yes, in full.** Executed. D.1 measured
+the binary; D.2 installed the plugin. The first attempt assumed a
+`~/.config/opencode/tools/` directory convention and a filename-becomes-tool-name
+rule; opencode 1.18.32 has neither — custom tools arrive through a plugin's
+`Hooks.tool` map, and `opencode debug config` showed **zero** trace of the file
+in its original location. It is now at
+`~/.config/opencode/plugins/elohim-gate.ts`, which auto-discovers with no
+`opencode.json` entry at all, and that file was not left in the config. Recorded
+because it is the same assert-a-state-instead-of-measuring-it failure this
+repository keeps finding, committed by me.
+
+**Q4 — is Phase E authorised? — ANSWERED: yes, in full.** Executed as far as the
+repository is concerned. `publish.yml` is written, dispatch-only, with the
+`pypi` environment and `id-token: write`. **What is left needs the owner, in a
+browser:** register the trusted publisher on PyPI naming owner `BoozeLee`,
+repository `elohim`, workflow `publish.yml`, environment `pypi`. Every other
+field was verified from here — `full_name` is `BoozeLee/elohim`, the default
+branch is `main`, the repository is public, and `elohim` is not on PyPI yet, so
+there is no name to collide with. A publisher configured against a workflow that
+does not exist fails at upload rather than at configure time; that failure mode
+is now closed by the workflow existing.
+
