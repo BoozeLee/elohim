@@ -52,9 +52,40 @@ SHA_PIN = re.compile(r"^[\w.-]+/[\w.-]+(?:/[\w.-]+)*@([0-9a-f]{40})$")
 # name wearing a pin's clothes.
 RELEASE = re.compile(r"^v\d+(\.\d+)*$")
 
-# The one reference that is legitimately not a third-party pin: an action in the
-# repository being built, read from the checkout.
+# A local action reference: `./` or a path inside the checkout, e.g.
+# `./instrument`. It cannot be a third-party reference, because `SHA_PIN` requires
+# an `owner/repo@<40 hex>` and a `./`-prefixed value never has an `@`. So the
+# exemption below is not a hole in the mutable-reference rule -- it is the same
+# rule, applied to the one form that is genuinely not third-party.
 LOCAL = "./"
+
+# The `path:` of a checkout step, which is what makes a local reference
+# resolvable. A local action reference is a path into the workspace, so whether it
+# resolves depends entirely on whether some checkout in the same manifest put this
+# repository there. That is checkable from the manifest's own text, and checking it
+# is what turns the exemption from a string comparison into a verified fact.
+CHECKOUT = re.compile(r"^[ \t]*(?:-[ \t]+)?uses:[ \t]*actions/checkout@", re.MULTILINE)
+PATH_KEY = re.compile(r"^[ \t]+path:[ \t]*(\S+)[ \t]*$", re.MULTILINE)
+# The next step starts here. A `path:` after it belongs to a different step and is
+# not evidence about this one.
+NEXT_STEP = re.compile(r"^[ \t]*(?:-[ \t]+)?(?:uses|name|run):", re.MULTILINE)
+
+
+def _checkout_paths(text: str) -> set:
+    """Every directory a checkout step in this manifest checks out into.
+
+    The absence of a `path:` is itself a fact: a checkout with no `path` puts the
+    repository at the workspace root, which is what makes a bare `./` resolve.
+    """
+    paths = set()
+    for match in CHECKOUT.finditer(text):
+        rest = text[match.end():]
+        boundary = NEXT_STEP.search(rest)
+        step = rest[: boundary.start()] if boundary else rest
+        found = PATH_KEY.search(step)
+        paths.add(found.group(1).strip("\"'") if found else ".")
+    return paths
+
 
 
 def _manifests() -> list[Path]:
@@ -75,11 +106,32 @@ def test_every_third_party_action_is_pinned_to_a_named_commit():
     """No mutable reference survives in any workflow."""
     unpinned: list[str] = []
     unreleased: list[str] = []
+    dangling: list[str] = []
     pinned = 0
     for path in _manifests():
-        for value, comment in USES.findall(path.read_text(encoding="utf-8")):
+        text = path.read_text(encoding="utf-8")
+        checkouts = _checkout_paths(text)
+        for value, comment in USES.findall(text):
             where = f"{path.name}: {value}"
-            if value == LOCAL:
+            if value.startswith(LOCAL):
+                # A local reference is only legitimate if a checkout in this same
+                # manifest puts the repository where the reference points. Without
+                # this the gate exempted `./` on the strength of a string
+                # comparison, and `.github/workflows/action.yml` used `uses: ./`
+                # while checking out into `path: instrument` -- so it pointed at a
+                # workspace root that deliberately holds no copy of this
+                # repository. It failed on its first execution in eight seconds
+                # with "Can't find 'action.yml' ... Did you forget to run
+                # actions/checkout before running your local action?", and nothing
+                # in the repository could have said so beforehand.
+                target = value[2:].strip("/") or "."
+                if target not in checkouts:
+                    dangling.append(
+                        f"{where} -- no checkout step in this manifest puts the "
+                        f"repository at {target!r}, so the reference cannot resolve "
+                        f"(checkouts declare: "
+                        f"{', '.join(repr(c) for c in sorted(checkouts)) or 'none'})"
+                    )
                 continue
             if not SHA_PIN.match(value):
                 unpinned.append(f"{where} -- not owner/repo@<40 hex sha>")
@@ -90,11 +142,17 @@ def test_every_third_party_action_is_pinned_to_a_named_commit():
                     f"{where} -- pinned, but the trailing comment names no release "
                     f"(found {comment or 'no comment'}; expected `# v7`, `# v7.0.1`)"
                 )
-    assert not unpinned and not unreleased, (
+    assert not unpinned and not unreleased and not dangling, (
         "every third-party action must be pinned to a 40-character commit sha and "
         "named by its release, because a tag or a branch is a mutable reference "
-        "inside a gate that decides whether a claim was verified.\n  mutable: "
-        + "\n  ".join(unpinned) + "\n  unnamed: " + "\n  ".join(unreleased)
+        "inside a gate that decides whether a claim was verified. Every LOCAL "
+        "reference must be backed by a checkout step that puts the repository "
+        "where the reference points.\n  mutable: "
+        + "\n  ".join(unpinned)
+        + "\n  unnamed: "
+        + "\n  ".join(unreleased)
+        + "\n  dangling: "
+        + "\n  ".join(dangling)
     )
     # The control for the control: a pattern that stopped matching would leave the
     # assertions above vacuously true. Measured against the manifests actually on
@@ -113,6 +171,26 @@ def test_the_extractor_actually_discriminates():
     assert USES.findall("        uses: a/b@" + "0" * 40 + " # v7") == [("a/b@" + "0" * 40, "v7")]
     assert USES.findall("      - uses: ./") == [("./", "")]
     assert USES.findall("      uses: ./") == [("./", "")], "must not require the dash"
+
+    # The control for `_checkout_paths`, for the same reason as the rest of this
+    # test: a helper that quietly stopped matching would leave the dangling check
+    # vacuously empty, and an empty list is what "everything is fine" looks like.
+    assert _checkout_paths(
+        "      - uses: actions/checkout@abc\n        with:\n          path: instrument\n"
+    ) == {"instrument"}
+    assert _checkout_paths(
+        "      - uses: actions/checkout@abc\n        with:\n          ref: v1\n"
+    ) == {"."}, "a checkout with no path puts the repository at the root"
+    assert _checkout_paths("      - name: build\n        run: make\n") == set()
+    assert _checkout_paths(
+        "      - uses: actions/checkout@abc\n        with:\n          path: one\n"
+        "      - uses: actions/checkout@abc\n        with:\n          path: two\n"
+    ) == {"one", "two"}, "every checkout counts, not just the first"
+    # A `path:` belonging to a different step is not evidence about this one.
+    assert _checkout_paths(
+        "      - uses: actions/checkout@abc\n        with:\n          ref: v1\n"
+        "      - name: later\n        with:\n          path: not-this-one\n"
+    ) == {"."}
 
     assert SHA_PIN.match("actions/checkout@" + "a" * 40) is not None
     assert SHA_PIN.match("github/codeql-action/init@" + "a" * 40) is not None, (
