@@ -6,7 +6,7 @@ All notable changes to this project are recorded here. The format follows
 rather than promising compatibility: the tip of `main` is the only supported
 version, and no version is covered by a stability guarantee.
 
-## [Unreleased]
+## [0.2.0] — 2026-10-03
 
 Nine roadmap items close in this range, and one of them closes two of its three
 clauses and no more: `A2`, `A3`, `B1`, `B2`, `C2`, `C3`, `D1`, `V1`, and the
@@ -336,6 +336,11 @@ range** is the last heading, and it is a sum rather than a bullet count.
 - The commits that wrote this section, and any after it, are not in it. The
   accounting below is complete as of the commit before this file changed; the
   released range is `afb61a3..v0.2.0` and the two commands below re-derive it.
+- **This version is not tagged and not published yet.** The heading is the
+  declaration, not the event. The gate in
+  `docs/superpowers/plans/v0.2.0-release.md` is what stands between this line
+  and a published release, and it needs an explicit instruction that states the
+  orphaned `v0.1.0` in the same breath.
 
 ### How to check this section is complete
 
@@ -432,5 +437,6 @@ pinned facts and 31 independently re-derived traps.
   unpinned and reported as noise instead.
 - `main` is not branch-protected. Review the diff.
 
-[Unreleased]: https://github.com/BoozeLee/elohim/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/BoozeLee/elohim/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/BoozeLee/elohim/compare/afb61a3...v0.2.0
 [0.1.0]: https://github.com/BoozeLee/elohim/releases/tag/v0.1.0

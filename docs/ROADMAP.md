@@ -914,7 +914,10 @@ one.
 Written 2026-10-03. This is the first release planned in this file, so the shape
 below is the one to argue with.
 
-### Two things block it, and neither is code
+### What is in the way
+
+Two things were named here as blocking. One was resolved by recording a fact; the
+other is resolved by the act this section now describes. Neither is code.
 
 **`v0.1.0`'s tag no longer points at this history.** The 2026-10-02 re-sign
 rewrote all 53 commits onto verified email addresses so GitHub would badge them,
@@ -931,15 +934,23 @@ endpoint exposes. **This needs a person in Settings → Rules.** Until it is
 resolved, `v0.2.0` either ships without a resolvable predecessor or ships
 against a tag that points into a rewritten history.
 
-**54 commits are unreleased against 9 changelog bullets.** `git rev-list --count
-afb61a3..main` was 54 when this section was last measured on 2026-10-03, and it
-grows with every commit — re-measure it rather than trusting the number here. It
-already closes nine roadmap items (`A2`, `A3`, `B1`, `B2`, `C2`, `C3`, `D1`,
-`V1`, and both `E1` slices — whose third clause is still open, see `E2`). The
-`[Unreleased]` section holds 9 bullets. The changelog has not
-been kept up with the tree, and this project is unusually well placed to notice
-that and unusually bad at noticing it, because the whole argument is that a
-claim nobody re-derives is not a fact.
+**Closed by recording, not by moving.** The `0.2.0` changelog now states the
+orphan, its cause and the choice to publish anyway, which is the first condition
+in the table below, and it names the consequence: the range this release describes
+is `afb61a3..v0.2.0`, not `v0.1.0..v0.2.0`. Recording the decision is not the
+same as taking it, and the changelog says so in the same paragraph. The tag still
+needs a person in Settings → Rules if a resolvable predecessor is ever wanted.
+
+**The changelog gap is closed.** This section previously read "54 commits are
+unreleased against 9 changelog bullets", which was true when it was written and
+false by the time it was written. The `[0.2.0]` section now groups every
+unreleased commit under the roadmap item it closes, counts them in a table whose
+groups sum to a measured total, and gives the two commands that re-derive both —
+so the gap is a claim somebody can re-check rather than a claim this file makes.
+It closed nine roadmap items — `A2`, `A3`, `B1`, `B2`, `C2`, `C3`, `D1`, `V1`,
+and the first two `E1` clauses, the third still open per `E2` — and every commit
+in the range is grouped under the one it closes. The counting discipline did not
+change: re-measure it rather than trusting any number printed in this file.
 
 ### Recommended: `v0.2.0`
 
@@ -956,7 +967,7 @@ Each line is written as the condition that closes it, not as a task.
 | Item | Done when |
 |---|---|
 | The tag | `v0.1.0` points at `afb61a3`, or the decision to leave it orphaned is recorded in the changelog with the reason. |
-| `[Unreleased]` rewritten | Every unreleased commit is either a changelog entry or explicitly out of scope. |
+| `[0.2.0]` rewritten | Every unreleased commit is either a changelog entry or explicitly out of scope. |
 | The semver sentence | Corrected, as its own commit, because a changelog that denies its own version numbers is the same defect class this project exists to catch. |
 | `elohim_gate` recorded | The `tools/` → `elohim_gate/` move is in the changelog under Changed, with the breaking-ness stated. |
 | A changelog for the viewer | `BoozeLee/elohim-gate-viewer` shipped a report page and a Pages workflow with no CHANGELOG at all. A release with no release record is the failure mode, not the exception. |
