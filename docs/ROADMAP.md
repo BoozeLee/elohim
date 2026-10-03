@@ -1645,7 +1645,7 @@ attemptable, and a failure in any of them wastes the attempt.
 |---|---|---|
 | 1 | A PyPI trusted publisher exists for `BoozeLee/elohim` / `publish.yml` / environment `pypi` | **NOT MET — owner's browser.** No `~/.pypirc`, no `pypi.toml`, and no `PYPI_*` or `TWINE_*` variable on any host this work is done from. `twine`, `poetry` and `uv` are installed and all three *upload*; none can register a trusted publisher. The four values above are verified; the registration is not made. |
 | 2 | The name `elohim` is still free on PyPI at the moment of upload | 404 on 2026-10-03. Re-check immediately before publishing, not now — a name free today can be taken tomorrow, and a taken name is a rename, which is a version decision, not a retry. |
-| 3 | The `0.3.0` changelog range accounts for every commit intended to be in it | **NOT MET.** Two remote branches, `feat/roadmap-corrections` and `push/c1-through-b1`, have never been inspected. If either carries unpushed work the range is incomplete. Owner's call. |
+| 3 | The `0.3.0` changelog range accounts for every commit intended to be in it | **MET — measured 2026-10-03, after being written down as an open question.** `git cherry origin/main <branch>` compares by patch-id, so it sees through a rebase or a reword: `push/c1-through-b1` is `-` on all 11 commits, and `feat/roadmap-corrections` is `-` on 16 of 17. The seventeenth, `86c82cb` *"ROADMAP: name the conditions on three pinned measurements"*, is `+` — and then was checked by content rather than by sha, because `+` means "no patch-identical commit", not "missing work". All four of its corrections are on `main`, reworded and expanded: the `A2` "measure before building" ordering (lines 144–147, 1279–1280), the 31.2 s contention analysis with the same 17.23–18.38 s uncontended band and 0.96 ratio (431–446), the retracted *"three items and none of them is code"* count, and `D3` marked shipped against `isDraft: false` / `isPrerelease: false` / HTTP 200 (504–505). The commit was superseded, not lost. The range is complete and both branches are safe to delete. |
 | 4 | The publish workflow has executed at least once without uploading | **MET.** Run `37108217139`, branch `dry-run/publish-gate`, conclusion `success`. Step 6 `publish to PyPI` reported `skipped`; steps 5 (build) and 7 (verify) both ran. |
 | 5 | The built wheel is the one the workflow would upload, and it says so | **MET.** Same run's log: `built: elohim-0.3.0-py3-none-any.whl`, then `version: elohim 0.3.0 \| metadata: 0.3.0 \| pyproject: 0.3.0`. |
 | 6 | The four places that declare the version agree | **MET.** `pyproject.toml`, `elohim_gate/__init__.py`, `uv.lock` and the newest `CHANGELOG.md` heading, enforced by `tests/test_version_agreement.py`. Its `SHAPE` rule is why there is no `## [Unreleased]` section. |
@@ -1654,8 +1654,12 @@ attemptable, and a failure in any of them wastes the attempt.
 | 9 | Every CI step whose name is a claim can fail | **MET for the nine found.** Eight already could. The ninth — *"assemble a caller tree that holds no checkout of this repository"* — asserted only that the tree held no harness and never that it held anything, and was green on a tree carrying five of six skills. Repaired to compare the two sets by name; the control that motivated the repair now exits 1. |
 | 10 | The Action's own numbers hold | **MET.** 1,679 population sites, 1,679 attempted, `share_of_population` 1.0, defect arm 3.94% against a 5% threshold, all six control digests agreeing. |
 
-Conditions 1 and 3 are the release. Neither is code, and neither can be
-finished from a machine that has no credential for either.
+Condition 1 is the release. It is not code, and it cannot be finished from a
+machine that has no credential for it. Condition 3 was the other open question
+when this table was written and was closed by measurement an hour later, which
+is worth noting for what it says about writing down a doubt: a flagged unknown
+that could have been answered from the repository is indistinguishable, in the
+moment, from one that cannot.
 
 ### What this section is not
 
