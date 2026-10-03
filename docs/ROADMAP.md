@@ -42,7 +42,20 @@ Measured, not asserted:
 | tampers caught by nothing but the sha256 | **404 of 522 (77.4 %)** |
 | CLI exit codes, each measured rather than assumed | 4 (0, 1, 2, 3) |
 | JSON payload contract version | `elohim.gate/1` |
-| tools in the repo that are not stdlib-only | 0 |
+| tools importing a third-party package — stdlib, the pinned dev group, and the first-party siblings loaded off `skills/` excluded | 0 |
+
+The last row is scoped because the scope is the measurement. Every import in
+every `*.py` outside the mirrored tree, resolved against
+`sys.stdlib_module_names`, leaves six files carrying a non-stdlib name, and not
+one of them is a third-party package at runtime. `harness_run.py` and
+`tools/claim_binding_selftest.py` import `claim_binding`, and
+`tools/mutation_survival.py` imports `seal_independence` — first-party siblings
+that each put `skills/` on `sys.path` and read from there. `tests/test_all.py`
+imports `submit` the same way, and two other test modules import `pytest`, which
+is a pin in the dev group. The shipped package `elohim_gate/` imports nothing
+outside the stdlib at all. Left unscoped the row reads `0` and is simply false
+the moment `pytest` is counted, with nothing in the document to say which
+counting was meant.
 
 The strongest result is the interpreter matrix, and it needed correcting before
 it could be called one. A 4-year span of CPython produces byte-identical
@@ -561,8 +574,20 @@ leak with a distinct source.
 **The verifier is a separate file, not a flag.** The load-bearing rule is that no
 existing gate may read `artifacts/`, and `harness_run.py` is precisely what all
 four gates execute. A flag inside it would satisfy that rule only by discipline; a
-separate file satisfies it structurally. Consequence: the gate runner and all 62
-mirrored files stayed untouched.
+separate file satisfies it structurally. Consequence: within this slice, the gate
+runner and all 62 mirrored files stayed untouched.
+
+> **Corrected 2026-10-03.** That consequence held for the slice and then stopped
+> being true of the tree, which is the same failure this file has already been
+> corrected for twice. `skills/elohim-harness/scripts/harness_run.py` — the file
+> every skill gate names as its entry point — has been modified by six commits
+> since, the most recent making an unpinned instrument declare that it is
+> deliberately unwritten. The sentence is corrected in place rather than deleted
+> so the structural argument stays readable next to its own expiry: putting the
+> reader in a separate file was right, and the claim about what that spared was
+> only ever true until something else needed the runner. The other half still
+> holds and was re-measured on 2026-10-03: 7 skills, 62 mirrored files excluding
+> `out/`.
 
 **The manifest got stronger than specified.** There is no `enforce` key and no off
 switch. A file present in `artifacts/` but absent from the manifest is itself a
