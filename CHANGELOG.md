@@ -192,6 +192,26 @@ range** is the last heading, and it is a sum rather than a bullet count.
 
 ### Fixed
 
+- **A shipped ledger could have its `instrument.sha256` deleted and still report
+  PASS.** `verify_pin` returned `status: unpinned`, and both consumers of that
+  status accepted it — `gate_skill` holds `{"PASS", "unpinned"}` and
+  `mutation.py:274` holds `("PASS", None, "unpinned")` — so the gate reported
+  success having compared no checksum at all. That checksum is not incidental: 25
+  of the 38 recorded traps fire without it, and the seal-independence argument
+  rests on it. Making `unpinned` fail was rejected, because `contract.md` promises
+  it as the state a new skill legitimately starts in, and forbidding it would
+  break both that workflow and the census. The defect was one signal carrying two
+  meanings — absent because the skill is being written, or absent because a
+  shipped ledger's pin was deleted. A ledger now declares
+  `instrument.bootstrap: true` when the absence is intentional, which yields
+  `unpinned`; an undeclared absence yields `MALFORMED`, which is in neither accept
+  set. `bootstrap` travels in the payload, so the reason moves with the verdict
+  instead of being inferred from an absence. A new case in `tests/test_all.py`
+  reads both accept sets out of their two sources with `ast` and requires that
+  `MALFORMED` is in neither, and requires the extraction to find exactly one set
+  per consumer — an extraction that matched nothing would otherwise report that
+  no consumer accepts `MALFORMED`, which is the most agreeable available way to be
+  wrong.
 - **A README claimed the skills were "discoverable by the agent-skill indexes
   that crawl public repositories".** They were not listed anywhere, and nobody
   had measured it. `skills.sh/BoozeLee/elohim/SKILL.md` returns a 41,077-byte
@@ -364,24 +384,32 @@ it is a sum:
 | Prose and record corrections (no roadmap item) | 8 |
 | Out of scope | 1 |
 | The release plan itself | 1 |
-| **Total** | **56** |
+| Ledger gate correctness, no roadmap item | 1 |
+| Release bookkeeping, written after this section | 4 |
+| **Total** | **61** |
 
 ```sh
 git rev-list --count afb61a3..HEAD
 git log afb61a3..HEAD --format=%s
 ```
 
-Read those against the right point or the second command above looks wrong. The
-table's total was measured on 2026-10-03 over `afb61a3..HEAD` as `HEAD` stood at
-the moment this file was written, which is one commit before the commit that
-wrote it. Run the same two commands against `v0.2.0` once it exists and the count
-will be larger by exactly the commits that write this section and rename its
-heading — re-measure rather than trusting the number printed here. The count is
-the weaker of the two checks anyway. The second command is the real one: it lists
-every subject in the range, so a commit missing from this section is a subject on
-that list that no entry accounts for. A bullet count is not a check. The failure
-this section exists to repair is a claim nobody re-derives — 54 commits stood
-against 9 bullets, and nothing in the repository said so.
+Read those against the right point or the second command above looks wrong. This
+table's total was first measured on 2026-10-03 over `afb61a3..HEAD` as `HEAD` stood
+one commit before the commit that wrote this section, and it read 56 then. The
+released range is 61. The five commits are this section itself, the commit that
+renamed its heading, the two that closed the release plan, and the ledger gate fix
+above — five, not the two this paragraph originally predicted, because three more
+landed after the prediction was written. An earlier draft of that sentence said the
+count would grow "by exactly the commits that write this section and rename its
+heading", which was wrong the moment a fourth session touched the tree. Re-measure
+rather than trusting the number printed here, and treat it as a sum to be checked
+against the range, not a figure to be quoted.
+
+The count is the weaker of the two checks anyway. The second command is the real
+one: it lists every subject in the range, so a commit missing from this section is a
+subject on that list that no entry accounts for. A bullet count is not a check. The
+failure this section exists to repair is a claim nobody re-derives — 54 commits
+stood against 9 bullets, and nothing in the repository said so.
 
 ## [0.1.0] — 2026-09-30
 
