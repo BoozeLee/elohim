@@ -10,11 +10,27 @@ readme = "README.md"
 requires-python = ">=3.10"
 license = "MIT"
 license-files = ["LICENSE"]
+# Present on PyPI's sidebar, and its absence was visible: a package with no
+# `authors` renders with nobody to contact, which for a tool whose whole claim is
+# that it can be audited is the wrong first impression.
+authors = [{ name = "Kiliaan Vanvoorden" }]
 keywords = ["evaluation", "verification", "reproducibility", "claims", "gate"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    # The interpreter range is this project's central claim and it is measured,
+    # not asserted: `skills/reproducibility` holds every sibling shard to the
+    # interpreter it was pinned under, and `ci.yml` runs 3.10 through 3.14 on
+    # every push. Declaring `>=3.10` and then listing only `:: 3` left the
+    # metadata contradicting the thing the package is for. Each minor below is
+    # one CI's `core` job has actually run green.
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Scientific/Engineering",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",

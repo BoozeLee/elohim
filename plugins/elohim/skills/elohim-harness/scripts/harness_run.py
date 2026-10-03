@@ -920,7 +920,25 @@ def print_human_all(payload: dict) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="parameterised ELOHIM gate")
+    # `prog` is left to argparse (None) unless the installed console script named
+    # itself, via `elohim_gate.cli`, which runs this file through
+    # `runpy.run_path(init_globals=...)`.
+    #
+    # The reason that is necessary: `runpy.run_path` assigns `sys.argv[0]` to the
+    # path it is running, for the duration of the run, through its own
+    # `_ModifiedArgv0`. argparse derives `prog` from `sys.argv[0]`, so the
+    # installed `elohim` command reported itself as `harness_run.py` -- an
+    # internal module shipped inside the wheel, which is not a name the user
+    # typed and not one they can invoke. Removing the assignment in cli.py did
+    # not help, because runpy was doing it anyway.
+    #
+    # Standalone runs are unaffected: `python3 harness_run.py` sets no such
+    # global, `globals().get` returns None, and argparse derives `prog` from
+    # argv[0] exactly as before.
+    parser = argparse.ArgumentParser(
+        prog=globals().get("__elohim_prog__"),
+        description="parameterised ELOHIM gate",
+    )
     parser.add_argument("--skill-dir")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--discover", action="store_true")

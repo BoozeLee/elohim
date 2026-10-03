@@ -49,9 +49,29 @@ def main() -> int:
         return 2
     if str(_PKG_ROOT) not in sys.path:
         sys.path.insert(0, str(_PKG_ROOT))
-    sys.argv[0] = str(runner)
+    # The program name is passed in, not achieved by editing sys.argv.
+    #
+    # `runpy.run_path` assigns `sys.argv[0]` to the path it is running for the
+    # duration of the run -- its own `_ModifiedArgv0` does this, and it does it
+    # whatever this module does to sys.argv. argparse derives `prog` from
+    # `sys.argv[0]`, so `elohim --help` printed `usage: harness_run.py`: an
+    # internal module shipped inside the wheel, which is not a name the user
+    # typed and not a name they can invoke. An earlier version of this file set
+    # `sys.argv[0] = str(runner)` itself, which looked like the cause and was not
+    # -- runpy was already doing exactly that, so removing the line changed
+    # nothing. The parser has to be told.
+    #
+    # `init_globals` is the narrow channel for that: it seeds the runner's module
+    # globals and nothing else, so a standalone `python3 harness_run.py` still
+    # finds no such global and still derives its own name.
+    #
+    # The inconsistency this caused was visible inside this same file, which
+    # printed `elohim: instrument runner missing` on its one error path while
+    # `--help` said `harness_run.py`.
     try:
-        runpy.run_path(str(runner), run_name="__main__")
+        runpy.run_path(
+            str(runner), run_name="__main__", init_globals={"__elohim_prog__": "elohim"}
+        )
     except SystemExit as exc:
         return int(exc.code or 0)
     return 0
