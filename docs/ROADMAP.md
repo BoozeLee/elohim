@@ -941,6 +941,43 @@ it the kind of document this repository exists to catch: one asserting the
 opposite of what the code does. Each entry below carries what it says now and,
 where the position moved, what moved it. Nothing here was deleted silently.
 
+### Declined on 2026-10-03, with the measurement
+
+- **A `.agents/skills/` mirror of the canonical tree.** This was on the list and
+  was taken off it. The argument for it was that `.agents/skills/` is one of the
+  paths `npx skills add` writes to, that without it the install route to 75+
+  harnesses does not work, and that `npx skills` is the only index an agent's
+  discovery path touches. Measured against `vercel-labs/skills` 1.7.0, all three
+  parts of that argument fail or invert:
+
+  1. **The install route already works.** That CLI's own discovery list names
+     `skills/` as a source root, covering "flat layouts
+     (`skills/<name>/SKILL.md`)" — which is exactly what this repository already
+     ships, under exactly that layout. The mirror's deliverable is met by the
+     directory that exists, so dropping it forfeits nothing.
+  2. **`.agents/skills/` is two things at once.** The same table lists it as the
+     *project* path for roughly twenty agents — Codex, Cursor, Gemini CLI,
+     Copilot, opencode, Cline, Zed and others — while the CLI also *writes* it as
+     an install target. Adding it here would put the same seven names into a
+     second root the installer itself walks, inside this repository. The
+     collision the mirror was meant to prevent is created by the mirror.
+  3. **It has already happened here.** `~/.agents/skills/elohim` on the author's
+     machine is this project: a real directory carrying
+     `metadata: author: BoozeLee`, dated 29 September. And `~/.agents/skills`
+     (199 real directories, 2 symlinks) against `~/.claude/skills` (167 real
+     directories, 24 symlinks) already share **109 names**, both being roots.
+     The non-deterministic resolution this rule exists to refuse is not a
+     hypothetical on this machine; it is the state the machine is in.
+
+  What replaced it is not nothing. `tools/verify_skill_roots.py` refuses a name
+  two roots can both reach, resolving each path first so that the installer's own
+  symlink install shape — one canonical copy linked from every agent root — is
+  not read as a duplicate. It was green on arrival, and green-because-clean is
+  the same observable state as a gate that cannot fire, so it ships with a
+  committed fixture it is run against on every CI pass in the opposite
+  direction: `--expect-findings` turns "found nothing" into a failure. A
+  negative control that cannot fail is not evidence that anything is checked.
+
 ### Reopened and now in scope
 
 - **Distribution.** The `elohim` console script, the wheel, and the nightly

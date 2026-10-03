@@ -84,3 +84,32 @@ jobs:
       # `tools/verify_interpreter_claim.py` names which.
       - name: the documented range is the range that ran
         run: python3 tools/verify_interpreter_claim.py
+
+      # Both gates below run TWICE, in opposite directions, and the second run is
+      # the one that matters.
+      #
+      # Each ships green because this tree is clean -- no project-local skill root
+      # exists, and all seven SKILL.md files are well-formed -- and green-because-
+      # clean is the same observable state as a gate that cannot fire. That is not a
+      # hypothetical: this repository shipped a 43-test suite no CI job ran, and a
+      # census that enumerated a population it did not cover while reporting the
+      # smaller number as the rate. So each fixture directory holds a defect on
+      # purpose, and --expect-findings turns "nothing found" into a failure. If a
+      # gate is weakened until it can no longer see the defect it was written for,
+      # the first run still passes and the second goes red.
+      #
+      # The fixtures live under tests/fixtures/ rather than at a real root, so they
+      # are never mistaken for shipped skills -- and they sit five or more levels
+      # deep, past the three-level container walk `npx skills add` performs, so it
+      # never discovers them either.
+      - name: one skill name is reachable from one place
+        run: |
+          python3 tools/verify_skill_roots.py
+          python3 tools/verify_skill_roots.py \
+            --root tests/fixtures/skill_roots --expect-findings
+
+      - name: every shipped SKILL.md is one a loader can read
+        run: |
+          python3 tools/verify_skill_frontmatter.py
+          python3 tools/verify_skill_frontmatter.py \
+            --skill-root tests/fixtures/skill_frontmatter --expect-findings
