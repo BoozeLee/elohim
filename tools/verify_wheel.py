@@ -37,6 +37,7 @@ job so it runs in parallel with the unit gates instead of extending them.
 """
 
 import ast
+import re
 import subprocess
 import sys
 import tempfile
@@ -44,6 +45,14 @@ import venv
 from pathlib import Path
 
 PKG = "elohim_gate"
+
+# The same expression `tests/test_version_agreement.py` uses, and for the same
+# reason: `tomllib` is a 3.11 addition and the matrix still runs 3.10. Anchored
+# to the start of a line so a `version` key under some other table cannot be
+# read as the project's own. The comparison below is `.group(1)` on a required
+# match, so a pyproject.toml with no version key fails here rather than
+# silently agreeing with nothing.
+PYPROJECT_VERSION = re.compile(r'^version = "([^"]+)"', re.MULTILINE)
 
 PROBE = r'''
 import json, os, sys
@@ -352,6 +361,64 @@ def main() -> int:
                 "checkout, so the probes above proved something about a stale "
                 "artifact" % PKG)
         print("imported from: %s (byte-identical to this checkout)" % installed)
+
+        # What the artifact calls itself, from three directions, required to
+        # agree. `tests/test_version_agreement.py` checks the four *sources* in
+        # the checkout agree with each other, which is the wrong question here:
+        # the source of truth for a published wheel is what the build backend
+        # stamped on the artifact and what the installed distribution reports,
+        # and a packaging change can break that wiring while all four files in
+        # the tree still agree perfectly. The filename a user installs from and
+        # the `elohim --version` they run afterwards are the only two strings an
+        # outside caller ever sees, so those are the two checked against the
+        # tree.
+        #
+        # The console script is invoked rather than imported on purpose: the
+        # version is handed to the runner through `init_globals` instead of an
+        # import, so a caller that never imports the package still gets the
+        # right string, and that claim is only observable from outside.
+        script = env_dir / "bin" / "elohim"
+        if not script.exists():
+            script = env_dir / "Scripts" / "elohim.exe"
+        if not script.exists():
+            return _fail("the wheel installed no `elohim` console script; a "
+                         "distribution with no entry point cannot be invoked "
+                         "the way every instruction in this repository invokes "
+                         "it")
+
+        said = _run([str(script), "--version"], cwd)
+        if said.returncode != 0:
+            return _fail("`elohim --version` failed in the installed wheel:\n"
+                         + said.stdout + said.stderr)
+        stamped = _run([str(py), "-c",
+                        "import importlib.metadata as m;"
+                        "print(m.version('elohim'))"], cwd)
+        if stamped.returncode != 0:
+            return _fail("could not read the installed distribution's "
+                         "version:\n" + stamped.stdout + stamped.stderr)
+
+        reported = said.stdout.strip()
+        metadata = stamped.stdout.strip()
+        try:
+            declared = PYPROJECT_VERSION.search(
+                (repo / "pyproject.toml").read_text(encoding="utf-8")).group(1)
+        except (AttributeError, OSError) as exc:
+            return _fail("could not read this checkout's declared version from "
+                         "pyproject.toml: %s" % exc)
+
+        print("version: %s | metadata: %s | pyproject: %s"
+              % (reported, metadata, declared))
+        disagree = [("%s said %r" % (n, v)) for n, v in
+                    (("the console script", reported.split()[-1]),
+                     ("the distribution metadata", metadata),
+                     ("this checkout", declared))
+                    if v != declared]
+        if disagree:
+            return _fail(
+                "the artifact is not the thing this checkout describes: %s. A "
+                "wheel whose own version disagrees with its source is "
+                "installable, and every other gate in this repository stays "
+                "green while it is." % "; ".join(disagree))
 
     print("verify_wheel: the installed wheel runs the API")
     return 0

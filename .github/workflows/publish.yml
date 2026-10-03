@@ -37,6 +37,16 @@ name: Publish to PyPI
 on:
   # Only this. A tag push publishes nothing, and that is the point.
   workflow_dispatch:
+    inputs:
+      # `type: boolean` is load-bearing, not decoration. Without it
+      # `${{ inputs.dry_run }}` is the *string* "false", which is truthy, and the
+      # flag inverts: a dry run would upload. `tests/test_package_metadata.py`
+      # asserts the type, because a `dry_run` that cannot be turned on is worse
+      # than none -- it looks like a safety control.
+      dry_run:
+        description: "Build and verify without uploading. Set this on the first run."
+        type: boolean
+        default: false
 
 # `contents: read` matches every other workflow in this repository.
 # `id-token: write` is what mints the OIDC token PyPI exchanges for a
@@ -84,7 +94,20 @@ jobs:
       # v1.14.2. The sha is the commit the annotated tag v1.14.2 resolves to,
       # dereferenced rather than copied from the tag object, so it names code
       # rather than a name that can be moved.
+      #
+      # The `if:` is on this step and not on the job, so a dry run still builds,
+      # still installs, and still verifies -- it simply does not upload. A dry run
+      # that skips the work is not a dry run; it is a workflow that reported
+      # success without having checked anything.
+      #
+      # It exists because of a measured pattern rather than a precaution: two
+      # workflows in this repository had never executed and both were defective,
+      # one in 12 seconds and one in 8, and every one of them looked correct in
+      # review. This is the first workflow here whose first *successful* run
+      # writes to a public index, which is the most expensive place to learn that
+      # lesson.
       - name: publish to PyPI
+        if: ${{ !inputs.dry_run }}
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
 
       # The upload succeeding is not the same as the artifact being installable,

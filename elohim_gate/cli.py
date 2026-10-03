@@ -12,6 +12,8 @@ import runpy
 import sys
 from pathlib import Path
 
+from elohim_gate import __version__
+
 _PKG_ROOT = Path(__file__).resolve().parent
 _RUNNER_REL = ("elohim-harness", "scripts", "harness_run.py")
 
@@ -68,9 +70,19 @@ def main() -> int:
     # The inconsistency this caused was visible inside this same file, which
     # printed `elohim: instrument runner missing` on its one error path while
     # `--help` said `harness_run.py`.
+    #
+    # `__elohim_version__` rides the same channel for the same reason. The runner
+    # cannot import it -- it never imports `elohim_gate`, so that a standalone
+    # `python3 harness_run.py` works from a bare checkout with nothing installed --
+    # and this module is the only place that knows the package's version.
     try:
         runpy.run_path(
-            str(runner), run_name="__main__", init_globals={"__elohim_prog__": "elohim"}
+            str(runner),
+            run_name="__main__",
+            init_globals={
+                "__elohim_prog__": "elohim",
+                "__elohim_version__": __version__,
+            },
         )
     except SystemExit as exc:
         return int(exc.code or 0)

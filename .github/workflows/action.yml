@@ -91,6 +91,46 @@ jobs:
             exit 1
           fi
 
+          # The positive half of the same claim, which the check above does not
+          # make. "Holds no checkout of this repository" is satisfied by a tree
+          # holding nothing at all, and a tree quietly missing a skill still has
+          # no harness, so that check stayed green on a caller tree carrying
+          # five of the six skills. Measured: widening the exclusion above to
+          # also skip `elohim` left this step at exit 0 with 5 of 6 skills
+          # present. The census then runs against a population smaller than the
+          # one the Action reports, and the smaller number is published as the
+          # rate -- the defect census.py already shipped here, in which a
+          # dropped __main__ guard made the module print nothing and exit 0.
+          #
+          # Compared by name, not by count, for the same reason the population
+          # gates compare denominators: a count agrees just as happily for a
+          # tree that gained a skill and lost another.
+          expected=""
+          for d in instrument/skills/*/; do
+            name="$(basename "$d")"
+            if [ "$name" = "elohim-harness" ]; then
+              continue
+            fi
+            expected="${expected} ${name}"
+          done
+          # Globs expand sorted, so this is ordered the same way as `expected`.
+          # On an empty tree the glob does not expand at all and `basename`
+          # yields the pattern itself, which matches nothing in `expected` --
+          # so the empty case fails here rather than comparing "" to "".
+          actual=""
+          for d in "${GITHUB_WORKSPACE}"/skills/*/; do
+            actual="${actual} $(basename "$d")"
+          done
+          if [ "${expected}" != "${actual}" ]; then
+            echo "::error::the caller tree does not hold the instrument skills," >&2
+            echo "::error::so the census below measures a population this job" >&2
+            echo "::error::does not claim to measure." >&2
+            echo "::error::expected: ${expected}" >&2
+            echo "::error::actual:   ${actual}" >&2
+            exit 1
+          fi
+          echo "caller tree holds every instrument skill except the harness:"
+
       # The negative control, and it runs first because it is cheap and a
       # control that cannot fail is not a control. Naming a skill the tree does
       # not hold must refuse rather than skip: a census that silently measured

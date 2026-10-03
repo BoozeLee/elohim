@@ -1548,3 +1548,136 @@ evidence the finding underneath it was wrong.
 0.20, which arrives with Tauri 3 — and no code in the viewer references `glib` or
 any `Variant` type. Unreached is not the same as fixed, and the difference should
 survive into the release notes rather than into a README nobody re-reads.
+
+---
+
+## The definition of done for 0.3.0
+
+Written as conditions, because the alternative is adjectives. "Production
+ready" and "well tested" cannot be checked by anyone, least of all by the person
+who wrote them after a long session. Every line below names either a command
+that produces the answer or the measurement the answer came from, and every
+line is marked with its state *as measured*, not as intended.
+
+### Which measurement decides it
+
+`jev` was asked which single measurement, obtainable by a stranger with no
+access to the session that produced this release, should decide whether the
+release is finished. Four candidates were offered, including "the checklist is
+committed" and "an outsider re-derives every number in the release notes".
+
+**`install_and_run_from_pypi`, probability 1.00, confidence 0.99** (model
+`jev-1.13.0`). The other three were returned at 0.0.
+
+That is a useful negative result and it is recorded rather than dropped: a
+written checklist scored zero as a *deciding* measurement, because a checklist
+can be complete while the artefact it describes does not exist. This section is
+therefore written as the record of the conditions and **not** as the thing that
+settles them. The thing that settles them is one command run by someone who
+cannot see any of this.
+
+It also independently confirms the condition already written at `E3`: *"Decided
+by: `pip install elohim` in a clean environment runs `elohim --all` to `verdict
+PASS` from outside the checkout."* That sentence was written before the question
+was put, and the judge picked the same measurement without being shown it.
+
+### The deciding condition
+
+> A person with no access to this repository, in a clean environment, runs:
+>
+> ```console
+> $ python3 -m venv /tmp/check && /tmp/check/bin/pip install elohim==0.3.0
+> $ cd /tmp/somewhere-else
+> $ /tmp/check/bin/elohim --version     # elohim 0.3.0
+> $ /tmp/check/bin/elohim --all         # verdict PASS, exit 0
+> ```
+>
+> and the answers come from the installed distribution rather than from a
+> checkout.
+
+**State: every part measured, except the one that needs the index.**
+
+Measured on 2026-10-03 against a locally built wheel, installed into a fresh
+venv, run from a directory outside the checkout:
+
+```text
+$ elohim --version
+elohim 0.3.0                                    rc=0
+
+$ elohim --all
+PASS elohim               pin PASS      facts 25/25   traps 6/6
+PASS estimator-bias       pin PASS      facts 15/15   traps 7/7
+PASS invariant-hunter     pin PASS      facts  3/3    traps 5/5
+PASS precision-budget     pin PASS      facts  9/9    traps 6/6
+PASS reproducibility      pin PASS      facts  6/6    traps 7/7
+PASS tolerance-prover     pin PASS      facts 23/23   traps 7/7
+--------------------------------------------------------------------------
+skills 6/6 pass, facts 81/81 verified, traps 38/38 hold,
+hygiene 0 findings, claims 0 unbound
+runtime  30.208s
+==========================================================================
+verdict PASS                                              rc=0
+```
+
+Two details in that output are load-bearing and were checked rather than
+assumed:
+
+- The skills root resolved to `.../site-packages/elohim_gate/_skills`, so the
+  instruments came from the install. This is the seam the GitHub Action job
+  exists to prove, reached here by a different route.
+- Six skills, not seven. The wheel ships all seven; `elohim-harness` ships
+  without a `ledger.json` because it is the instrument's own code rather than a
+  skill that owns one, and `--all` gates "every skill that owns an instrument".
+  The Action's caller tree assembles the same six for the same reason. The
+  local suite's seven is seven *gate cases*, which is a different count.
+
+**Not yet measured:** `pip install elohim` *from PyPI*. No such upload exists.
+The local wheel is the same artefact the workflow would upload, but "the same
+artefact by construction" is an argument and not a measurement, and it is the
+one step of this condition that cannot be closed from here.
+
+### The preconditions, and who owns each
+
+None of these is the deciding measurement. All of them have to hold for it to be
+attemptable, and a failure in any of them wastes the attempt.
+
+| # | Condition | State, measured 2026-10-03 |
+|---|---|---|
+| 1 | A PyPI trusted publisher exists for `BoozeLee/elohim` / `publish.yml` / environment `pypi` | **NOT MET — owner's browser.** No `~/.pypirc`, no `pypi.toml`, and no `PYPI_*` or `TWINE_*` variable on any host this work is done from. `twine`, `poetry` and `uv` are installed and all three *upload*; none can register a trusted publisher. The four values above are verified; the registration is not made. |
+| 2 | The name `elohim` is still free on PyPI at the moment of upload | 404 on 2026-10-03. Re-check immediately before publishing, not now — a name free today can be taken tomorrow, and a taken name is a rename, which is a version decision, not a retry. |
+| 3 | The `0.3.0` changelog range accounts for every commit intended to be in it | **MET — measured 2026-10-03, after being written down as an open question.** `git cherry origin/main <branch>` compares by patch-id, so it sees through a rebase or a reword: `push/c1-through-b1` is `-` on all 11 commits, and `feat/roadmap-corrections` is `-` on 16 of 17. The seventeenth, `86c82cb` *"ROADMAP: name the conditions on three pinned measurements"*, is `+` — and then was checked by content rather than by sha, because `+` means "no patch-identical commit", not "missing work". All four of its corrections are on `main`, reworded and expanded: the `A2` "measure before building" ordering (lines 144–147, 1279–1280), the 31.2 s contention analysis with the same 17.23–18.38 s uncontended band and 0.96 ratio (431–446), the retracted *"three items and none of them is code"* count, and `D3` marked shipped against `isDraft: false` / `isPrerelease: false` / HTTP 200 (504–505). The commit was superseded, not lost. The range is complete and both branches are safe to delete. |
+| 4 | The publish workflow has executed at least once without uploading | **MET.** Run `37108217139`, branch `dry-run/publish-gate`, conclusion `success`. Step 6 `publish to PyPI` reported `skipped`; steps 5 (build) and 7 (verify) both ran. |
+| 5 | The built wheel is the one the workflow would upload, and it says so | **MET.** Same run's log: `built: elohim-0.3.0-py3-none-any.whl`, then `version: elohim 0.3.0 \| metadata: 0.3.0 \| pyproject: 0.3.0`. |
+| 6 | The four places that declare the version agree | **MET.** `pyproject.toml`, `elohim_gate/__init__.py`, `uv.lock` and the newest `CHANGELOG.md` heading, enforced by `tests/test_version_agreement.py`. Its `SHAPE` rule is why there is no `## [Unreleased]` section. |
+| 7 | The dry run cannot be a dry run in name only | **MET.** `dry_run` is `type: boolean`; without it GitHub dispatches the default as the truthy string `"false"` and the guard inverts. Five tests, verified red against the previous `publish.yml` before the change. |
+| 8 | A stranger can tell what they are installing from the metadata alone | **MET.** `authors`, per-minor classifiers for 3.10–3.14, readme, license, project URLs, and a console script that reports `elohim 0.3.0` rather than `harness_run.py`. `tests/test_package_metadata.py`, 23 tests. |
+| 9 | Every CI step whose name is a claim can fail | **MET for the nine found, and now executed on a runner.** Eight already could. The ninth — *"assemble a caller tree that holds no checkout of this repository"* — asserted only that the tree held no harness and never that it held anything, and was green on a tree carrying five of six skills. Repaired to compare the two sets by name; the control that motivated the repair now exits 1. Run `37109013640` is the first execution of the repaired step: `success`, and the log carries its new line, `caller tree holds every instrument skill except the harness:`, after `caller tree holds 6 ledger(s) and no harness:`. The census it then ran is **unchanged** — 63 effective survivors at rate 0.0394 against a 0.05 threshold, byte-for-byte the numbers the unrepaired tree produced. A repair to an assertion must not move the measurement it guards, and this one did not. |
+| 10 | The Action's own numbers hold | **MET.** 1,679 population sites, 1,679 attempted, `share_of_population` 1.0, defect arm 3.94% against a 5% threshold, all six control digests agreeing. |
+| 11 | Every pinned action sha still resolves | **MET — by hand, because nothing in the suite can.** `tests/test_workflow_pins.py` reads the workflow text; whether a sha still names a commit a runner can fetch has no answer without a network, which is the one item this plan named as a person's job. Re-resolved 2026-10-03 against the GitHub API: **all six match** — `actions/checkout@v7`, `actions/setup-python@v7`, `actions/upload-artifact@v7.0.1`, `github/codeql-action/init@v4`, `github/codeql-action/analyze@v4`, `pypa/gh-action-pypi-publish@v1.14.2` — and all six commits are reachable (HTTP 200). Two wrong answers came first and are worth recording, because both were confident. A URL built from the whole `uses:` path asks for a repository called `github/codeql-action/init`, and reports two pins unresolved. And for an **annotated** tag, `GET /git/ref/tags/<name>` returns the sha of the *tag object*, with the commit one level deeper, so comparing it to a pin reports every annotated tag as moved: three false positives here, and the count grows with every annotated pin added. Dereference once on `type == "tag"` and all six match. Execution is the stronger form of the same claim — CodeQL ran green on this branch, so both codeql pins were downloaded and run by a real runner, and dry run `37108217139` downloaded `pypa/gh-action-pypi-publish@dc37677b` and reported that exact SHA. |
+
+Condition 1 is the release. It is not code, and it cannot be finished from a
+machine that has no credential for it. Condition 3 was the other open question
+when this table was written and was closed by measurement an hour later, which
+is worth noting for what it says about writing down a doubt: a flagged unknown
+that could have been answered from the repository is indistinguishable, in the
+moment, from one that cannot.
+
+### What this section is not
+
+It is not a claim that 0.3.0 is published, or ready, or done. The package is
+not on PyPI. Every green line above describes a **local wheel** or a **CI run**,
+and the distinction is kept explicit in each row because the failure this
+repository has shipped before is a sentence written while true that was left
+behind when the event it was waiting for landed — twice, in this very document,
+in the viewer claims corrected in the previous release.
+
+The deciding condition has exactly one line outstanding, and it is the one no
+amount of work on this repository can close:
+
+```console
+$ /tmp/check/bin/pip install elohim==0.3.0
+```
+
+Until that line has been run by someone, every other row in this table is a
+precondition and the release is unmeasured at exactly the point where it starts
+mattering.
