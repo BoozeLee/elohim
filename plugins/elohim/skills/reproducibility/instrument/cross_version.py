@@ -78,6 +78,13 @@ PINNED_CLASSES = {
     "invariant-hunter": {PRE312: "4bdfb8f34c78", POST312: "4bdfb8f34c78"},
     "precision-budget": {PRE312: "23d801ec5ecc", POST312: "23d801ec5ecc"},
     "tolerance-prover": {PRE312: "79ea4f7f114c", POST312: "79ea4f7f114c"},
+    # pay-signal reads a committed text corpus with a rule list. Nothing in
+    # its measurement depends on the interpreter, dict iteration, or float
+    # repr, so one value serves both classes -- and that claim is what the
+    # matrix exists to check. Recorded in BOTH columns deliberately: an
+    # entry missing from one is how an instrument gets classified UNLISTED
+    # and trips the wire, which is exactly what happened the first time.
+    "pay-signal": {PRE312: "1d0f042d68b6", POST312: "1d0f042d68b6"},
 }
 
 # Skills that ship no instrument of their own.

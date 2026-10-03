@@ -22,6 +22,11 @@
       "description": "3 pinned facts, 5 independent trap re-derivations. An honest negative: it measures a claimed Collatz conserved quantity and a derived ghost seed and returns the measurement that shows neither is structure."
     },
     {
+      "name": "pay-signal",
+      "path": "skills/pay-signal",
+      "description": "9 pinned facts, 5 independent trap re-derivations, and a dated Hacker News corpus committed as a golden fixture. Separates stated preference, which costs its speaker nothing, from revealed preference, which costs money, migration effort or a private workaround, and reports which needs have no verified position rather than ranking them anyway. The measurement that motivated it: a quarter of a demand-shaped corpus is the author selling the answer. Its honest negative is that the classifier's revealed base is nearly empty, so the instrument withdraws its own rank-shift figure and leaves only the counts standing."
+    },
+    {
       "name": "precision-budget",
       "path": "skills/precision-budget",
       "description": "9 pinned facts, 6 independent trap re-derivations. Derives the working-digit budget for a Pisot bound from the formula, then measures whether it is sufficient and shows the same quantity collapsing on a starved budget."

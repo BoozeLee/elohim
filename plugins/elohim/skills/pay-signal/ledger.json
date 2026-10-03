@@ -1,0 +1,80 @@
+{
+  "label": "PAY SIGNAL",
+  "version": "pay_signal_ledger_v1",
+  "note": "Every entry is re-measured on every run. A drifting residual is a finding, not a warning. The counts are measurements of how a fixed, dated, committed corpus reads under this classifier -- NOT facts about the market. The corpus is fixed precisely so that a change here means the classifier moved, not the world did.",
+  "instrument": {
+    "path": "instrument/pay_signal.py",
+    "sha256": "c36dd1bc215b3b0f8a532ec2b97f1d7878a61c97daaadccadff5f86b6efcf19e",
+    "bytes": 23291,
+    "note": "Editing this file is itself a measurable event. The harness reports both hashes and never resolves to a passing verdict on a modified instrument."
+  },
+  "seal_at_heading": "19e6a9335693abe97b6be68fb5e878d347921d56be7ce96a05767ea34ae541ed",
+  "facts": [
+    {
+      "id": "corpus_pinned",
+      "claim": "the corpus is a fixed, dated, committed artefact rather than fetched at run time",
+      "path": "corpus_fetched",
+      "expect": "2026-10-03T10:02:17Z",
+      "origin": "fetched 2026-10-03 from hn.algolia.com"
+    },
+    {
+      "id": "corpus_is_the_unit_the_classifier_reads",
+      "claim": "a need is a thread: signals are grouped by the story they answer",
+      "path": "threads_total",
+      "expect": 30,
+      "origin": "measured; a keyword corpus of loose comments clusters to size 1 and ranks nothing"
+    },
+    {
+      "id": "signal_count",
+      "claim": "the corpus holds this many signals",
+      "path": "signals_total",
+      "expect": 132,
+      "origin": "measured"
+    },
+    {
+      "id": "builder_count",
+      "claim": "a quarter of a demand-shaped corpus is the author selling the answer",
+      "path": "class_counts.builder",
+      "expect": 34,
+      "origin": "measured; the reason this skill exists"
+    },
+    {
+      "id": "stated_count",
+      "claim": "most signals cost their speaker nothing",
+      "path": "class_counts.stated",
+      "expect": 97,
+      "origin": "measured"
+    },
+    {
+      "id": "revealed_count",
+      "claim": "very few signals record behaviour that cost the author something",
+      "path": "class_counts.revealed",
+      "expect": 1,
+      "origin": "measured"
+    },
+    {
+      "id": "demand_signal_count",
+      "claim": "the number of demand signals once builders are removed",
+      "path": "demand_signal_count",
+      "expect": 98,
+      "origin": "measured; the gap against signal_count is the builder count"
+    },
+    {
+      "id": "stated_only_threads",
+      "claim": "most threads have no revealed signal, so they have no verified position",
+      "path": "threads_stated_only_count",
+      "expect": 23,
+      "origin": "measured"
+    },
+    {
+      "id": "thin_base_is_flagged",
+      "claim": "the instrument refuses to lean on a rank shift computed over too few threads",
+      "path": "revealed_base_is_thin",
+      "expect": true,
+      "origin": "the instrument's own limit on its own output"
+    }
+  ],
+  "unbound": [
+    "no claim here is about the market. Every number describes a committed corpus read by a rule list, and the report says so in the same breath."
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "schema": "elohim.backlog/1",
+  "note": "Measured but not yet bound to a ledger fact. An entry here is a claim the instrument can support and the ledger does not yet assert. `elohim --promote ID:TOL` binds one.",
+  "measurements": [
+    {
+      "id": "builder_fraction",
+      "claim": "roughly a quarter of a demand-shaped corpus is the supplier rather than the demander",
+      "measured": 0.257576,
+      "origin": "corpus fetched 2026-10-03T10:02:17Z, 34 of 132 signals",
+      "why_not_bound": "a fraction is a summary of two counts that ARE bound; binding it too would let the summary drift away from its parts"
+    },
+    {
+      "id": "threads_without_revealed",
+      "claim": "23 of 30 threads have no revealed-preference signal at all",
+      "measured": 23,
+      "origin": "measured",
+      "why_not_bound": "the count is bound as threads_stated_only_count; this entry carries the denominator, which is threads_total, also bound"
+    },
+    {
+      "id": "classifier_error_rate",
+      "claim": "the builder rule's false-positive rate on this corpus",
+      "measured": null,
+      "origin": "NOT MEASURED",
+      "why_not_bound": "measuring it requires hand-labelling the corpus, which is the work this skill tells people not to skip. Recorded as a gap rather than an estimate."
+    }
+  ]
+}
