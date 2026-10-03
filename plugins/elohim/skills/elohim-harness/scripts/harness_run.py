@@ -939,6 +939,32 @@ def main() -> int:
         prog=globals().get("__elohim_prog__"),
         description="parameterised ELOHIM gate",
     )
+    # `--version` answers a question a published command must answer. It was
+    # missing, and the gap was found by planning the publish dry run, whose whole
+    # verification is "read the version line out of the log" -- impossible while
+    # the command has no way to say which version it is. A user who cannot read
+    # the version cannot tell whether a fix landed.
+    #
+    # The value arrives the way the program name does, through
+    # `runpy.run_path(init_globals=...)`, because this file never imports
+    # `elohim_gate`: it is deliberately package-independent so a standalone
+    # `python3 harness_run.py` works from a bare checkout with nothing installed.
+    #
+    # Absent, it says so rather than printing a number it cannot have. A bare
+    # harness run is not a released package, and a plausible-but-wrong version is
+    # worse than an honest "unknown" -- which is the same reason a gate that
+    # cannot fail is worse than no gate.
+    _version = globals().get("__elohim_version__")
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=(
+            f"elohim {_version}"
+            if _version
+            else "elohim (harness standalone; package version unknown)"
+        ),
+        help="print the elohim version and exit",
+    )
     parser.add_argument("--skill-dir")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("--discover", action="store_true")

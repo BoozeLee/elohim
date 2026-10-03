@@ -199,5 +199,70 @@ def test_the_runner_no_longer_rewrites_argv():
     )
 
 
+# --- the command can report its own version ------------------------------
+
+def test_the_installed_command_can_report_its_version():
+    """`elohim --version` printing a usage dump is not a version report.
+
+    Found while planning the publish dry run: that run's whole verification is
+    "read the version line out of the log", and it is impossible while the
+    command has no way to say which version it is. A user who cannot read the
+    version also cannot tell whether a fix landed.
+    """
+    assert '"--version"' in RUNNER.read_text(encoding="utf-8"), (
+        "the harness parser declares no --version, so `elohim --version` prints "
+        "the usage dump instead of a version"
+    )
+
+
+def test_the_version_arrives_through_init_globals():
+    """Not through an import. The harness never imports `elohim_gate` -- it is
+    deliberately package-independent so `python3 harness_run.py` works from a
+    bare checkout -- so the value has to be handed in on the same channel that
+    already carries the program name."""
+    src = CLI.read_text(encoding="utf-8")
+    assert "__elohim_version__" in src, (
+        "elohim_gate/cli.py does not hand the version to the runner; the runner "
+        "cannot import it, because a standalone harness run has no package"
+    )
+    assert "init_globals=" in src, (
+        "init_globals is how the name and version reach the runner; any other "
+        "channel is undone by runpy's own _ModifiedArgv0"
+    )
+
+
+def test_a_standalone_run_does_not_claim_a_version():
+    """`globals().get(...)` must default, so a standalone run says it does not
+    know rather than printing a number it cannot have."""
+    assert re.search(
+        r'globals\(\)\.get\(\s*"__elohim_version__"',
+        RUNNER.read_text(encoding="utf-8"),
+    ), (
+        "the runner must read __elohim_version__ through globals().get, so an "
+        "absent global degrades to 'unknown' rather than raising"
+    )
+
+
+def test_the_version_says_so_when_it_does_not_know():
+    """A harness run with no package behind it must not print a plausible
+    number. 'Plausible and wrong' is the failure an emptiness check misses."""
+    runner = RUNNER.read_text(encoding="utf-8")
+    assert "standalone" in runner, (
+        "the no-version branch must say the run is standalone, so a reader is "
+        "not left believing a bare harness_run.py is a released package"
+    )
+
+
+def test_the_harness_does_not_import_the_package():
+    """The reason the version travels by value rather than by import. If this
+    ever changes, the import becomes the simpler channel and these tests are
+    asserting an accident."""
+    body = re.sub(r"^\s*#.*$", "", RUNNER.read_text(encoding="utf-8"), flags=re.MULTILINE)
+    assert not re.search(r"^\s*(import|from)\s+elohim_gate\b", body, re.MULTILINE), (
+        "the harness now imports elohim_gate; a standalone "
+        "`python3 harness_run.py` in a bare checkout would break"
+    )
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
