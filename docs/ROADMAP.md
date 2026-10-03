@@ -1444,6 +1444,68 @@ Each line is written as the condition that closes it, not as a task.
 
 ### Three findings that should not wait for the release
 
+**Two workflows had never executed before 2026-10-03, and both failed on their
+first execution.** This is the finding that produced the day's work, and it is
+recorded here because the number was wrong in conversation first and the
+correction is the useful part.
+
+What was said was "three workflows had never executed, all three had defects."
+Measured, it is **two**. `.github/workflows/matrix.yml` and
+`.github/workflows/action.yml` were both written, both committed, and neither had
+ever run. Their first executions, both on 2026-10-03:
+
+| workflow | first run | result | what it found |
+|---|---|---|---|
+| `matrix.yml` | 12 s | **failed** | `the documented range names ['3.11.9'], which is not installed here` |
+| `action.yml` | 8 s | **failed** | `Can't find 'action.yml' … Did you forget to run actions/checkout before running your local action?` |
+
+`publish.yml` is the third new workflow and is **not** counted here: it had
+nothing to fail, having never been written before today. Counting it would have
+turned "two defective" into "three", which is the shape of number this file keeps
+finding in its own documents.
+
+**Both failures were of a class that reading cannot catch, and one of them was a
+claim about the future.**
+
+`matrix.yml` said `uv python install 3.10 3.11 3.12 3.13 3.14`. That is not a
+statement about minors; it is a claim that whatever each minor is newest *today*
+is what the documents already measured. On 2026-10-03, `3.11` is 3.11.15 and all
+six documented surfaces name **3.11.9**. The comment above that line argued the
+minors were correct — "a workflow that dictated the answer would remove the need
+for the check rather than performing it" — which is right about the wrong thing.
+A minor-only spec is still a claim, and it is a claim that drifts. The line was
+wrong from the day it was written and could not have passed, ever; it had simply
+never been executed. `matrix.yml` was also **never on the remote before today** —
+it was added in `e72871c`, one of the twelve commits that sat unpushed — so its
+first execution was also its first opportunity to exist on a runner at all.
+
+`action.yml` checked out into `path: instrument` so that the workspace root would
+hold no copy of this repository, and then referred to its own action as `uses:
+./`, which resolves at the workspace root. The design and the reference were
+mutually exclusive, and the design was the correct one, so the reference was the
+defect.
+
+**What made the second one invisible is the part worth keeping.** The repository's
+own pinning gate, `tests/test_workflow_pins.py`, exempted `uses: ./` on a string
+comparison and nothing else — it never asked whether anything was checked out
+there. So the one gate that might have caught it was structurally unable to, and
+it stayed green on a workflow that could not run. The gate now requires a local
+reference to be backed by a checkout step declaring that path, and reverting to
+`uses: ./` makes it red:
+
+```
+dangling: action.yml: ./ -- no checkout step in this manifest puts the
+           repository at '.', so the reference cannot resolve
+           (checkouts declare: 'instrument')
+```
+
+This is the third time this repository's history records the same shape: a 43-test
+suite that no CI job ran, a census that reported a smaller population as the rate,
+and now a green gate that was blind to the one reference form it had exempted.
+**A gate that has never seen a failure is a gate whose scope has never been
+tested.** Executing the thing is the only thing that tests it, and two of the
+three workflows written to check this repository had never been executed at all.
+
 **`E1`'s third clause is still open, and the viewer does not close it.** The
 published report page consumes `elohim.gate/1` JSON through `harness_run.py
 --json` — that is `D1` — not through `run_census` or `gate_verdict`, so it is
