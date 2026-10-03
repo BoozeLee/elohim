@@ -1713,10 +1713,25 @@ probability 1.00, and it is closed.
 
 What it does **not** claim is that the next version will publish the same way.
 `publish.yml` is `workflow_dispatch`-only by decision, so a tag push publishes
-nothing; the next release is another manual dispatch, and the thing that would
-break first is somebody renaming the repository or the environment, which
-invalidates the publisher on PyPI's side with no error anywhere in this
-repository. That is a standing cost of the arrangement and is recorded here
-rather than solved, because solving it means either a tag-triggered publish —
-declined at probability 0.29 when the decision was put — or a repository
-rename policy nobody has agreed to.
+nothing; the next release is another manual dispatch, and what breaks first is
+somebody renaming the repository or the environment, which invalidates the
+publisher on PyPI's side with no error anywhere in this repository.
+
+That cost was put to jev twice and settled by neither. The leading answer was
+"add nothing" at probability 0.72 and then 0.65, both under the 0.78 threshold,
+with the case for a gate holding at 0.28 and then 0.26 — a minority that would
+not go to zero. So the decision is recorded in **`docs/PUBLISHING.md`**, and it
+is split by cost rather than by preference. The recovery procedure is written
+down now, before anything breaks, so the fix is a lookup rather than a
+reconstruction. The push-time drift gate is deferred to a trigger, and the
+trigger is written down too: build it when a rename happens that a human did not
+knowingly cause — a repository transfer, an organisation rename, a
+collaborator's settings change, or the repository recreated under the same short
+name. Every rename observed so far was typed by the person who then already
+knew. A gate, when it comes, can only catch the two knowable cases; it cannot
+see PyPI's side, which is the failure that actually occurred, and asserting a
+recorded owner/repository string would add one more pinned number that can go
+false while every test is green.
+
+The earlier decline of a tag-triggered publish, at probability 0.29, is
+unchanged.

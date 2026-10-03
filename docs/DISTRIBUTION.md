@@ -236,6 +236,20 @@ a working install:
    effect of this file existing. If it is done: trusted publishing via GitHub
    Actions, so no long-lived API token has to exist anywhere.
 
+   **It was done, on 2026-10-03**, and this paragraph was right about every
+   part of it. `elohim 0.3.0` is on PyPI, the name is taken, the README's "not
+   on PyPI yet" note was rewritten the same day, and the release was made by
+   trusted publishing through GitHub Actions with no API token anywhere. The
+   procedure and its failure mode are in **`docs/PUBLISHING.md`**.
+
+   What this file got wrong, and only by being early: it treated the decision
+   as pending, and the sentence has been left as written rather than tidied
+   into a past-tense summary, because a prediction that reads as a prediction is
+   checkable and a summary that reads as settled is not. The kill criterion
+   above it is now satisfied in the other direction too — a stranger can install
+   the skills by following the README, and the README is what they will read
+   first, which is why its PyPI note had to be true.
+
 **Kill criterion (Week 3):** if after this phase a stranger still cannot install
 the skills by following the README, stop building distribution features and fix
 the install path. Everything downstream is wasted if the front door is broken.
