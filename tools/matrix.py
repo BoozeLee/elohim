@@ -20,7 +20,8 @@ second copy of it is a second thing that can quietly disagree with the first.
     python3 tools/matrix.py --expect-interpreters 5
 
 Exit 0 when every observed seal is pinned, 1 when one is not, 2 when it could not
-run or ran short.
+run or ran short, 3 when two interpreters disagreed about which one answers to a
+minor version.
 
 Why `--expect-interpreters` exists. This tool answers one question: do the pinned
 classes hold across the range. A run over one interpreter answers a smaller one --
@@ -101,12 +102,60 @@ def load_instrument_module():
     return module
 
 
+class AmbiguousInterpreter(ValueError):
+    """One minor version, two patch versions, and no basis for choosing between them."""
+
+
+def dedupe_by_minor(found) -> list:
+    """One interpreter per minor version, refusing where that choice changes the answer.
+
+    Two candidates for one minor version are ordinary and mostly harmless. A uv
+    install directory ships both ``bin/python3`` and ``bin/python3.12``, and a second
+    manager may hold its own copy of the same build. Same version, same answer, so
+    the first found is kept and the rest dropped without comment: running the same
+    version twice would print two identical rows and read as corroboration. It is
+    not.
+
+    Different patch versions are a different matter. `traps.md`, `SKILL.md`,
+    `cross_version.py` and `ledger.json` each name the interpreter versions these pins
+    were measured across, so a row reporting one patch version is not evidence about
+    the other, and which one this tool happened to run would be a function of what
+    happens to be installed rather than of anything stated. So it refuses.
+
+    Measured on the machine that prompted this: uv's 3.14.5 appeared between two runs
+    of this tool on the same day, and the 3.14 row went from 3.14.7 to 3.14.5 with no
+    edit here and no edit to any of the four documents naming it.
+    """
+    by_minor = {}
+    for item in sorted(found):
+        version = version_of(Path(item))
+        if version == "?":
+            continue
+        key = tuple(version.split(".")[:2])
+        kept = by_minor.get(key)
+        if kept is None:
+            by_minor[key] = (version, Path(item))
+            continue
+        kept_version, kept_path = kept
+        if kept_version == version:
+            continue
+        raise AmbiguousInterpreter(
+            "%s.%s is claimed by two interpreters with different patch versions: kept "
+            "%s at %s, found %s at %s. Which one ran decides what this run says about "
+            "%s.%s, and nothing here states which one is meant, so it refuses rather "
+            "than reports. Name the ones to use with --interpreter PATH, or remove one "
+            "of the two." % (key[0], key[1], kept_version, kept_path, version, item,
+                             key[0], key[1])
+        )
+    return [by_minor[key][1] for key in sorted(by_minor)]
+
+
 def interpreters(explicit) -> list:
     """Every interpreter asked for, or every one we can find, one row per minor version.
 
-    Deduplicated by version rather than by path: a uv interpreter directory ships
-    both ``bin/python3`` and ``bin/python3.12``, and running the same version twice
-    would print two identical rows and read as corroboration. It is not.
+    Explicit paths are taken as given. Naming an interpreter is how a caller resolves
+    an ambiguity it has been told about, so the discovery rules below -- including
+    the refusal in `dedupe_by_minor` -- do not apply to them.
     """
     if explicit:
         return [Path(item) for item in explicit]
@@ -115,13 +164,7 @@ def interpreters(explicit) -> list:
         for item in sorted(glob.glob(pattern)):
             if os.access(item, os.X_OK):
                 found.add(item)
-    by_minor = {}
-    for item in sorted(found):
-        version = version_of(Path(item))
-        if version != "?":
-            key = tuple(version.split(".")[:2])
-            by_minor.setdefault(key, Path(item))
-    return [by_minor[key] for key in sorted(by_minor)]
+    return dedupe_by_minor(found)
 
 
 def version_of(python: Path) -> str:
@@ -189,7 +232,11 @@ def main() -> int:
     args = parser.parse_args()
 
     module = load_instrument_module()
-    pythons = interpreters(args.interpreter)
+    try:
+        pythons = interpreters(args.interpreter)
+    except AmbiguousInterpreter as exc:
+        sys.stderr.write("matrix: REFUSED: %s\n" % exc)
+        return 3
     if not pythons:
         sys.stderr.write("matrix: no interpreter found; pass --interpreter PATH\n")
         return 2
