@@ -1,14 +1,14 @@
 """pytest-visible entry points for the existing checks in `tests/test_all.py`.
 
-`tests/test_all.py` was written as a script: it calls six `case_*` functions
+`tests/test_all.py` was written as a script: it calls eight `case_*` functions
 from its own `main()`, prints a line per case, and returns 0 or 1. `pytest`
 collects by looking for `test_` functions, so it found none and exited 5 with
 "no tests collected" -- the suite was real and pytest simply could not see it.
 
 This module does not reimplement those checks. It imports the `case_`
-functions and calls them from six `test_` functions, so the same assertions
+functions and calls them from eight `test_` functions, so the same assertions
 run, each now able to fail on its own and report which one failed, rather than
-six cases sharing one exit code.
+eight cases sharing one exit code.
 
 One thing is deliberately not done here. Each case prints; the assertions are
 inside the cases. pytest captures stdout, so a case that fails shows its
@@ -57,6 +57,7 @@ CASES = [
     ("claim", test_all.case_claim_binding),
     ("index", test_all.case_index_drift),
     ("compare", test_all.case_compare),
+    ("bootstrap", test_all.case_bootstrap),
 ]
 
 
@@ -77,7 +78,7 @@ def test_case_passes(name, case):
 
 
 def test_the_script_has_a_case_for_every_name_it_names():
-    """The seven cases above are the seven the script runs; keep them in step.
+    """The eight cases above are the eight the script runs; keep them in step.
 
     If someone adds a `case_` function to the script and forgets it here, the
     new check runs in the script and silently does not run under pytest. This

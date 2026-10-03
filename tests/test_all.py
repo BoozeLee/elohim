@@ -23,7 +23,9 @@ never written to, so a failing case can never damage what it is measuring.
 
 from __future__ import annotations
 
+import ast
 import hashlib
+import importlib.util
 import json
 import os
 import shutil
@@ -78,7 +80,7 @@ SCHEMA_KEY_SETS: dict[str, dict[str, frozenset[str]]] = {
         "fact": frozenset({"id", "claim", "status", "detail", "residual"}),
         "instrument_pin": frozenset({
             "path", "source", "pinned", "expected_sha256", "actual_sha256",
-            "expected_bytes", "actual_bytes", "status", "detail",
+            "expected_bytes", "actual_bytes", "status", "detail", "bootstrap",
         }),
     },
 }
@@ -696,6 +698,161 @@ def case_compare() -> bool:
     return ok
 
 
+def case_bootstrap() -> bool:
+    """A ledger must pin its instrument, or declare that it is not written yet.
+
+    Deleting `instrument.sha256` from a shipped ledger used to report
+    `status: unpinned`, and both consumers of that status counted it as
+    acceptable -- so the gate returned PASS having compared no checksum at all,
+    which is the checksum 25 of the 38 recorded traps depend on.
+
+    The status cannot simply be made to fail. `contract.md` needs `unpinned`
+    for the authoring workflow, where a new skill legitimately has no pin until
+    step 5, and it says so in as many words. An absent checksum cannot mean both
+    "not written yet" and "written, and then unpinned", so the ledger declares
+    which: `instrument.bootstrap: true` gives `unpinned`, and an undeclared
+    absence gives MALFORMED.
+
+    The accept sets are read out of the two consumers with `ast` rather than
+    written out here. A copy would agree with itself while either set was
+    widened, and a set holding MALFORMED is the whole defect. Finding no set at
+    all fails this case rather than passing it: an extraction that quietly
+    matched nothing would report that no consumer accepts MALFORMED, which is
+    the most agreeable possible way to be wrong.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    harness = SKILLS_DIR / HARNESS_RELATIVE
+    census_module = REPO_ROOT / "elohim_gate" / "mutation.py"
+    for required in (harness, census_module):
+        if not required.is_file():
+            print(f"bootstrap   FAIL  {required} is not readable, so the accept sets "
+                  f"cannot be read from the source")
+            return False
+    try:
+        spec = importlib.util.spec_from_file_location("harness_run_pin", harness)
+        if spec is None or spec.loader is None:
+            print(f"bootstrap   FAIL  {harness} produced no importable module spec")
+            return False
+        hr = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(hr)
+    except Exception as exc:
+        print(f"bootstrap   FAIL  harness_run.py could not be imported: {exc}")
+        return False
+
+    def literals(node):
+        out = set()
+        for element in node.elts:
+            if isinstance(element, ast.Constant) and (
+                isinstance(element.value, str) or element.value is None
+            ):
+                out.add(element.value)
+            else:
+                return None
+        return out
+
+    def mentions_status(node):
+        return any(
+            (isinstance(sub, ast.Attribute) and sub.attr == "status")
+            or (isinstance(sub, ast.Constant) and sub.value == "status")
+            for sub in ast.walk(node)
+        )
+
+    def accepted_statuses(path):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        found = []
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Compare) or len(node.ops) != 1:
+                continue
+            if not isinstance(node.ops[0], (ast.In, ast.NotIn)):
+                continue
+            for named, other in ((node.left, node.comparators[0]),
+                                 (node.comparators[0], node.left)):
+                if not mentions_status(named):
+                    continue
+                if isinstance(other, (ast.Set, ast.Tuple, ast.List)):
+                    values = literals(other)
+                    if values:
+                        found.append(values)
+        return found
+
+    ok = True
+    try:
+        gate_sets = accepted_statuses(harness)
+        census_sets = accepted_statuses(census_module)
+    except Exception as exc:
+        print(f"bootstrap   FAIL  the accept sets could not be parsed: "
+              f"{type(exc).__name__}: {exc}")
+        return False
+
+    for consumer, found, expected_sets in (("gate_skill", gate_sets, 1),
+                                           ("the census", census_sets, 1)):
+        if len(found) != expected_sets:
+            ok = False
+            print(f"bootstrap   FAIL  {expected_sets} status accept set(s) expected in "
+                  f"{consumer}, {len(found)} found; if the extraction stopped matching "
+                  f"then the checks below are agreeing with nothing")
+            continue
+        statuses = found[0]
+        if "MALFORMED" in statuses:
+            ok = False
+            print(f"bootstrap   FAIL  {consumer} accepts MALFORMED "
+                  f"({sorted(map(str, statuses))}), so a ledger with its pin deleted "
+                  f"still reaches a passing verdict")
+        if "unpinned" not in statuses:
+            ok = False
+            print(f"bootstrap   FAIL  {consumer} no longer accepts unpinned "
+                  f"({sorted(map(str, statuses))}), which contract.md promises for a "
+                  f"skill that is still being written")
+        if "PASS" not in statuses:
+            ok = False
+            print(f"bootstrap   FAIL  {consumer} does not accept PASS "
+                  f"({sorted(map(str, statuses))}); the extraction found a comparison "
+                  f"that is not the one it was looking for")
+        if ok:
+            print(f"bootstrap   {consumer} accepts {sorted(map(str, statuses))} and not "
+                  f"MALFORMED, read from the source")
+
+    work = Path(tempfile.mkdtemp(prefix="bootstrap-"))
+    try:
+        instrument = work / "instrument" / "probe.py"
+        instrument.parent.mkdir(parents=True)
+        instrument.write_text("VALUE = 1\n", encoding="utf-8")
+        digest = hr.sha256_of(instrument)
+        size = instrument.stat().st_size
+
+        shapes: tuple[tuple[str, dict[str, object], str], ...] = (
+            ("pinned, matching", {"sha256": digest, "bytes": size}, "PASS"),
+            ("pinned, drifted", {"sha256": "0" * 64, "bytes": size}, "DRIFT"),
+            ("no pin, declares bootstrap", {"bootstrap": True}, "unpinned"),
+            ("no pin, declares nothing", {}, "MALFORMED"),
+            ("bootstrap false is not a declaration", {"bootstrap": False}, "MALFORMED"),
+        )
+        for label, declared, wanted in shapes:
+            result = hr.verify_pin(None, {"instrument": declared}, instrument, "probe")
+            got = result.get("status")
+            if got != wanted:
+                ok = False
+                print(f"bootstrap   FAIL  {label} reported {got!r}, not {wanted!r}")
+                continue
+            if result.get("bootstrap") is not (declared.get("bootstrap") is True):
+                ok = False
+                print(f"bootstrap   FAIL  {label} reported bootstrap="
+                      f"{result.get('bootstrap')!r}, which does not match what the "
+                      f"ledger declares ({declared.get('bootstrap')!r})")
+                continue
+            print(f"bootstrap   {label} -> {got}")
+    except Exception as exc:
+        ok = False
+        print(f"bootstrap   FAIL  the behaviour checks raised {type(exc).__name__}: {exc}")
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+    if ok:
+        print("bootstrap   exit 0  a deleted pin is refused and a declared one is not")
+    return ok
+
+
 def main() -> int:
     cases = [
         ("mirror", case_mirror),
@@ -705,6 +862,7 @@ def main() -> int:
         ("claim", case_claim_binding),
         ("index", case_index_drift),
         ("compare", case_compare),
+        ("bootstrap", case_bootstrap),
     ]
     failures = []
     for name, func in cases:

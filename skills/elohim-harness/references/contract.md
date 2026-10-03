@@ -250,9 +250,19 @@ is `UNLOCATED`, and a `traps` value that is a failing report rather than a list
 of traps that trivially held — because "no traps ran" and "the traps passed" are
 the same JSON to anyone not checking.
 
-`instrument_pin` carries `path`, `source`, `pinned`, `expected_sha256`,
-`actual_sha256`, `expected_bytes`, `actual_bytes`, `status` and `detail`.
-`status` is `PASS`, `DRIFT`, `unpinned` or `UNLOCATED`.
+`instrument_pin` carries `path`, `source`, `pinned`, `bootstrap`,
+`expected_sha256`, `actual_sha256`, `expected_bytes`, `actual_bytes`, `status`
+and `detail`. `status` is `PASS`, `DRIFT`, `unpinned`, `MALFORMED` or
+`UNLOCATED`.
+
+`unpinned` and `MALFORMED` are both "this ledger pins no checksum", and they
+are not interchangeable. `unpinned` means the ledger says it is still being
+written — `instrument.bootstrap` is `true` — and it reaches PASS, because that
+is a state a new skill legitimately passes through. `MALFORMED` means the ledger
+pins nothing and does not claim to be a work in progress, which is what a
+shipped ledger looks like after its pin is deleted. It cannot reach PASS. The
+distinction has to be declared, because the absence of a checksum is all the
+two cases otherwise share.
 
 A fact outcome carries `id`, `claim`, `status`, `detail` and `residual`.
 `status` is `verified` or `drifted`, and `residual` is the measured distance
@@ -301,9 +311,11 @@ fallback.
 1. Create `<skill-dir>/` with `ledger.json` and `instrument/<name>.py`.
 2. Give the instrument a `label` and an `instrument.path` when it has more than
    one file in `instrument/`.
-3. Run the harness with `--skill-dir <path>`. An unpinned ledger reports
-`status: unpinned` and still reaches PASS. That is the state a new skill
-   starts in, and it is visible rather than silent.
+3. Run the harness with `--skill-dir <path>`. A ledger that pins no checksum
+   reports `status: MALFORMED` and fails, unless it declares
+   `instrument.bootstrap: true` — then it reports `status: unpinned` and
+   reaches PASS. That is the state a new skill starts in, and the ledger says
+   so rather than the harness inferring it from a checksum that is not there.
 4. Run `--discover`. Read the backlog before promoting anything.
 5. Copy the instrument's real sha256 and byte count into the ledger's
    `instrument` block. Expect the pin to report DRIFT until you do, then

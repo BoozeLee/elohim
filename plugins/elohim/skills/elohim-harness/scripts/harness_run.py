@@ -164,32 +164,49 @@ def verify_pin(skill: Skill, ledger: dict, instrument: Path, source: str) -> dic
     code runs. The pin is what makes an edit to that code visible instead of
     silent. Drift is reported with both hashes so the difference is auditable,
     and it can never resolve to a passing verdict.
+
+    An absent checksum used to report ``unpinned``, which the contract blesses
+    while a skill is being authored. But absence also describes a shipped
+    ledger whose pin was deleted, and nothing blesses that. One signal cannot
+    carry both meanings, so the ledger has to say which it is:
+    ``instrument.bootstrap: true`` declares a ledger still being written, and a
+    ledger with no checksum and no such declaration is ``MALFORMED`` instead of
+    passing. ``bootstrap`` is reported in the payload so the reason is visible
+    to whoever reads the verdict rather than inferable only from the code.
     """
     pin = ledger.get("instrument") or {}
     actual = sha256_of(instrument)
     size = instrument.stat().st_size
+    bootstrap = pin.get("bootstrap") is True
     result = {
         "path": str(instrument),
         "source": source,
         "pinned": bool(pin.get("sha256")),
+        "bootstrap": bootstrap,
         "expected_sha256": pin.get("sha256"),
         "actual_sha256": actual,
         "expected_bytes": pin.get("bytes"),
         "actual_bytes": size,
-        "status": "unpinned",
-        "detail": "ledger pins no instrument checksum",
+        "status": "MALFORMED",
+        "detail": (
+            "ledger pins no instrument checksum and does not declare bootstrap: "
+            "a ledger is pinned, or it says it is still being written, and an "
+            "absent checksum on its own says neither"
+        ),
     }
-    if not result["pinned"]:
-        return result
-    if actual == pin["sha256"] and size == pin.get("bytes"):
-        result["status"] = "PASS"
-        result["detail"] = "checksum and size match the ledger"
-    else:
-        result["status"] = "DRIFT"
-        result["detail"] = (
-            f"instrument was modified: expected {pin['sha256'][:16]} "
-            f"({pin.get('bytes')} bytes), found {actual[:16]} ({size} bytes)"
-        )
+    if bootstrap:
+        result["status"] = "unpinned"
+        result["detail"] = "ledger declares bootstrap and pins no checksum yet"
+    if result["pinned"]:
+        if actual == pin["sha256"] and size == pin.get("bytes"):
+            result["status"] = "PASS"
+            result["detail"] = "checksum and size match the ledger"
+        else:
+            result["status"] = "DRIFT"
+            result["detail"] = (
+                f"instrument was modified: expected {pin['sha256'][:16]} "
+                f"({pin.get('bytes')} bytes), found {actual[:16]} ({size} bytes)"
+            )
     return result
 
 
