@@ -6,6 +6,134 @@ All notable changes to this project are recorded here. The format follows
 rather than promising compatibility: the tip of `main` is the only supported
 version, and no version is covered by a stability guarantee.
 
+## [0.3.0] — 2026-10-03
+
+Twenty-seven commits past `v0.2.0`, grouped by the item each closes rather than
+listed one per commit — the `[0.2.0]` convention, and the reason it exists: 27
+bullets would hide the shape of the work. Minor rather than patch, because the
+`tools/` → `elohim_gate/` move landed in the previous range and anything since
+that changes what ships inside the wheel is an addition.
+
+**The organising fact of this release: two workflows had never executed, and both
+failed on their first execution.** `matrix.yml` failed in 12 seconds because
+`uv python install 3.10 3.11 3.12 3.13 3.14` resolves each minor to whatever is
+newest *today*, and 3.11 is 3.11.15 while all six documented surfaces name
+3.11.9. `action.yml` failed in 8 seconds because it checked out into
+`path: instrument` — so the workspace root holds no copy of this repository, by
+design — and then referred to its own action as `uses: ./`, which resolves there.
+The line it could never have passed had been written days earlier and simply
+never run. `matrix.yml` had also never been on the remote at all; it was added in
+one of the twelve commits sitting unpushed.
+
+### Added
+
+- **`tools/verify_interpreter_claim.py`** — compares the six documented
+  interpreter surfaces against a real `tools/matrix.py` run rather than trusting
+  the prose. Six surfaces across three forms: three `range`, two `subset`, one
+  `bounds`.
+- **`tools/verify_skill_roots.py`** — refuses a skill name two discovery roots can
+  reach, resolving each path first. The installer's own shape is one real copy
+  under `.agents/skills/` with symlinks into `.claude/skills/`; measured against
+  a real install, a path-comparing variant would have reported **7 false
+  duplicates on a clean clone** of the published repository. Also a local-only
+  `--global`, because a CI runner has no home-directory roots and a global check
+  there would be vacuously green.
+- **`tools/verify_skill_frontmatter.py`** — refuses a `SKILL.md` a loader would
+  reject or silently drop: a `name` that disagrees with its directory, and an
+  unquoted `: ` in `description:`.
+- **`tools/verify_agents_drift.py`** — fails when the command list in `AGENTS.md`
+  and `CONTRIBUTING.md` stops naming a command `ci.yml`'s `core` job runs. Not a
+  path-existence test on purpose: `ci.yml` invokes every gate by path, so a
+  renamed or missing gate file already turns CI red by itself, and such a test
+  would pass unchanged against a gate neutered to `return []`.
+- **`AGENTS.md` and `CONSTRAINTS.md`** — the first agent-facing context files this
+  repository has had. `AGENTS.md` carries the three rules and the gate commands;
+  `CONSTRAINTS.md` carries the long form.
+- **`.github/workflows/matrix.yml`** — provisions the measured interpreter range
+  and runs all four gates, each in **both** directions: the real tree, then the
+  committed fixture under `--expect-findings`, so "found nothing" is a failure.
+- **`.github/workflows/publish.yml`** — `workflow_dispatch`-only, `environment:
+  pypi`, `id-token: write`. A tag push publishes nothing: the earlier decline of
+  a build-on-tag workflow at 0.29 is untouched, because a human still decides
+  what and when to release and this only executes that decision.
+- **`tests/fixtures/`** — three deliberately-malformed trees so the gates that
+  read them can be observed *failing*, not merely observed passing. Inert text,
+  no real skill name, five or more levels deep so the installer's three-level
+  walk cannot reach them.
+
+### Changed
+
+- **`uv python install` now names exact patches.** `3.10.20 3.11.9 3.12.13
+  3.13.13 3.14.5`, matching the six documented surfaces. A minor-only spec is
+  still a claim, and it is a claim that drifts.
+- **`tests/test_workflow_pins.py` now requires a local action reference to be
+  backed by a checkout step declaring that path.** The previous version exempted
+  `uses: ./` on a string comparison and never asked whether anything was checked
+  out there — which is why `action.yml` could be green and unable to run. With
+  the check in place, the original `uses: ./` is a finding.
+- **The installed command names itself correctly.** `elohim --help` printed
+  `usage: harness_run.py`, an internal module shipped inside the wheel. The
+  assignment in `cli.py` was not the cause: `runpy.run_path` performs the same
+  assignment through its own `_ModifiedArgv0`, overwriting whatever `cli.py` did.
+  The parser is now told its name through `init_globals`, so a standalone
+  `python3 harness_run.py` still derives its own.
+- **Package metadata now carries an author and the measured interpreter range.**
+  `[project]` declared no `authors`, so PyPI would have rendered the package with
+  nobody to contact, and it declared `requires-python = ">=3.10"` while listing
+  only `Programming Language :: Python :: 3` — understating the one claim the
+  package exists to demonstrate, in a repository that measures it on every push.
+  Each minor 3.10–3.14 now has a classifier, and a test asserts the declared
+  range stops at a minor `ci.yml`'s matrix has actually run.
+
+### Fixed
+
+- **`check_text.py` refuses a shipped file that names a real home directory.** A
+  release plan in this repository named the author's home path twice, publicly,
+  and the only thing that found it was a grep run by hand. A path left in a tree
+  is environment, not product.
+- **`tools/matrix.py` refuses a minor version two patch versions disagree
+  about**, and takes an explicit matrix width from its caller. A silent
+  first-wins deduplication had already cost this project a day.
+- **Comparisons that could reach agreement by measuring nothing are refused**
+  (`elohim_gate/compare.py`).
+
+### Known limitations
+
+- **The Action census has run once on a real runner and its seam is proven; the
+  population verdict from that run is the one thing this release cannot state.**
+  The negative control passed — the Action installed itself as a distribution,
+  measured a caller tree holding six skills and no harness, and refused a skill
+  it does not hold — but the 1,679-pair census takes longer than the other gates
+  combined. Read the run rather than this file for its number.
+- **Nothing has been published to PyPI.** The name is free (404 today), but
+  Trusted Publishing cannot be registered from a machine with no PyPI
+  credential, so the first upload needs a person in a browser. `publish.yml`
+  exists so that upload is a workflow dispatch rather than a local command with
+  a long-lived token.
+- **`v0.1.0`'s tag is orphaned** into the history rewritten for commit signing
+  and cannot be moved through the API. `v0.3.0` describes the range
+  `v0.2.0..v0.3.0`, which is resolvable.
+- **The account is an explicit always-bypass actor on the only branch ruleset.**
+  Left deliberately: with one person on the account, removing it produces
+  self-approved pull requests, a control that cannot fail. See `docs/ROADMAP.md`.
+
+### How to check this section is complete
+
+No commit shas, for the reason `[0.2.0]` records: a sha in a document that keeps
+being edited decays on any rebase that changes no code. What is checkable is the
+count, and it is a sum:
+
+```sh
+git rev-list --count v0.2.0..HEAD
+git log v0.2.0..HEAD --format=%s
+```
+
+The second command is the real check: it lists every subject in the range, so a
+commit missing from this section is a subject on that list that no entry accounts
+for. The count was 27 when this section was written; it is one more now, because
+the commit that wrote this section is itself in the range. Re-derive both rather
+than trusting either number printed here.
+
 ## [0.2.0] — 2026-10-03
 
 Nine roadmap items close in this range, and one of them closes two of its three
@@ -586,5 +714,6 @@ pinned facts and 31 independently re-derived traps.
 - `main` is not branch-protected. Review the diff.
 
 [Unreleased]: https://github.com/BoozeLee/elohim/compare/v0.2.0...HEAD
+[0.3.0]: https://github.com/BoozeLee/elohim/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/BoozeLee/elohim/compare/afb61a3...v0.2.0
 [0.1.0]: https://github.com/BoozeLee/elohim/releases/tag/v0.1.0
