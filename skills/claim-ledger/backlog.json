@@ -21,7 +21,8 @@
       "claim": "the claims file is derived from what the run actually said, rather than written by the run being judged",
       "measured": null,
       "origin": "NOT BUILT",
-      "why_not_bound": "this is the single largest gap in the skill and it is a research problem, not a missing feature. Who writes the claims file determines how much the gate is worth, and it is an open owner decision."
+      "why_not_bound": "DECIDED, not merely deferred. jev 0.6.2 ranked it last of three at probability 0.12, below the 0.78 working threshold, so the owner chose `both`: ship the agent-written path now and build transcript extraction as a SEPARATE LATER SKILL that feeds this one a file. The reasoning behind splitting it: extraction from prose has no published reliable method, a deterministic extractor under-extracts, and an LLM extractor would put a judgement step inside the measurement path, which is the one thing this design forbids -- so folding it in would make the gate worse than the thing it gates. Isolating it keeps the research question from blocking a working gate, at the cost of two skills, and the later skill inherits the same AUROC 0.65 ceiling on its own accuracy.",
+      "note_on_the_shape_linter": "The `both` option was described as shipping a deterministic shape linter alongside the agent-written path. MEASURED: it already ships. the_unverifiable_claim, the_green_check_that_checked_nothing and the_decorative_check run in applied mode, not only on the pinned fixture -- fed a deliberately badly-shaped file (one claim with no check, one evidenced by `true`, one whose `asserts` appears nowhere in its argv), all three went red and claims_reproduced was 0. No new linter was written, because writing one would have been a second implementation of a gate that already fires."
     },
     {
       "id": "self_authorship_detection_rate",

@@ -214,11 +214,20 @@ def test_the_fakes_are_only_distinguishable_by_full_path():
 def test_explicit_interpreters_bypass_discovery(monkeypatch):
     """`--interpreter PATH` is the documented way out, so it must skip the refusal.
 
-    This matters because it is the mechanism the S2 gate depends on: naming the
-    five interpreters a runner provisioned makes the run deterministic regardless
-    of what else that machine has installed. If an explicit list were still run
-    through `dedupe_by_minor`, a runner holding two patches of one minor would go
-    red for a condition the caller had already resolved by naming them.
+    This matters because it is the mechanism the interpreter-claim gate depends
+    on: naming the five interpreters a runner provisioned makes the run
+    deterministic regardless of what else that machine has installed. If an
+    explicit list were still run through `dedupe_by_minor`, a runner holding two
+    patches of one minor would go red for a condition the caller had already
+    resolved by naming them.
+
+    Named rather than numbered on purpose. "S2" is ambiguous in this tree: it is
+    the interpreter-claim gate in
+    docs/superpowers/plans/2026-10-03-next-phases.md, and an entirely
+    different skill (pay-signal) in
+    docs/superpowers/plans/2026-10-03-demand-suite-design.md. This comment had
+    been writing "the S2 gate" and meant the former, which is the collision
+    that made the numbering worth retiring rather than documenting.
     """
     monkeypatch.setattr(
         matrix,
