@@ -99,12 +99,25 @@ one of the twelve commits sitting unpushed.
 
 ### Known limitations
 
-- **The Action census has run once on a real runner and its seam is proven; the
-  population verdict from that run is the one thing this release cannot state.**
-  The negative control passed — the Action installed itself as a distribution,
-  measured a caller tree holding six skills and no harness, and refused a skill
-  it does not hold — but the 1,679-pair census takes longer than the other gates
-  combined. Read the run rather than this file for its number.
+- **The Action's verdict is measured, and it is not currently visible in CI.**
+  Run 37104130157, 34m14s: the Action installed itself as a distribution,
+  measured a caller tree holding six skills and no harness, refused a skill it
+  does not hold, and enumerated **1,679 sites with all 1,679 attempted** —
+  `share_of_population: 1.0`, so the smaller-number problem that produced the
+  original census finding is closed. The defect arm gives **63 survivors of
+  1,598 decided (3.94 %)** against a 5 % threshold; the forged arm including inert
+  sites is 3.75 %; the stale arm is 60/60 caught. All six control digests agree.
+  Read the run's `elohim-census-report` artifact rather than this file for the
+  per-operator and per-skill breakdown, which is 1,739 rows and does not belong
+  in a changelog.
+
+  The number is not in the job output because of a defect fixed in the commit
+  that adds this section: all six of the Action's `outputs:` declared a
+  `description` and no `value:`, and the step that wrote them had no `id`. A
+  composite action propagates nothing without a `value:`, so every one resolved
+  empty for every caller, and the workflow step that consumed them echoed five
+  blank lines and went green. The run below is the fix, and its verification
+  step now refuses an empty value rather than printing one.
 - **Nothing has been published to PyPI.** The name is free (404 today), but
   Trusted Publishing cannot be registered from a machine with no PyPI
   credential, so the first upload needs a person in a browser. `publish.yml`

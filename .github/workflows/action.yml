@@ -142,12 +142,57 @@ jobs:
           ref: ${{ github.sha }}
           fail-over: ${{ inputs.fail_over || '0.05' }}
 
+      # This step was named as an assertion and asserted nothing. It echoed the
+      # Action's five outputs and exited 0, so the first run in the repository's
+      # history reported five blank lines, named no population, and went green --
+      # while the Action underneath it had measured 1,679 sites and written a
+      # report. An echo is not a check: a value that is empty because the wiring is
+      # broken is indistinguishable from a value that is empty because the census
+      # found nothing, and only one of those is a passing run.
+      #
+      # So each value is required to be non-empty, and `population-sites` is
+      # required to be the number the report itself carries, which is a claim the
+      # caller can check rather than a value the caller has to trust.
       - name: the Action named a population and refused nothing
         run: |
           set -euo pipefail
-          echo "population-sites: ${{ steps.census.outputs.population-sites }}"
-          echo "defect-arm rate:  ${{ steps.census.outputs.rate }}"
-          echo "effective:        ${{ steps.census.outputs.effective }}"
-          echo "decided:          ${{ steps.census.outputs.decided }}"
+          sites="${{ steps.census.outputs.population-sites }}"
+          rate="${{ steps.census.outputs.rate }}"
+          effective="${{ steps.census.outputs.effective }}"
+          decided="${{ steps.census.outputs.decided }}"
+          survivors="${{ steps.census.outputs.survivors }}"
+
+          for pair in "population-sites:${sites}" "rate:${rate}" \
+                      "effective:${effective}" "decided:${decided}"; do
+            name="${pair%%:*}"
+            value="${pair#*:}"
+            if [ -z "${value}" ]; then
+              echo "::error::the Action reported an empty ${name}. A composite" >&2
+              echo "::error::action only propagates an output that declares a" >&2
+              echo "::error::\`value:\`, so an empty one here means the wiring is" >&2
+              echo "::error::broken -- not that the census found nothing." >&2
+              exit 1
+            fi
+          done
+
+          # Cross-check the propagated number against the report artifact, rather
+          # than only checking that a number arrived. A count that is present,
+          # plausible, and wrong is the failure mode a value-only check misses.
+          report="${{ steps.census.outputs.report }}"
+          if [ -z "${report}" ] || [ ! -f "${report}" ]; then
+            echo "::error::the Action reported no report file (got '${report}')" >&2
+            exit 1
+          fi
+          from_report="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["population_sites"])' "${report}")"
+          if [ "${from_report}" != "${sites}" ]; then
+            echo "::error::the Action propagated population-sites=${sites} but" >&2
+            echo "::error::its own report says ${from_report}." >&2
+            exit 1
+          fi
+
+          echo "population-sites: ${sites}"
+          echo "defect-arm rate:  ${rate}"
+          echo "effective:        ${effective}"
+          echo "decided:          ${decided}"
           echo "survivors:"
-          printf '%s\n' "${{ steps.census.outputs.survivors }}"
+          printf '%s\n' "${survivors}"

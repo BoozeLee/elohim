@@ -64,19 +64,49 @@ inputs:
     required: false
     default: "3.13"
 
+# Every output here declared a `description` and NO `value:`. In a composite
+# action that is not a stylistic gap -- `value:` is the only thing that
+# propagates, so all six resolved to the empty string for every caller, forever.
+#
+# Found by reading a run, not the file. The Action completed and wrote its report
+# correctly -- 1,679 sites, 63 survivors, a 3.94% defect-arm rate against a 5%
+# threshold -- and `.github/workflows/action.yml` printed:
+#
+#   population-sites:
+#   defect-arm rate:
+#   effective:
+#   decided:
+#   survivors:
+#
+# and then went green, because the step consuming them echoed them without
+# checking. That is a green tick on a job whose entire purpose is to produce a
+# verdict, produced by a step named "the Action named a population and refused
+# nothing" which named no population. A false green is the specific failure this
+# repository exists to catch, and it was in the Action that exists to catch it.
+#
+# The writer was always correct: it appends all six to GITHUB_OUTPUT. What was
+# missing was the id to read them from (`census`, added above) and the value
+# expressions below. Both halves are needed -- `value:` pointing at a step with
+# no id propagates nothing either.
 outputs:
   report:
     description: "Path to the census report JSON, inside the runner's temp directory. The committed tree is never written to."
+    value: ${{ steps.census.outputs.report }}
   rate:
     description: "Defect-arm survival rate, inert operators excluded. Empty when the run was refused."
+    value: ${{ steps.census.outputs.rate }}
   effective:
     description: "Surviving mutations. Counted, not trusted -- read survivors for the identities."
+    value: ${{ steps.census.outputs.effective }}
   decided:
     description: "Mutations the gate actually decided (caught, equivalent, effective)."
+    value: ${{ steps.census.outputs.decided }}
   population-sites:
     description: "The (operator x site) pairs enumerated before the run started."
+    value: ${{ steps.census.outputs.population-sites }}
   survivors:
     description: "Newline-separated survivor identities, each `operator|skill|site_index`."
+    value: ${{ steps.census.outputs.survivors }}
 
 runs:
   using: composite
@@ -199,6 +229,9 @@ runs:
     # consistency -- enumerated versus attempted -- which is knowable from
     # outside, and the survivor identities are RECORDED rather than compared.
     - name: name the surviving mutations, and prove the population was covered
+      # This id is what the six outputs below reference. It was absent, so every
+      # `value:` had nothing to read from -- see the note on the outputs block.
+      id: census
       if: always()
       shell: bash
       env:
