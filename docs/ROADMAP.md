@@ -977,6 +977,49 @@ and the first two `E1` clauses, the third still open per `E2` — and every comm
 in the range is grouped under the one it closes. The counting discipline did not
 change: re-measure it rather than trusting any number printed in this file.
 
+### Three things found while publishing, none of them code
+
+**Commit signing stopped 19 commits ago and nobody noticed.** `git log --format='%G?'`
+over the whole history: **53 signed, 19 unsigned**, and the 19 are the 19 most
+recent, contiguously. The last signed commit is `4e2845b`; the first unsigned one
+after it is `7074eb0` "Move the measurement core into elohim_gate". So this is a
+break of the repository's own working convention rather than a state it was always
+in, and `commit.gpgsign` being unset is why nothing signed automatically. The SSH
+signing key was configured and works. `commit.gpgsign = true` is now set for this
+repository, so the commit that records this decision is itself the receipt that
+signing works again. The 19 already published stay unsigned — signing them would
+mean rewriting published history. `v0.2.0`'s tag **is** signed, and GitHub reports
+that tag object `verified: true, reason: valid`.
+
+**The account is an explicit bypass actor on the only branch ruleset.** Ruleset
+`24365691`, "protect-all-branches", target `branch`, enforcement `active`, applies
+to `~ALL`, with rules `deletion`, `non_fast_forward` and `pull_request`. It has
+exactly one `bypass_actor`: actor id `96494827`, type `User`, **`bypass_mode:
+"always"`** — the account owner. That is why two direct pushes to `main` succeeded
+while the remote reported `Changes must be made through a pull request.` No audit
+log is reachable from this account (`repos/…/audits` and `orgs/…/audit-log` both
+404), so those bypass events cannot be independently audited.
+
+**This is left as an open decision on purpose.** Removing the bypass actor would
+make the pull-request rule mandatory, and with one person on the account that
+produces self-approved pull requests rather than review — a control that cannot
+fail, which is the failure this repository treats as worse than having no control
+at all. The honest options are to accept that `main` is pushed directly and say so,
+or to require a second real reviewer before the rule means anything. Deciding which
+is a person's call, not a gate's.
+
+**A published claim did not survive re-derivation.** The `v0.2.0` release notes
+first published that a "repository ruleset `GH013` refuses every REST endpoint for
+tag protection". The error string itself is a real observation — attempting to
+update the protected ref returns `GH013: Cannot update this protected ref`, quoted
+above — but the generalization to *every REST endpoint*, and the presentation of
+`GH013` as a ruleset whose configuration is discoverable, are not supported: this
+repository has exactly one ruleset and it targets branches, `repos/…/tags/protection`
+404s, and no audit log is reachable. The notes now state only the operational fact,
+that the tag cannot currently be moved or repaired through the API, and this
+paragraph keeps the captured error string as the observation it is. Re-derive with
+`gh api repos/BoozeLee/elohim/rulesets` before believing any mechanism here.
+
 ### Recommended: `v0.2.0`
 
 Minor, not patch, because of `E1`. Moving `tools/{census,mutate,sites}.py` into
