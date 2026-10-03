@@ -1,0 +1,86 @@
+name: Interpreter Matrix
+
+# The interpreter range the pins were measured across is written in six places,
+# and this workflow is what connects them to a measurement. Without it the
+# surfaces were internally consistent and still able to be wrong about what had
+# actually been run: the 3.14 row of `tools/matrix.py` reported 3.14.7 on one day
+# and 3.14.5 on the next, with no edit to the tool and no edit to any document,
+# and nothing noticed. A document that is consistent with itself is not the same
+# as a document that is true.
+#
+# Its own workflow file rather than a fifth job in `ci.yml`. `ci.yml` has four
+# jobs and a second concurrent owner, and this one is not the same unit of work:
+# it installs five interpreters before it can measure anything, and folding it in
+# would put that provisioning cost on every pull request that runs the fast gates.
+#
+# It writes nothing. `contents: read` is the whole permission set, there is no
+# scheduled trigger, and no step commits anything. An earlier design had a
+# nightly record the measured list as a committed artifact for this job to assert
+# against; that was dropped because it would have created an unattended write
+# path to main bypassing review, and because it conflated two different claims --
+# "measured across this range" is a historical statement, while "measured today"
+# is a live one, and asserting the second against the first is not a check.
+#
+# `timeout-minutes` is set well above the expected time rather than at it, for
+# the reason `mutation-census.yml` records: a timeout produces no verdict, and a
+# job that times out reads as "no regression found". Measured locally on an
+# ordinary machine, the whole run is about half a minute once the interpreters
+# exist; the rest of the budget covers provisioning five downloads on a cold
+# runner, and the ceiling is there so that a hang fails the job instead of
+# leaving it pending until GitHub gives up on its own schedule.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interpreter-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      # uv from PyPI rather than `astral-sh/setup-uv`, so this workflow adds no
+      # new third-party action and every `uses:` here is a sha already pinned in
+      # `ci.yml`. `tests/test_workflow_pins.py` discovers workflows by glob and
+      # would check a new reference just as strictly, but reusing the two shas
+      # already in the repository is the smaller change. The pin is exact for the
+      # same reason `ci.yml` pins `build` and `hatchling`: this job's verdict
+      # depends on which interpreter manager resolved what.
+      - name: install the interpreter manager
+        run: python3 -m pip install --disable-pip-version-check "uv==0.11.14"
+
+      # Minors only. The patch versions are deliberately absent from this file.
+      # Writing them here would make the workflow a seventh surface carrying the
+      # claim, and the whole defect was that nothing connected the surfaces to a
+      # measurement -- a workflow that dictated the answer would remove the need
+      # for the check rather than performing it. The tool reads the range from
+      # the documents and measures that.
+      - name: provision the measured range
+        run: uv python install 3.10 3.11 3.12 3.13 3.14
+
+      # Read the failure before running it for the first time.
+      #
+      # If this job goes red because the measured range moved -- uv shipped a new
+      # 3.14 patch and the documents still name the old one -- that is a
+      # re-measurement a human owes, not a broken gate. Re-measure, update all
+      # six surfaces together, commit. The one thing not to do is relax the
+      # comparison: a gate that agrees with whatever the machine happens to have
+      # is a gate that can no longer fail, and this one exists because a silent
+      # first-wins deduplication already cost this project a day of it.
+      #
+      # Exit 3 is `tools/matrix.py`'s own code for "two interpreters disagreed
+      # about which one answers to a minor version", propagated verbatim.
+      # `tools/verify_interpreter_claim.py` names which.
+      - name: the documented range is the range that ran
+        run: python3 tools/verify_interpreter_claim.py
