@@ -8,6 +8,15 @@ on:
 permissions:
   contents: read
 
+# One pytest pin for this workflow, referenced by every job below. `test_pins.py`
+# requires exactly one `"pytest=="` string per file, so two jobs cannot each spell
+# the pin out -- they have to read it from here. That is a constraint the test
+# already enforced on one job; a second job is what turned it into a constraint on
+# the file. The value stays quoted because that quoting is what the test's regex
+# matches on, and `"$PYTEST_PIN"` in a `run:` block deliberately does not match it.
+env:
+  PYTEST_PIN: "pytest==9.0.3"
+
 concurrency:
   group: core-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -62,8 +71,13 @@ jobs:
       # which the 3.10 leg of this matrix cannot promise, and tomllib does not
       # exist on 3.10 either, so the pin cannot be read from the one canonical
       # table. The two must move together.
+      #
+      # It is spelled once for the whole file and read from `env` here and in
+      # `unit-stress`, because `tests/test_pins.py` requires exactly one
+      # `"pytest=="` string per file and a second job is what made that a
+      # constraint on this file rather than on this step.
       - name: install the unit-test runner
-        run: python3 -m pip install --disable-pip-version-check "pytest==9.0.3"
+        run: python3 -m pip install --disable-pip-version-check "$PYTEST_PIN"
 
       - name: the unit suite is green
         run: python3 -m pytest -q
@@ -141,3 +155,102 @@ jobs:
 
       - name: the installed wheel runs the API
         run: python3 tools/verify_wheel.py
+
+  # The fourth job. It exists because a single run per push cannot see
+  # nondeterminism, which is a real class and invisible by construction -- but the
+  # red that prompted it turned out NOT to be that class, and writing otherwise
+  # here would be the exact defect this repository exists to catch.
+  #
+  # What was actually observed: a local unit-suite run went red, a re-run at the
+  # same commit passed, and CI passed on both commits involved. The cause is
+  # `tests/test_gate_suite.py::test_the_script_has_a_case_for_every_name_it_names`,
+  # which reads `tests/test_all.py` from disk at test time and asserts that the
+  # `def case_*` functions on disk equal the ones `CASES` declares. Another agent
+  # session was editing that file in a shared working tree, so the two views
+  # disagreed mid-edit. A clean detached checkout of the same commit is green. The
+  # suite was never nondeterministic; the tree it reads was moving underneath it.
+  #
+  # So this job cannot catch that, and it would be wrong to read it as if it could.
+  # CI checks out a clean committed tree, where those two views agree by
+  # construction. That failure class is local to a working tree and no CI job can
+  # observe it. The suite size is the same story one level up: the collected count
+  # moved when a test was added to a file in that tree.
+  #
+  # What it does cover is the class that SURVIVES a clean checkout: timing,
+  # randomness, filesystem ordering, anything depending on state a run leaves
+  # behind. A single run genuinely cannot see that, which is what makes the job
+  # worth its wall clock. It runs the suite repeatedly and stops at the first
+  # failure.
+  #
+  # It is a separate job rather than a fifth step in `core` for the reasons the
+  # other two are: `core` is a matrix over three interpreter versions, so a
+  # repeat count there is three times the wall clock for the same information,
+  # and `core` goes last-then-first in a way that makes an intermittent red
+  # indistinguishable from an install failure. One leg, 3.14, is where the red
+  # was actually observed.
+  #
+  # Six is a budget, not a derivation. If the per-run failure rate is p, then
+  # six independent runs detect a failure with probability 1 - (1 - p)**6, and
+  # that is the whole honest claim: this job multiplies the chance per push of
+  # getting a name instead of a shrug. p is not written here on purpose. One run
+  # went red and four passed at the same commit, which bounds p somewhere under a
+  # fifth and does not pin it, and a number in this file that a later run
+  # invalidates is the exact defect this repository keeps finding in its own
+  # documents. Measure p before quoting it; plug it into the expression above.
+  #
+  # Read the consequence plainly: this job is a detector, not a fix, and a green
+  # run is NOT evidence that the suite is clean. Raise the count when the suite
+  # is fast enough to afford it; lower it knowing the probability falls with it.
+  #
+  # continue-on-error is deliberately absent, and this is the case where that
+  # costs something real: a genuinely intermittent suite will make this job red
+  # on a push where nothing is wrong, and red-on-nothing is how a team learns to
+  # ignore red. That is the trade being made. The alternative -- tolerating the
+  # failure -- is the failure this repository treats as worse than having no
+  # control at all, because an unmonitored layer is not optional, it is
+  # unmonitored. If this job goes red intermittently and nobody can name a test,
+  # the honest response is to fix the suite, not to add continue-on-error.
+  #
+  # `-rf` is not decoration. The one time this was observed locally the failing
+  # test name was destroyed by a `tail -1`, and a run that cannot name its
+  # failure cannot be diagnosed. If you add a tail to this step, keep the FAILED
+  # lines.
+  #
+  # What it does NOT cover: `tests/test_all.py` is not collected by pytest -- it
+  # parses Python with `ast` and is run as a script by `core` -- so this job
+  # repeats the same 46 cases from three files that `core` runs, and nothing
+  # else. It is a stress job, not a second, wider gate.
+  unit-stress:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      # Reads the pin from the file-level `env` rather than spelling it out again.
+      # `tests/test_pins.py` requires exactly one `"pytest=="` string per file,
+      # and an earlier draft of this step wrote the pin out a second time and
+      # carried a comment arguing that was better -- which is precisely the kind
+      # of claim this repository exists to catch, and the pin gate caught it. The
+      # duplication `test_pins.py` guards is between this file and pyproject.toml,
+      # which cannot be merged on the matrix's 3.10 leg; two jobs inside this file
+      # can be, and now are.
+      - name: install the unit-test runner
+        run: python3 -m pip install --disable-pip-version-check "$PYTEST_PIN"
+
+      - name: the unit suite is green six times in a row
+        run: |
+          set -u
+          runs=6
+          for i in $(seq 1 "$runs"); do
+            echo "=== run $i of $runs ==="
+            if python3 -m pytest -q -rf; then
+              echo "=== run $i: rc=0 ==="
+            else
+              rc=$?
+              echo "=== run $i: rc=$rc -- stopping. The FAILED lines above name the test; keep them. ==="
+              exit "$rc"
+            fi
+          done
+          echo "=== $runs of $runs green ==="
