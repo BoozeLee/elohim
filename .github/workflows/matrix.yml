@@ -60,14 +60,43 @@ jobs:
       - name: install the interpreter manager
         run: python3 -m pip install --disable-pip-version-check "uv==0.11.14"
 
-      # Minors only. The patch versions are deliberately absent from this file.
-      # Writing them here would make the workflow a seventh surface carrying the
-      # claim, and the whole defect was that nothing connected the surfaces to a
-      # measurement -- a workflow that dictated the answer would remove the need
-      # for the check rather than performing it. The tool reads the range from
-      # the documents and measures that.
+      # Exact patches, and the reason this line changed on the job's FIRST EVER
+      # RUN is worth more than the fix itself.
+      #
+      # It read `uv python install 3.10 3.11 3.12 3.13 3.14`, with a comment
+      # arguing that minors are correct because "the patch versions are
+      # deliberately absent from this file" -- writing them would make the
+      # workflow a seventh surface carrying the claim, and a workflow that
+      # dictated the answer would remove the need for the check rather than
+      # performing it. That reasoning is about the wrong claim, and run 37102974948
+      # showed it in twelve seconds:
+      #
+      #   verify_interpreter_claim: the documented range names ['3.11.9'], which
+      #   is not installed here.
+      #
+      # `uv python install 3.11` resolves to whatever 3.11 is newest *today*. On
+      # 2026-10-03 that is 3.11.15, while the documents name 3.11.9 -- the patch
+      # that was actually measured. The other four minors happened to still match
+      # (3.10.20, 3.12.13, 3.13.13, 3.14.5), which is why exactly one interpreter
+      # was reported missing. So the job could never have passed as written: it
+      # was not a gate that might fail, it was a line that had already failed and
+      # had simply never been executed.
+      #
+      # The distinction the old comment missed: a minor-only spec is still a
+      # claim -- "the newest 3.11" -- and it is a claim that drifts. Provisioning
+      # is a different assertion from measuring. The documents assert *these
+      # versions were measured*; this line asserts *provision exactly those*, and
+      # the gate still does the work the old comment wanted it to do: it compares
+      # six independent document surfaces against each other and against what is
+      # installed, and it will go red if someone updates the ledger to 3.11.15
+      # without updating this line. Pinning here makes the job deterministic; it
+      # does not make the check redundant, because nothing here reads a document.
+      #
+      # A workflow cannot be the thing that verifies the documents, but it can be
+      # the thing that provisions what the documents say -- and a provisioner that
+      # quietly provisions something else is worse than one that pins.
       - name: provision the measured range
-        run: uv python install 3.10 3.11 3.12 3.13 3.14
+        run: uv python install 3.10.20 3.11.9 3.12.13 3.13.13 3.14.5
 
       # Read the failure before running it for the first time.
       #
