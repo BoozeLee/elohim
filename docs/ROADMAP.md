@@ -979,17 +979,29 @@ change: re-measure it rather than trusting any number printed in this file.
 
 ### Three things found while publishing, none of them code
 
-**Commit signing stopped 19 commits ago and nobody noticed.** `git log --format='%G?'`
-over the whole history: **53 signed, 19 unsigned**, and the 19 are the 19 most
-recent, contiguously. The last signed commit is `4e2845b`; the first unsigned one
-after it is `7074eb0` "Move the measurement core into elohim_gate". So this is a
-break of the repository's own working convention rather than a state it was always
-in, and `commit.gpgsign` being unset is why nothing signed automatically. The SSH
-signing key was configured and works. `commit.gpgsign = true` is now set for this
-repository, so the commit that records this decision is itself the receipt that
-signing works again. The 19 already published stay unsigned — signing them would
-mean rewriting published history. `v0.2.0`'s tag **is** signed, and GitHub reports
-that tag object `verified: true, reason: valid`.
+**Commit signing stopped 19 commits ago and nobody noticed.** Counted with
+
+```sh
+git log --format='%G?' | sort | uniq -c
+```
+
+every unsigned commit (`N`) sits after every signed one (`G`) — the break is
+contiguous, and the boundary does not move as work lands: the last signed commit is
+`4e2845b`, the first unsigned commit after it is `7074eb0` "Move the measurement
+core into elohim_gate". So this is a break of the repository's own working
+convention rather than a state it was always in, and `commit.gpgsign` being unset is
+why nothing signed automatically. Totals are deliberately not written here: another
+agent session shares this branch and commits to it, so a count of how many commits
+are unsigned is stale before it is read, and this file has already been the place
+where that happened. The boundary commits above are the durable fact; the command
+is how to get today's counts.
+
+The SSH signing key was configured the whole time and a probe proved it works.
+`commit.gpgsign = true` is now set for this repository, so the commit that records
+this decision is itself the receipt that signing works again. The already-published
+unsigned commits stay unsigned — signing them would mean rewriting published
+history. `v0.2.0`'s tag **is** signed, and GitHub reports that tag object
+`verified: true, reason: valid`.
 
 **The account is an explicit bypass actor on the only branch ruleset.** Ruleset
 `24365691`, "protect-all-branches", target `branch`, enforcement `active`, applies
