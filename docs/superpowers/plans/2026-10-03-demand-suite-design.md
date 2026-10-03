@@ -13,6 +13,58 @@ this file.
 
 ---
 
+## 0. Identifiers renamed on 2026-10-03 — S1–S5 became DP1–DP5
+
+**Nothing in this document was decided differently.** Only the labels changed,
+and the table below is the complete mapping, so the record of what was decided
+on 2026-10-03 is recoverable in full.
+
+| was | is | skill |
+|---|---|---|
+| `S1` | `DP1` | `demand-probe` (deferred, with the reason recorded in §3) |
+| `S2` | `DP2` | `pay-signal` |
+| `S3` | `DP3` | `idea-falsifier` |
+| `S4` | `DP4` | `decision-decay` |
+| `S5` | `DP5` | `lineage` |
+
+**Why.** `S1` through `S5` were defined twice in `docs/superpowers/plans/` and
+meant unrelated things. This document used `S1` for `demand-probe` and `S2` for
+`pay-signal`; `2026-10-03-next-phases.md`, in the same directory, used `S1` for
+the matrix-interpreter-ambiguity gate and `S2` for the interpreter-claim gate.
+
+The collision was not theoretical. `tests/test_matrix_interpreters.py` carried a
+docstring reading *"the mechanism the S2 gate depends on"*, meaning the
+interpreter-claim gate, and a reader or a later comment-writer could just as
+easily have meant `pay-signal`. That comment now names the gate instead of its
+number.
+
+Three measurements decided this, all taken rather than argued:
+
+1. **Nothing read the frame.** It lives in this one dated design document. No
+   test, tool, or script parses it, and no assertion anywhere would fail if the
+   numbering were deleted.
+2. **The labels collided, and the collision reached code** — see above.
+3. **The live index already organises differently.** `docs/ROADMAP.md` is
+   arranged as Track A "the gate defends itself" / B "reproducibility" / C "the
+   claim discipline" / D "surface and reach" / V "the summoned artifact". The
+   pipeline ordering here is not the live frame; it is one archived plan
+   competing with a second for the same two labels.
+
+`next-phases.md` was left alone. With this document on `DP*`, its `S1`/`S2` are
+unambiguous again, and renaming a second document would change a record that is
+not in conflict any more.
+
+The flow diagram in §8 was redrawn to the derived column positions while the
+labels changed. In the original it was off by one: `┐` and `├` sat at column 21
+while `┘` sat at column 22, so the two probe branches did not actually meet.
+
+**This document is a record, not a spec.** Two of the five skills have since been
+built or superseded by others: `pay-signal` shipped as the seventh instrumented
+skill, and `claim-ledger` — which gates the agent rather than the product, and so
+was never in this frame — shipped as the eighth.
+
+---
+
 ## 1. The problem this has to solve first
 
 elohim's machinery is a **measurement loop**: a pinned instrument is run, it
@@ -96,7 +148,7 @@ And the rules, which are the project's own and are not relaxed here:
 
 ---
 
-## 3. S1 — `demand-probe`
+## 3. DP1 — `demand-probe`
 
 **The claim it owns:** *this evidence actually supports building this.*
 
@@ -106,7 +158,7 @@ timeframe outside the launch week, swap the stated need for its neighbour — an
 records whether the **ranking** moves. A need whose rank survives every mutation
 is load-bearing. A need whose rank is unchanged by removing its own evidence was
 decorative. This is the existing mutation mechanic applied to qualitative
-input, which is why it is S1 and not the flagship.
+input, which is why it is DP1 and not the flagship.
 
 **Facts.** `decorative_needs` (int) · `single_source_needs` (int) ·
 `mutation_survivors` (list) · `founder_prior_needs` (int) ·
@@ -126,7 +178,7 @@ non-zero. Verified in both directions before the skill is considered built.
 
 ---
 
-## 4. S2 — `pay-signal`  ← build this one first
+## 4. DP2 — `pay-signal`  ← build this one first
 
 **The claim it owns:** *this is wanted, not merely asked for.*
 
@@ -185,13 +237,13 @@ on their own.
 
 ---
 
-## 5. S3 — `idea-falsifier`
+## 5. DP3 — `idea-falsifier`
 
 **The claim it owns:** *this build is aimed at a need, and we would know if we
 were wrong.*
 
 **What the instrument measures.** For each hypothesis: does a kill criterion
-exist, and does it trace to a **numbered entry** in S1 or S2. The gate is a
+exist, and does it trace to a **numbered entry** in DP1 or DP2. The gate is a
 lineage check, not a judgement about the idea.
 
 **Facts.** `hypotheses_total` (int) · `with_kill_criterion` (int) ·
@@ -207,7 +259,7 @@ A2 lesson, inverted: measure before building the thing the tool would measure.
 
 ---
 
-## 6. S4 — `decision-decay`
+## 6. DP4 — `decision-decay`
 
 **The claim it owns:** *this decision still holds.*
 
@@ -240,7 +292,7 @@ own formulation is the right one to borrow: *retrieval is not enforcement*.
 
 ---
 
-## 7. S5 — `lineage`
+## 7. DP5 — `lineage`
 
 **The claim it owns:** *this shipped thing came from that need, and caused that
 architecture consequence.*
@@ -262,16 +314,16 @@ rename and nobody notices, because both ends still look correct in isolation.
 ## 8. The chain, and why the order is not obvious
 
 ```
-   S1 demand-probe ──┐
-                     ├──> S3 idea-falsifier ──> shipped feature
-   S2 pay-signal ────┘                              │
-                                                    v
-                                            S4 decision-decay
-                                                    │
-   S5 lineage <──────────────────────────────────────┘
+   DP1 demand-probe─┐
+                    ├──> DP3 idea-falsifier ──> shipped feature
+   DP2 pay-signal───┘                           │
+                                                v
+                                          DP4 decision-decay
+                                                │
+   DP5 lineage <────────────────────────────────┘
 ```
 
-S5 depends on S1–S4 existing, which is why it is last despite being the one that
+DP5 depends on DP1–DP4 existing, which is why it is last despite being the one that
 makes the suite coherent. Building it first would mean inventing the links it
 walks. This is the dependency that jev's ordering did not cover, and it is
 recorded here rather than discovered later.
@@ -282,11 +334,11 @@ recorded here rather than discovered later.
 
 | # | Skill | Gate before the next begins |
 |---|---|---|
-| 1 | **S2 `pay-signal`** | fixture-mode verdict PASS **and** both negative controls red **and** applied mode produces a report on a real corpus with no network |
-| 2 | S1 `demand-probe` | as above, plus it reuses S2's classifier without forking it |
-| 3 | S3 `idea-falsifier` | a hypothesis with no parent need fails |
-| 4 | S4 `decision-decay` | a decision whose driver has left the tree fails |
-| 5 | S5 `lineage` | a shipped feature with no parent fails |
+| 1 | **DP2 `pay-signal`** | fixture-mode verdict PASS **and** both negative controls red **and** applied mode produces a report on a real corpus with no network |
+| 2 | DP1 `demand-probe` | as above, plus it reuses DP2's classifier without forking it |
+| 3 | DP3 `idea-falsifier` | a hypothesis with no parent need fails |
+| 4 | DP4 `decision-decay` | a decision whose driver has left the tree fails |
+| 5 | DP5 `lineage` | a shipped feature with no parent fails |
 
 No skill is merged until its negative control is committed and red. A skill
 whose traps cannot fail is the defect this repository was founded to catch, and
@@ -319,9 +371,9 @@ larger scale.
 
 ## 11. What this design does not settle
 
-- **Whether S1 and S2 are one skill.** They share a classifier, and the boundary
+- **Whether DP1 and DP2 are one skill.** They share a classifier, and the boundary
   between "is this evidence real" and "is this evidence payment" may turn out to
-  be a flag rather than a skill boundary. Building S2 first is what would settle
+  be a flag rather than a skill boundary. Building DP2 first is what would settle
   it, which is part of why it goes first.
 - **How much of a real corpus is enough.** A fixture large enough to be
   representative is also a fixture that has to be committed, and those pull
