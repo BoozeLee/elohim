@@ -209,6 +209,20 @@ range** is the last heading, and it is a sum rather than a bullet count.
   refuses at its own reproducibility control. A skill's verdict depends on which
   other skills ship beside it. This was invisible while no foreign tree was
   reachable, and it is the substance of `E2`'s difficulty.
+- **`action.yml` is executed in CI, on a tree that holds no checkout of this
+  repository.** `.github/workflows/action.yml` checks this repository out into a
+  subdirectory, assembles a caller tree at the workspace root holding the six
+  instrument skills and *not* the harness, and runs the Action against it —
+  checked out at the root instead, the run would pass whether or not the seam
+  worked. Its first act is a negative control: naming a skill the tree does not
+  hold must fail the step, and a following step fails the job if that step
+  succeeded. Measured locally against the same tree: the control refuses with
+  exit 2 and names the skill and the missing `ledger.json`; the census returns
+  `population_sites 1679`, six skills bound, rate `0.0`.
+  It runs on pushes to `main` rather than on pull requests, because the Action
+  installs elohim from `git+...@<ref>` and a pull request's `github.sha` is a
+  merge commit that was never pushed — pull requests are covered by the text
+  assertions in `tests/test_all.py`, which need no network.
 
 ### Changed
 
@@ -259,9 +273,37 @@ range** is the last heading, and it is a sum rather than a bullet count.
   `--json`. That is `D1`, not `E1`: the report does not call `run_census` or
   `gate_verdict`, so citing it as evidence that `E1`'s callable core has an
   external caller would be counting a consumer that does not call the thing.
+- **The declared version was three files and none of them matched the tag.**
+  `pyproject.toml` and `elohim_gate/__init__.py` both said `0.1.0` and `uv.lock`
+  agreed, while the newest changelog section and tag were `v0.2.0` — so `uv build`
+  from the released tree produced a wheel that called itself `0.1.0`, and
+  `docs/DISTRIBUTION.md` had documented that filename as the expected output.
+  All three now declare `0.2.0`, and `tests/test_version_agreement.py` fails when
+  any declarer disagrees with the newest released section, naming every one that
+  does rather than the first pair noticed. `docs/DISTRIBUTION.md` states
+  `elohim-<version>.*` so the claim cannot go stale again.
+- **Every third-party action was pinned by convention and by nothing else.**
+  Every `uses:` in every workflow named a 40-character commit sha with its release
+  in a trailing comment — and no check read them, so one edit from the convention
+  being lost, and a gate that decides whether a numerical claim was verified is
+  exactly where a mutable reference does damage.
+  `tests/test_workflow_pins.py` now reads the manifests by discovering them, so a
+  workflow added after the gate was written is covered, and refuses both a tag or
+  branch reference and a sha whose release is not named. Measured: it rejects
+  `actions/checkout@v7` in a newly added file and passes again once it is gone.
 
 ### Fixed
 
+- **A pristine tree that is not PASS said only that it was not PASS.** The
+  payload `run_gate` returns already carried the reason — `claim_binding`'s
+  `failures`, each with the fact, the literal and the problem — and nothing read
+  it. Measured on a one-skill caller tree, the refusal was
+  `pristine tree is not PASS (FAIL)`; it is now
+  `pristine tree is not PASS (FAIL) -- claim binding: 1 unbound claim(s) --
+  unclassified number '192': closest pinned value 183.0 at relative gap 0.0492.
+  Bind it, mark it structural, or declare it in claim_binding_exemptions.json
+  with a reason.` An unexplained FAIL stays unexplained rather than being given
+  an invented cause.
 - **The census's reproducibility refusal discarded the reason it had just
   computed.** `run_census` builds a per-skill `error` for every pristine run and
   then raised `ControlFailed("the pristine shard is not reproducible")` without

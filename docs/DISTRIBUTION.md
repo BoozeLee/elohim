@@ -45,7 +45,7 @@ installed copy trustworthy rather than merely importable.
 What was verified, on 2026-10-02:
 
 ```
-uv build                                   -> elohim-0.1.0.tar.gz + elohim-0.1.0-py3-none-any.whl
+uv build                                   -> elohim-<version>.tar.gz + elohim-<version>-py3-none-any.whl
 pip install . (clean venv, from a clone)   -> exit 0, .venv/bin/elohim present
 elohim --all   (run from /tmp, not the repo) -> ALL_SKILLS_PASS, exit 0
                                                  facts 81/81, traps 38/38,

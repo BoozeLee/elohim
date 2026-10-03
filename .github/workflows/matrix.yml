@@ -1,0 +1,167 @@
+name: Interpreter Matrix
+
+# The interpreter range the pins were measured across is written in six places,
+# and this workflow is what connects them to a measurement. Without it the
+# surfaces were internally consistent and still able to be wrong about what had
+# actually been run: the 3.14 row of `tools/matrix.py` reported 3.14.7 on one day
+# and 3.14.5 on the next, with no edit to the tool and no edit to any document,
+# and nothing noticed. A document that is consistent with itself is not the same
+# as a document that is true.
+#
+# Its own workflow file rather than a fifth job in `ci.yml`. `ci.yml` has four
+# jobs and a second concurrent owner, and this one is not the same unit of work:
+# it installs five interpreters before it can measure anything, and folding it in
+# would put that provisioning cost on every pull request that runs the fast gates.
+#
+# It writes nothing. `contents: read` is the whole permission set, there is no
+# scheduled trigger, and no step commits anything. An earlier design had a
+# nightly record the measured list as a committed artifact for this job to assert
+# against; that was dropped because it would have created an unattended write
+# path to main bypassing review, and because it conflated two different claims --
+# "measured across this range" is a historical statement, while "measured today"
+# is a live one, and asserting the second against the first is not a check.
+#
+# `timeout-minutes` is set well above the expected time rather than at it, for
+# the reason `mutation-census.yml` records: a timeout produces no verdict, and a
+# job that times out reads as "no regression found". Measured locally on an
+# ordinary machine, the whole run is about half a minute once the interpreters
+# exist; the rest of the budget covers provisioning five downloads on a cold
+# runner, and the ceiling is there so that a hang fails the job instead of
+# leaving it pending until GitHub gives up on its own schedule.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: interpreter-matrix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  matrix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.14"
+
+      # uv from PyPI rather than `astral-sh/setup-uv`, so this workflow adds no
+      # new third-party action and every `uses:` here is a sha already pinned in
+      # `ci.yml`. `tests/test_workflow_pins.py` discovers workflows by glob and
+      # would check a new reference just as strictly, but reusing the two shas
+      # already in the repository is the smaller change. The pin is exact for the
+      # same reason `ci.yml` pins `build` and `hatchling`: this job's verdict
+      # depends on which interpreter manager resolved what.
+      - name: install the interpreter manager
+        run: python3 -m pip install --disable-pip-version-check "uv==0.11.14"
+
+      # Exact patches, and the reason this line changed on the job's FIRST EVER
+      # RUN is worth more than the fix itself.
+      #
+      # It read `uv python install 3.10 3.11 3.12 3.13 3.14`, with a comment
+      # arguing that minors are correct because "the patch versions are
+      # deliberately absent from this file" -- writing them would make the
+      # workflow a seventh surface carrying the claim, and a workflow that
+      # dictated the answer would remove the need for the check rather than
+      # performing it. That reasoning is about the wrong claim, and run 37102974948
+      # showed it in twelve seconds:
+      #
+      #   verify_interpreter_claim: the documented range names ['3.11.9'], which
+      #   is not installed here.
+      #
+      # `uv python install 3.11` resolves to whatever 3.11 is newest *today*. On
+      # 2026-10-03 that is 3.11.15, while the documents name 3.11.9 -- the patch
+      # that was actually measured. The other four minors happened to still match
+      # (3.10.20, 3.12.13, 3.13.13, 3.14.5), which is why exactly one interpreter
+      # was reported missing. So the job could never have passed as written: it
+      # was not a gate that might fail, it was a line that had already failed and
+      # had simply never been executed.
+      #
+      # The distinction the old comment missed: a minor-only spec is still a
+      # claim -- "the newest 3.11" -- and it is a claim that drifts. Provisioning
+      # is a different assertion from measuring. The documents assert *these
+      # versions were measured*; this line asserts *provision exactly those*, and
+      # the gate still does the work the old comment wanted it to do: it compares
+      # six independent document surfaces against each other and against what is
+      # installed, and it will go red if someone updates the ledger to 3.11.15
+      # without updating this line. Pinning here makes the job deterministic; it
+      # does not make the check redundant, because nothing here reads a document.
+      #
+      # A workflow cannot be the thing that verifies the documents, but it can be
+      # the thing that provisions what the documents say -- and a provisioner that
+      # quietly provisions something else is worse than one that pins.
+      - name: provision the measured range
+        run: uv python install 3.10.20 3.11.9 3.12.13 3.13.13 3.14.5
+
+      # Read the failure before running it for the first time.
+      #
+      # If this job goes red because the measured range moved -- uv shipped a new
+      # 3.14 patch and the documents still name the old one -- that is a
+      # re-measurement a human owes, not a broken gate. Re-measure, update all
+      # six surfaces together, commit. The one thing not to do is relax the
+      # comparison: a gate that agrees with whatever the machine happens to have
+      # is a gate that can no longer fail, and this one exists because a silent
+      # first-wins deduplication already cost this project a day of it.
+      #
+      # Exit 3 is `tools/matrix.py`'s own code for "two interpreters disagreed
+      # about which one answers to a minor version", propagated verbatim.
+      # `tools/verify_interpreter_claim.py` names which.
+      - name: the documented range is the range that ran
+        run: python3 tools/verify_interpreter_claim.py
+
+      # Both gates below run TWICE, in opposite directions, and the second run is
+      # the one that matters.
+      #
+      # Each ships green because this tree is clean -- no project-local skill root
+      # exists, and all seven SKILL.md files are well-formed -- and green-because-
+      # clean is the same observable state as a gate that cannot fire. That is not a
+      # hypothetical: this repository shipped a 43-test suite no CI job ran, and a
+      # census that enumerated a population it did not cover while reporting the
+      # smaller number as the rate. So each fixture directory holds a defect on
+      # purpose, and --expect-findings turns "nothing found" into a failure. If a
+      # gate is weakened until it can no longer see the defect it was written for,
+      # the first run still passes and the second goes red.
+      #
+      # The fixtures live under tests/fixtures/ rather than at a real root, so they
+      # are never mistaken for shipped skills -- and they sit five or more levels
+      # deep, past the three-level container walk `npx skills add` performs, so it
+      # never discovers them either.
+      - name: one skill name is reachable from one place
+        run: |
+          python3 tools/verify_skill_roots.py
+          python3 tools/verify_skill_roots.py \
+            --root tests/fixtures/skill_roots --expect-findings
+
+      - name: every shipped SKILL.md is one a loader can read
+        run: |
+          python3 tools/verify_skill_frontmatter.py
+          python3 tools/verify_skill_frontmatter.py \
+            --skill-root tests/fixtures/skill_frontmatter --expect-findings
+
+      # The third of the fixture-paired gates, and the one that was red on this
+      # tree before a line of it was edited. `ci.yml`'s `core` job ran five gates
+      # and both AGENTS.md and CONTRIBUTING.md named four, so an agent following
+      # either document ran a smaller suite than the one gating every push. The
+      # gate below reported it; the documents were then corrected.
+      #
+      # What makes this one worth its step, given the two above it already prove a
+      # gate can fire: neither a path-existence test nor CI can see this failure.
+      # CI invokes each gate BY PATH, so a renamed or missing file already turns
+      # CI red by itself -- `python3` exits 2 with "can't open file", measured, not
+      # assumed. What CI cannot produce is the file still existing, the command
+      # still running, and the prose an agent acts on naming a different set.
+      #
+      # The fixture pairs a synthetic workflow with a synthetic document that
+      # forgets one command, and the forgetting command is named in the fixture's
+      # prose and its layout table on purpose: only a fenced code block counts as
+      # a command list, so the fixture would pass vacuously if prose were read.
+      - name: the documented gates are the gates CI runs
+        run: |
+          python3 tools/verify_agents_drift.py
+          python3 tools/verify_agents_drift.py \
+            --root tests/fixtures/agents_drift --doc AGENTS.md --expect-findings
