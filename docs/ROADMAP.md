@@ -947,20 +947,46 @@ where the position moved, what moved it. Nothing here was deleted silently.
   was taken off it. The argument for it was that `.agents/skills/` is one of the
   paths `npx skills add` writes to, that without it the install route to 75+
   harnesses does not work, and that `npx skills` is the only index an agent's
-  discovery path touches. Measured against `vercel-labs/skills` 1.7.0, all three
-  parts of that argument fail or invert:
+  discovery path touches. All three parts of that argument fail or invert:
 
-  1. **The install route already works.** That CLI's own discovery list names
-     `skills/` as a source root, covering "flat layouts
-     (`skills/<name>/SKILL.md`)" — which is exactly what this repository already
-     ships, under exactly that layout. The mirror's deliverable is met by the
-     directory that exists, so dropping it forfeits nothing.
-  2. **`.agents/skills/` is two things at once.** The same table lists it as the
+  1. **The install route already works — measured here, not inherited.** Run
+     against a clean clone of the published repository, 2026-10-03, with
+     `DISABLE_TELEMETRY=1` set because the CLI reports the repository and skill
+     identifier for public repositories:
+
+     ```sh
+     git clone --depth 1 https://github.com/BoozeLee/elohim.git /tmp/elohim-scratch
+     cd /tmp/elohim-scratch && DISABLE_TELEMETRY=1 npx -y skills@1.7.0 \
+         add BoozeLee/elohim --list
+     ```
+
+     ```
+     ◇ Found 7 skills
+     ```
+
+     All seven, named: `elohim`, `elohim-harness`, `estimator-bias`,
+     `invariant-hunter`, `precision-budget`, `reproducibility`,
+     `tolerance-prover`. The mirror's deliverable is met by the `skills/`
+     directory that already exists, so dropping it forfeits nothing.
+
+     This entry previously rested on `vercel-labs/skills` 1.7.0's own discovery
+     list naming `skills/` as a source root. That was another project's
+     documentation, not a measurement here, and a claim in a public repository
+     that no gate can check is the defect class this repository exists to catch.
+     It is now measured against the CLI directly. Pinned to 1.7.0; a different
+     version may discover differently, and re-run the command rather than
+     inheriting this number.
+
+     What it does **not** show: that the roughly twenty agents the CLI places in
+     its "universal" tier actually read `.agents/skills/`. The CLI reports the
+     tier; that the agents honour it is a claim about them, and it is unmeasured
+     here.
+  2. **`.agents/skills/` is two things at once.** The same CLI lists it as the
      *project* path for roughly twenty agents — Codex, Cursor, Gemini CLI,
-     Copilot, opencode, Cline, Zed and others — while the CLI also *writes* it as
-     an install target. Adding it here would put the same seven names into a
-     second root the installer itself walks, inside this repository. The
-     collision the mirror was meant to prevent is created by the mirror.
+     Copilot, opencode, Cline, Zed and others — while also *writing* it as an
+     install target. Adding it here would put the same seven names into a second
+     root the installer itself walks, inside this repository. The collision the
+     mirror was meant to prevent is created by the mirror.
   3. **It has already happened here.** `~/.agents/skills/elohim` on the author's
      machine is this project: a real directory carrying
      `metadata: author: BoozeLee`, dated 29 September. And `~/.agents/skills`
@@ -977,6 +1003,83 @@ where the position moved, what moved it. Nothing here was deleted silently.
   committed fixture it is run against on every CI pass in the opposite
   direction: `--expect-findings` turns "found nothing" into a failure. A
   negative control that cannot fail is not evidence that anything is checked.
+
+- **The collision between the installer's symlinks and `sync_adapters.py`'s
+  rule, recorded as "unaddressed" and now refuted.** The earlier plan noted that
+  `npx skills add` installs by symlink while `sync_adapters.py` refuses symlinks
+  under `plugins/`, and left it open. Measured, 2026-10-03, the install shape is
+  not what the earlier note recorded. It is **one real copy plus links into the
+  roots that want links**:
+
+  ```sh
+  cd /tmp/elohim-scratch && DISABLE_TELEMETRY=1 npx -y skills@1.7.0 \
+      add BoozeLee/elohim -y
+  ```
+
+  | tier | agents | on disk |
+  |---|---|---|
+  | universal | Amp, Antigravity CLI, Cline, Codex, Cursor +15 more | **real directories** in `.agents/skills/<name>/` |
+  | symlinked | Claude Code, OpenClaw | **symlinks** in `.claude/skills/<name>` → `../../.agents/skills/<name>` |
+  | skipped | Continue, Crush, Goose, Grok Build, Hermes Agent +9 more | nothing |
+
+  **The two rules never meet.** `sync_adapters.py` forbids symlinks under
+  `plugins/` because the *Codex plugin installer* drops them on install.
+  `npx skills add` writes `.agents/` and `.claude/` and never `plugins/`. The
+  install cannot break the rule, because it does not touch the directory the
+  rule governs.
+
+  **And the gate is green on that install**, which is the part that matters:
+
+  ```sh
+  python3 tools/verify_skill_roots.py --root /tmp/elohim-scratch
+  # verify_skill_roots: OK  no duplicated name across 2 project-local roots
+  ```
+
+  The counterfactual is what makes that meaningful. The same two roots, counted
+  **without** resolving symlinks, give:
+
+  ```
+  2 tolerance-prover   2 reproducibility   2 precision-budget
+  2 invariant-hunter   2 estimator-bias    2 elohim-harness   2 elohim
+  ```
+
+  Every name twice. A gate that compared paths without resolving would report
+  **7 false duplicates on the installer's own recommended layout, on a clean
+  clone of the published repository** — and a gate that fires on the
+  recommended path gets disabled on first contact.
+
+  This also settles a verdict left open. `resolve_then_compare` was recorded at
+  probability 0.84 with confidence **0.76**, below the 0.78 threshold, flagged
+  unsettled and left unresolved precisely because nobody had checked it against
+  the real install shape. It is now measured, and the measurement says it is
+  load-bearing rather than merely tidy.
+
+- **The committed fixture trees under `tests/fixtures/`.** Not a decline, a note,
+  and it is here because a public repository now contains three trees of files
+  that exist only to be wrong. There are three of them —
+  `tests/fixtures/skill_roots/`, `tests/fixtures/skill_frontmatter/` and
+  `tests/fixtures/agents_drift/` — each holding a deliberate defect so the gate
+  it belongs to can be observed failing rather than merely observed passing.
+
+  What they are, so nobody mistakes them for content: **inert text**, deliberately
+  malformed in exactly the way a skill loader or a drift check would reject;
+  carrying **no real skill name** (`elohim-fixture`, `bad-name`, `bad-description`
+  and similar), so nothing can resolve to a shipped skill; and sitting **five or
+  more levels deep**, past the three-level container walk `npx skills add`
+  performs, so the installer cannot reach them. They are read by exactly one
+  command each, under `--expect-findings`.
+
+  The reason they exist is that green-because-clean is indistinguishable from
+  green-because-broken. All three gates shipped green on arrival — the tree
+  really is clean — and this repository has already shipped the failure twice: a
+  43-test suite that no CI job ran, and a census that enumerated a population it
+  did not cover while reporting the smaller number as the rate. A fixture is what
+  converts "nothing found" into a question the CI run has to answer.
+
+  Recorded here because the general rule about deliberate malformed content in a
+  public tree deserves a visible exception list, and because a future session
+  finding a directory of broken skills is exactly the moment it needs to be told
+  they are load-bearing rather than an accident.
 
 - **A path-existence gate over the commands `AGENTS.md` names.** Considered and
   refused, and the refusal is the measurement rather than a preference. `ci.yml`
@@ -1337,7 +1440,7 @@ Each line is written as the condition that closes it, not as a task.
 | `[0.2.0]` rewritten | Every unreleased commit is either a changelog entry or explicitly out of scope. |
 | The semver sentence | Corrected, as its own commit, because a changelog that denies its own version numbers is the same defect class this project exists to catch. |
 | `elohim_gate` recorded | The `tools/` → `elohim_gate/` move is in the changelog under Changed, with the breaking-ness stated. |
-| A changelog for the viewer | `BoozeLee/elohim-gate-viewer` shipped a report page and a Pages workflow with no CHANGELOG at all. A release with no release record is the failure mode, not the exception. |
+| A changelog for the viewer | **Closed 2026-10-03.** This row read that `BoozeLee/elohim-gate-viewer` "shipped a report page and a Pages workflow with no CHANGELOG at all", which was true when written and false by the next day: the viewer now carries a `CHANGELOG.md` and a `rust.yml` whose run has executed. A release with no release record was the failure mode; it is no longer this repository's problem, and the row is kept rather than deleted so the correction is visible. |
 
 ### Three findings that should not wait for the release
 
@@ -1351,10 +1454,32 @@ already recorded as not closing the clause either; see `E2`'s closing note above
 the reason `E2`'s note sets out. Only `E3`, or a real external caller actually
 running it, closes it.
 
-**The viewer's Rust has no CI.** The Pages workflow is deploy-only, because
-Tauri's Linux dependencies break a plain `ubuntu-latest` runner. Nothing compiles
-`src-tauri` on any push. Its 23 tests were run by hand and the result is not
-recorded anywhere a reader can check.
+**The viewer's Rust has no CI — corrected 2026-10-03, because this had become
+false.** The entry used to read that the Pages workflow was deploy-only, that
+nothing compiled `src-tauri` on any push, and that the viewer's 23 tests were run
+by hand with the result recorded nowhere. Checked directly rather than inherited:
+the viewer now has `.github/workflows/rust.yml`, it has executed, and
+`BoozeLee/elohim-gate-viewer` carries a `CHANGELOG.md` — so the release-table row
+reading that the viewer "shipped a report page and a Pages workflow with no
+CHANGELOG at all" is stale in the same way.
+
+The viewer's own commit `a953663` says this about itself, and the sentence is
+worth borrowing: *"Stop claiming the Rust workflow has never run, because it has
+— both files carrying that claim were written before the workflow had ever
+executed on a runner, which made them true. Actions run 37085312552 then made
+them false, and a document that says something untrue after the event it was
+waiting for has landed is worse than one that never raised the question."* This
+paragraph was the same shape about a different repository: written while true,
+left behind when the event landed. The method, not just the fix, is the point —
+the sentence went stale because it was inherited from an earlier session's note
+instead of re-measured, and it is now re-measured on the day it is read.
+
+**What survives the correction.** The workflow's existence is not its coverage.
+The Pages workflow remains deploy-only, because Tauri's Linux dependencies do
+break a plain `ubuntu-latest` runner, so `rust.yml` covers the Rust side on its
+own matrix rather than the whole application. Stating that limit is the reason
+the entry is corrected rather than deleted; a first clause going stale is not
+evidence the finding underneath it was wrong.
 
 **One dependency advisory is reachable and open.** `glib` 0.18.5 carries
 `RUSTSEC-2024-0429`. It is not fixable within Tauri 2 — the fix needs `glib`

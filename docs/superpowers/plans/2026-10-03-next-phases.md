@@ -247,19 +247,39 @@ census that reported a smaller population as the rate.
 
 **Files:** none. Read `.github/workflows/matrix.yml`.
 
-- [ ] **Step 1: sum the job's real cost from local measurements.** The job
-  installs uv, provisions five interpreters with `uv python install`, then runs
-  four gates. `verify_interpreter_claim` alone measures ~27 s. The other three
-  are seconds. Write the sum down next to the 15 and state plainly whether the
-  budget is comfortable or marginal — a number, not a reassurance.
+- [ ] **Step 1: sum the job's real cost from local measurements.** **Measured
+  2026-10-03 on this host**, with `time`:
+
+  | step | measured |
+  |---|---|
+  | `verify_skill_roots.py` | 0.095 s |
+  | `verify_skill_frontmatter.py` | 0.097 s |
+  | `verify_agents_drift.py` | 0.074 s |
+  | `verify_interpreter_claim.py` (full, as CI runs it) | **29.615 s** |
+  | `verify_interpreter_claim.py --dry-run` | 0.098 s |
+
+  Four gates together: **~30 s**. The earlier "~27 s" note in this plan was the
+  interpreter gate alone, and the `--dry-run` form — the one used in local
+  checking — is three hundred times cheaper than the run CI pays for. Worth
+  knowing which is which before quoting a number.
+
+  **Not measured here:** `uv python install 3.10 3.11 3.12 3.13 3.14`. Five
+  CPython downloads on a cold runner, and this host already has them cached, so
+  timing it locally would measure nothing. That is the dominant term and it is
+  unmeasured, which is why the budget below is a judgement and not a sum.
 - [ ] **Step 2: check the one setting that has no local analogue.** `uv==0.11.14`
-  is pinned in the workflow and resolves against the network. Confirm the version
-  exists on PyPI and that `uv python install 3.10 3.11 3.12 3.13 3.14` is a
-  command that version accepts. This is a claim about a third party, so it gets
-  checked rather than assumed — the same discipline as F.1.
-- [ ] **Step 3: decide the budget from the sum.** If the sum is comfortably under
-  15, leave it. If it is marginal, raise it and say in the commit that the number
-  is derived from a measurement rather than chosen.
+  is pinned in the workflow and resolves against the network. **Verified
+  2026-10-03**: `https://pypi.org/pypi/uv/0.11.14/json` answers with
+  `"version": "0.11.14"`, so the pin names a version that exists. This is a claim
+  about a third party, so it gets checked rather than assumed — the same
+  discipline as F.1.
+- [ ] **Step 3: decide the budget from the sum.** **Decision: leave
+  `timeout-minutes: 15` alone.** ~30 s of gates against a 900 s ceiling, plus a
+  uv install and five interpreter downloads, leaves a wide margin. Raising it
+  would be a number chosen for reassurance rather than from a measurement, which
+  is the opposite of what the comment above that setting asks for. If the first
+  run ever approaches the ceiling, that is a finding to record, not a setting to
+  quietly widen.
 
 ### Task G.2 — first execution
 
@@ -298,18 +318,35 @@ release table already states, and it is now unmet.
   write today's, with the commands beside them, exactly as the `[0.2.0]`
   section does. The section's own instruction is "treat it as a sum to be
   checked against the range, not a figure to be quoted".
-- [ ] **Step 2: group the 18 by the item each closes.** The existing convention
-  is one group per roadmap item, not one bullet per commit — 56 commits across 9
-  items was the shape `[0.2.0]` used, and one bullet per commit would hide the
-  work. Name the groups: the interpreter-claim gate, the home-directory leak
-  gate, the duplicate-name and frontmatter gates, the `AGENTS.md`/drift work, and
-  whatever the concurrent session landed.
-- [ ] **Step 3: decide now or at release, and say which.** Writing a
+- [ ] **Step 2: group the 18 by the item each closes.** **Measured 2026-10-03:
+  the range is 19 commits**, one more than the 18 at the start of this plan —
+  the commit that wrote it. Grouped by the item each closes, following the
+  `[0.2.0]` convention of one group per item rather than one bullet per commit:
+
+  | group | commits | subjects |
+  |---|---|---|
+  | `S1` matrix interpreter ambiguity | 2 | "Refuse a minor version that two patch versions disagree about", "Let a caller say how wide the matrix had to be" |
+  | `S2` interpreter-claim gate | 1 | "Measure the documented interpreter range instead of trusting it" |
+  | `A` home-directory leak gate | 1 | "Fail a shipped file that names a real home directory" |
+  | `B1` + `B3` skill gates | 1 | "Refuse a skill name two roots can reach, and a SKILL.md a loader cannot read" |
+  | `C` agent-facing docs + drift gate | 1 | "Give an agent the commands, and gate the list against the one CI runs" |
+  | CI and gates | 5 | "Execute the Action in CI…", "Check that every workflow action is pinned to a sha…", "Run the unit suite repeatedly…", "Gate the declared version against the newest changelog section…", "Refuse the comparisons that can reach agreement by measuring nothing" |
+  | `D1` census on a caller's tree | 1 | "Run the census on a caller's tree, and split the seam…" |
+  | Record and publishing corrections | 5 | "Record what the infrastructure decisions were…", "Record the order change: E4 ahead of E2…", "Stop counting the unsigned commits…", "Turn signing back on…", "Scope the stdlib-only claim, and date a consequence that has expired" |
+  | Release bookkeeping | 1 | "Account for the five commits that landed after this section was written" |
+  | This plan | 1 | "Plan the open-claims sweep, and measure the two claims nobody had measured" |
+  | **Total** | **19** | |
+
+  Re-derive rather than trusting that total: `git rev-list --count v0.2.0..HEAD`
+  and `git log v0.2.0..HEAD --format=%s`. It is already one ahead of the 18 in
+  the table above, and it will be one ahead again once this phase commits — which
+  is the point the `[0.2.0]` section already makes about its own number.
+- [ ] **Step 3: decide now or at release, and say which.** **Decision: accounting
+  now, prose at release.** The table above is the accounting; writing a
   `[0.3.0]` section is a release decision, and this repository has twice declined
-  to automate it. The cheap half is doing the *accounting* now — the count and
-  the grouping — and leaving the prose to release day. Doing it now is also what
-  makes it obvious if a commit cannot be placed in any group, which is the
-  failure worth catching early.
+  to automate it. Doing the grouping now is what makes an unplaceable commit
+  visible early — and every commit above is placeable, which is the result worth
+  having.
 
 ---
 
