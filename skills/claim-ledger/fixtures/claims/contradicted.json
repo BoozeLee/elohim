@@ -1,0 +1,20 @@
+{
+  "schema": "elohim.claim_ledger.claims/1",
+  "author": "fixture:contradicted",
+  "note": "The claim asserts the contract file carries MARKER_PRESENT and names a check that greps for exactly that. It does not, so the check exits 1 against an expectation of 0.",
+  "claims": [
+    {
+      "id": "the-marker-is-present",
+      "text": "the contract file carries MARKER_PRESENT",
+      "check": {
+        "argv": [
+          "python3",
+          "-c",
+          "import sys;sys.exit(0 if 'MARKER_PRESENT' in open('fixtures/claims/contract.txt').read() else 1)"
+        ],
+        "expect_exit": 0,
+        "asserts": "fixtures/claims/contract.txt"
+      }
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "elohim.backlog/1",
+  "note": "Measured but not yet bound to a ledger fact. An entry here is a claim the instrument can support and the ledger does not yet assert. `elohim --promote ID:TOL` binds one.",
+  "measurements": [
+    {
+      "id": "check_that_establishes_its_claim",
+      "claim": "a check establishes the claim it verifies, not merely references its scope",
+      "measured": null,
+      "origin": "NOT MEASURED, and the shipped fixture proved it is not the same test. A claim reading 'the contract does not carry the marker' had a check that grepped for the contract HEADER; with the marker present the check still exited 0 and the claim was reported reproduced. Measured directly: exit=0 on a contract carrying the marker. The scope string WAS in the argv, so the off-scope test could not see it.",
+      "why_not_bound": "deciding whether a check ESTABLISHES its claim is a judgement about meaning, and a judgement step in the measurement path is the thing this design exists to avoid. Recorded as a limit in references/limits.md and pinned by a negative control rather than bound as a number."
+    },
+    {
+      "id": "reproduced_fraction",
+      "claim": "the share of a run's claims that are reproduced by the check they name",
+      "measured": 1.0,
+      "origin": "2 of 2 claims in the pinned corpus, which is correct by construction",
+      "why_not_bound": "a fraction over a corpus built to be correct measures the fixture, not any run. There is no population of real agent claims in this repository to compute a rate over, and a number that reads as a general rate would be the exact overclaim this skill exists to catch."
+    },
+    {
+      "id": "claim_extraction_from_transcript",
+      "claim": "the claims file is derived from what the run actually said, rather than written by the run being judged",
+      "measured": null,
+      "origin": "NOT BUILT",
+      "why_not_bound": "this is the single largest gap in the skill and it is a research problem, not a missing feature. Who writes the claims file determines how much the gate is worth, and it is an open owner decision."
+    },
+    {
+      "id": "self_authorship_detection_rate",
+      "claim": "the rate at which a self-authored claims file is detected as self-authored",
+      "measured": null,
+      "origin": "NOT MEASURED",
+      "why_not_bound": "ELOHIM_CLAIM_AUTHOR catches a run that declares itself. A run that does not set it, or sets the wrong value, is not detectable from inside the measured process. The measured size of the general problem is the 32% catch rate in SLEIGHT-Bench, which is a different measurement and must not be quoted as this instrument's rate."
+    },
+    {
+      "id": "decay_over_time",
+      "claim": "a claim verified today still holds months later",
+      "measured": null,
+      "origin": "NOT MEASURED, and there is no time dimension in v1",
+      "why_not_bound": "the seal deliberately excludes the generated timestamp so nothing can be pinned to when a run happened. Auditing whether a claim decayed is decision-decay's territory, and building it here would ship a second skill's job inside the first one's name."
+    }
+  ]
+}

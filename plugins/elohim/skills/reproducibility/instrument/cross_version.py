@@ -85,6 +85,16 @@ PINNED_CLASSES = {
     # entry missing from one is how an instrument gets classified UNLISTED
     # and trips the wire, which is exactly what happened the first time.
     "pay-signal": {PRE312: "1d0f042d68b6", POST312: "1d0f042d68b6"},
+    # claim-ledger runs subprocesses and compares exit codes, and its seal was
+    # measured identical on 3.10.20, 3.11.9, 3.12.13, 3.13.13 and 3.14.5 --
+    # all five, verdict PASS, one value. That stability is a property of THIS
+    # corpus, not a general guarantee: the shipped checks are greps, so nothing
+    # in the measurement touches dict iteration, float repr, or hash seeding. A
+    # claims file whose checks did depend on any of those would split the
+    # classes, and the matrix would say so. Recorded in BOTH columns for the
+    # same reason as pay-signal above: an entry missing from one is what turns a
+    # stable instrument into an UNLISTED tripwire.
+    "claim-ledger": {PRE312: "d340ce3a75cc", POST312: "d340ce3a75cc"},
 }
 
 # Skills that ship no instrument of their own.

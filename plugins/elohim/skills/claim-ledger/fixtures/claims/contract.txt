@@ -1,0 +1,15 @@
+CLAIM LEDGER FIXTURE CONTRACT
+============================
+
+The marker token that `contradicted.json` greps for does NOT appear in this
+file. That sentence deliberately avoids spelling it, because the first draft of
+this fixture said "the marker is absent" -- and a sentence about a token
+contains the token, so the grep succeeded, the check exited 0, and the claim
+that was supposed to be REFUTED was reported as reproduced.
+
+The fixture defeated itself, and did it silently. That is the failure class this
+whole skill exists for, committed here so the next person does not rediscover it.
+
+The other two fixtures use this file as the scope they name, so a check that
+pointed somewhere else is caught by the_decorative_check rather than quietly
+establishing nothing.

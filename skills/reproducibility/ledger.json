@@ -3,8 +3,8 @@
   "note": "Facts bind to version-independent counts only, so this ledger passes on every interpreter class it pins. No floating point enters the shard: a float measured here would vary with the interpreter and would make this skill's own seal vary with it, which is the one property worth having. The magnitude of each sibling's ledger residual is reported on stdout and measured across the whole matrix by tools/matrix.py, and pinned nowhere.",
   "instrument": {
     "path": "instrument/cross_version.py",
-    "sha256": "60bcd5771e5a6fa3b438a1ab011596efd8810c2e33490309d79eb43e53c821c2",
-    "bytes": 12895
+    "sha256": "5c562adc5dbd62f5510bf8b55b33a2a20a651aa427650dcdd00415c660b3eb60",
+    "bytes": 13642
   },
   "facts": [
     {
@@ -15,7 +15,7 @@
         "summary",
         "siblings_measured"
       ],
-      "expect": 6,
+      "expect": 7,
       "origin": "measured 2026-09-30 on CPython 3.10.20, 3.11.9, 3.12.13, 3.13.13 and 3.14.5 | 5 -> 6 on 2026-10-03: pay-signal added as a sixth instrumented sibling. The count moved because an instrument was added, not because a bound was loosened; this still fails if the count moves again."
     },
     {
@@ -26,7 +26,7 @@
         "summary",
         "in_pinned_class"
       ],
-      "expect": 6,
+      "expect": 7,
       "origin": "measured 2026-09-30; this is the tripwire, and it is the fact that turns red first on a new class | 5 -> 6 on 2026-10-03: pay-signal added as a sixth instrumented sibling. The count moved because an instrument was added, not because a bound was loosened; this still fails if the count moves again."
     },
     {
@@ -37,7 +37,7 @@
         "summary",
         "pins_matching"
       ],
-      "expect": 6,
+      "expect": 7,
       "origin": "re-derived from the sibling ledgers, not from a second copy of the digests held here | 5 -> 6 on 2026-10-03: pay-signal added as a sixth instrumented sibling. The count moved because an instrument was added, not because a bound was loosened; this still fails if the count moves again."
     },
     {
@@ -48,7 +48,7 @@
         "summary",
         "ledger_reproducing"
       ],
-      "expect": 6,
+      "expect": 7,
       "origin": "the one shard that moves still reproduces; its worst residual across the range is 2.220e-16, measured and printed by the instrument | 5 -> 6 on 2026-10-03: pay-signal added as a sixth instrumented sibling. The count moved because an instrument was added, not because a bound was loosened; this still fails if the count moves again."
     },
     {
