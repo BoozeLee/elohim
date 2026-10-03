@@ -44,7 +44,8 @@ the skill name, and the command you ran.
 - a trap that can no longer fail
 - a `check_text` false negative — a shipped text file carrying an artefact of
   its authoring that the lint does not catch: a word the log-sanitising shell
-  rewrote in place, or an unresolved merge conflict marker left by a merge
+  rewrote in place, an unresolved merge conflict marker left by a merge, or a
+  real contributor's home directory left in the text
 - a path in the tree that escapes its skill directory
 
 ## What does not

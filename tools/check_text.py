@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
 """Fail the build when a shipped text file carries an artefact of its authoring.
 
-Two artefacts are hunted, for the same reason.  The first is a word a
+Three artefacts are hunted, for the same reason.  The first is a word a
 log-sanitising shell rewrites in place: some shells on this host pass commands
 through a wrapper that rewrites a particular word, the rewrite is silent, and it
 has corrupted prose in this repository before, inside f-strings that users later
 read in a report.  The second is an unresolved merge conflict marker.  Four of
 those sat in ``docs/ROADMAP.md`` and were committed, and every gate in the
 repository looked straight through them, because each gate searched only for the
-defect it had been written about.  A separator that a merge left behind is
-environment, not product, exactly like the rewritten word.
+defect it had been written about.  The third is a contributor's real home
+directory: a release plan in this repository named the author's home path twice,
+in a public repository, and the only thing that found it was a grep run by hand.
+A path left in a tree is environment, not product, exactly like the rewritten
+word.
 
 A sanitizer that belongs to the environment does not belong to the product, so
 the fix for a shipped file is always to rewrite the sentence -- never to make
@@ -23,12 +26,13 @@ tokenises Python instead of matching substrings.  Matching substrings would
 also be wrong on its own -- the file legitimately contains ``log10``,
 ``log_star`` and ``log-star``, and a naive needle fires on all three.
 
-Files that name the sanitizer on purpose, or that quote a conflict as an
-example, are exempted through ``tools/text-allowlist.json``, which carries a
-written reason for every exemption.
+Files that name the sanitizer on purpose, quote a conflict as an example, or
+name a home directory on purpose, are exempted through
+``tools/text-allowlist.json``, which carries a written reason for every
+exemption.
 
-Exit 0 when clean, 1 when a shipped file has been rewritten or left in
-conflict, 2 on bad input.
+Exit 0 when clean, 1 when a shipped file has been rewritten, left in conflict, or
+names a real home directory, 2 on bad input.
 """
 
 from __future__ import annotations
@@ -65,6 +69,37 @@ OPEN_RE = re.compile("^" + _OPEN + r"(?:\s|$)")
 CLOSE_RE = re.compile("^" + _CLOSE + r"(?:\s|$)")
 SEP_RE = re.compile("^" + _SEP + r"$")
 ANCESTOR_RE = re.compile("^" + _ANCESTOR + r"(?:\s|$)")
+
+# A home directory is a leak only when it names somebody. The prefix alone --
+# `/home/` with nothing after it -- is not a leak and two tracked files contain
+# it on purpose: the release plan that records the original leak, and the test
+# asserting `mutation.py` holds none. So the username is required, which is what
+# makes the class `[A-Za-z0-9._-]+` rather than `[A-Za-z0-9._-]*`.
+#
+# The class deliberately excludes `[`, which is what stops this pattern from
+# matching its own source line: as text it reads `/home/[A-Za-z0-9._-]+`, and `[`
+# is not a character the class admits. A rule that matched its own file would be
+# red from the moment it was added, and the tempting fix -- adding this file to
+# the allowlist -- would be an exemption nothing needs.
+#
+# Both platform forms are covered. `/Users/<name>` is the same leak on macOS,
+# which this project claims to support, and a Linux-only rule is a rule that
+# works right up until a macOS contributor's path lands in a docstring.
+_HOME = re.compile(r"/(?:home|Users)/[A-Za-z0-9._-]+")
+
+# Usernames that are placeholders rather than people. This is a judgement call
+# and it is recorded as one: a name added here is an exemption nobody will
+# revisit, and a real account whose name happens to collide with an entry below
+# is silently un-flagged. `runner` is not a judgement -- it is the GitHub
+# Actions user, and CI documentation will name it.
+_BENIGN_USERNAMES = frozenset({
+    "runner",    # the GitHub Actions user
+    "user",
+    "username",
+    "yourname",
+    "example",
+    "nobody",
+})
 
 SKIP_DIR_NAMES = frozenset({".git", "out", "__pycache__", "node_modules", ".venv", ".pytest_cache"})
 
@@ -155,9 +190,48 @@ def scan_conflicts(rel: Path, text: str) -> list[dict]:
     return findings
 
 
+def scan_home_dirs(rel: Path, text: str) -> list[dict]:
+    """A real contributor's home directory left in shipped text.
+
+    The leak this hunts is specific and it happened here: a release plan named
+    the author's real home directory twice, in a public repository, and the only
+    thing that found it was a grep run by hand.  `CHANGELOG.md` records what that
+    costs -- "no gate here looks for a home directory, which is the same defect
+    as the 43-test suite that no CI job ran" -- and records that the check was
+    left out of that release entry on purpose, because a release entry that
+    quietly grows the toolchain is the move this repository keeps refusing.  It
+    is a change of its own instead.
+
+    A username is required and a known-placeholder username is exempt, because
+    the prefix on its own is not a leak: `docs/superpowers/plans/v0.2.0-release.md`
+    records this very leak as prose, and `tests/test_mutate.py` asserts that
+    `mutation.py` contains no home path.  Both write the bare prefix.
+
+    Exemptions are per-file, not per-match, and that is the coarser tool on
+    purpose: a file whose subject is home directories belongs in
+    `text-allowlist.json` with a written reason, which is the same trade the
+    other two rules already make.
+    """
+    findings: list[dict] = []
+    for lineno, line in enumerate(text.splitlines(), 1):
+        for match in _HOME.finditer(line):
+            if match.group(0).rsplit("/", 1)[-1] in _BENIGN_USERNAMES:
+                continue
+            findings.append({
+                "file": rel.as_posix(),
+                "line": lineno,
+                "column": match.start() + 1,
+                "kind": "home",
+                "context": line.strip()[:160],
+            })
+    return findings
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Fail the build when a shell sanitizer has rewritten words in shipped text.",
+        description="Fail the build when a shipped text file carries an artefact of "
+                    "its authoring: a word a log-sanitising shell rewrote, an unresolved "
+                    "merge conflict marker, or a real home directory.",
     )
     parser.add_argument("--json", action="store_true", help="emit findings as JSON")
     args = parser.parse_args()
@@ -182,6 +256,7 @@ def main() -> int:
         scanned += 1
         findings.extend(scan_text(rel, text))
         findings.extend(scan_conflicts(rel, text))
+        findings.extend(scan_home_dirs(rel, text))
 
     if args.json:
         print(json.dumps({"clean": not findings, "scanned": scanned, "findings": findings}, indent=2))
@@ -190,6 +265,7 @@ def main() -> int:
             print(f"  {item['file']}:{item['line']}:{item['column']}  {item['context']}", file=sys.stderr)
         injected = [f for f in findings if f["kind"] == "injected"]
         conflicts = [f for f in findings if f["kind"] == "conflict"]
+        homes = [f for f in findings if f["kind"] == "home"]
         if conflicts:
             print(
                 f"check_text: FAIL  {len(conflicts)} unresolved merge marker(s) in shipped files.\n"
@@ -205,9 +281,17 @@ def main() -> int:
                 f"teach the product about the shell.  Genuine mentions belong in {ALLOWLIST.name}.",
                 file=sys.stderr,
             )
+        if homes:
+            print(
+                f"check_text: FAIL  {len(homes)} home directory path(s) in shipped files.\n"
+                "These are somebody's own machine paths, and this repository is public.  Replace\n"
+                "them with the checkout name -- the kind already used here -- and do not redact\n"
+                f"them into something that no longer works.  A genuine mention belongs in {ALLOWLIST.name}.",
+                file=sys.stderr,
+            )
     else:
         print(
-            f"check_text: OK  no injected tokens, no conflict markers  "
+            f"check_text: OK  no injected tokens, no conflict markers, no home directories  "
             f"({scanned} text file(s) scanned, {len(allowed)} exempt with a written reason)"
         )
 
