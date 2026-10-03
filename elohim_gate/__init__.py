@@ -13,4 +13,4 @@ __all__ = [
     # check that matched nothing fails loudly instead of comparing equal forever.
     "compare",
 ]
-__version__ = "0.1.0"
+__version__ = "0.2.0"
