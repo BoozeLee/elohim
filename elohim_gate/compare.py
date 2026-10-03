@@ -15,6 +15,19 @@ that looked like a measurement and was not:
   * a wrap width was asserted from a few sampled lines of a file whose longest
     line was 151 characters.
 
+Two more were measured on 2026-10-03, in this repository, and both were the same
+defect wearing the other hat -- agreement reported over a comparison that had
+measured nothing:
+
+  * a field both sides left blank (`rate:` with nothing after it) parsed to an
+    empty value, an empty value equals an empty value, and so the field counted
+    toward the number of fields compared and reported no difference;
+  * a byte-identity check enumerated zero files on *both* sides, because its skip
+    list was tested against the absolute path and so matched the checkout's own
+    ancestors. `out` or `node_modules` anywhere above the working tree silenced
+    it, and it printed `OK  0 files byte-identical` over a mirror that had been
+    altered on purpose.
+
 So this module refuses rather than answering. It has no sentinel return values,
 because a sentinel is exactly what a caller forgets to check: an exception
 cannot be compared, cannot be equal to itself, and cannot be reported as
@@ -35,9 +48,12 @@ __all__ = [
     "VacuousComparison",
     "Widths",
     "DocumentComparison",
+    "TreeComparison",
     "digest_of",
     "volatile_subtree",
+    "measured_fields",
     "compare_documents",
+    "compare_trees",
     "observed_widths",
     "is_wrap_width",
 ]
@@ -123,6 +139,42 @@ _DOC_LINE = re.compile(r"^\s*(?P<key>[^:={}]+?)\s*(?P<sep>:|==|=)\s*(?P<value>.*
 _PATH_VALUE = re.compile(r"^(?:/|~/|\.{1,2}/|[A-Za-z]:[\\/])")
 
 
+def measured_fields(
+    left: Mapping[str, str],
+    right: Mapping[str, str],
+    *,
+    what: str = "documents",
+) -> tuple[dict[str, str], dict[str, str], tuple[str, ...]]:
+    """Drop the fields both sides left blank, and refuse when nothing is left to compare.
+
+    `rate:` with nothing after the separator parses to an empty value, and an
+    empty value equals an empty value. So a field neither side filled in counted
+    toward the number of fields compared and reported no difference -- a field
+    that measured nothing, reported as agreement.
+
+    Blank against present is left alone. That one is information: a side
+    reported a value and the other did not, which is exactly what a caller
+    comparing two runs needs to be told.
+
+    Returns the two measured sides and the names dropped, so the caller reports
+    the omission rather than quietly narrowing its own comparison.
+    """
+    blank = tuple(
+        sorted(k for k in left.keys() & right.keys() if not left[k].strip() and not right[k].strip())
+    )
+    if not blank:
+        return dict(left), dict(right), ()
+    kept_left = {k: v for k, v in left.items() if k not in blank}
+    kept_right = {k: v for k, v in right.items() if k not in blank}
+    if not kept_left or not kept_right:
+        raise VacuousComparison(
+            f"{what}: {len(blank)} field(s) are blank on both sides ({list(blank)}), "
+            f"leaving {len(kept_left)} and {len(kept_right)} measurable. A field nobody "
+            f"filled in is not a field two sides agreed about."
+        )
+    return kept_left, kept_right, blank
+
+
 class DocumentComparison(NamedTuple):
     """The outcome of comparing two `key <sep> value` dumps."""
 
@@ -130,6 +182,7 @@ class DocumentComparison(NamedTuple):
     differences: tuple[str, ...]
     only_expected: tuple[str, ...]
     only_actual: tuple[str, ...]
+    blank: tuple[str, ...]
 
 
 def _parse(text: str, *, source: str) -> dict[str, str]:
@@ -194,6 +247,7 @@ def compare_documents(
                 f"{what}: every field was declared volatile ({list(marks)}), leaving "
                 f"{len(left)} and {len(right)}. There is nothing left to compare."
             )
+    left, right, blank = measured_fields(left, right, what=what)
     differences = tuple(
         f"{k}: expected {left[k]!r}, actual {right[k]!r}"
         for k in sorted(left.keys() & right.keys())
@@ -204,6 +258,56 @@ def compare_documents(
         differences=differences,
         only_expected=tuple(sorted(left.keys() - right.keys())),
         only_actual=tuple(sorted(right.keys() - left.keys())),
+        blank=blank,
+    )
+
+
+class TreeComparison(NamedTuple):
+    """The outcome of comparing two `relative path -> digest` maps."""
+
+    compared: int
+    differing: tuple[str, ...]
+    only_expected: tuple[str, ...]
+    only_actual: tuple[str, ...]
+
+
+def compare_trees(
+    expected: Mapping[str, Any],
+    actual: Mapping[str, Any],
+    *,
+    what: str = "trees",
+) -> TreeComparison:
+    """Compare two `relative path -> digest` maps, refusing a side that holds nothing.
+
+    This is `digest_of`'s refusal for file sets rather than rows. Two empty maps
+    are equal, so a byte-identity check whose enumeration matched nothing reports
+    every file identical -- and one did. Its skip list was tested against the
+    absolute path, so `out`, `node_modules`, `.venv` or `.git` anywhere above the
+    checkout silenced it, and it printed `OK  0 files byte-identical` over a
+    mirror that had been altered on purpose.
+
+    Refuses when either side is empty, and when any entry carries a blank digest:
+    a path beside an empty digest is a path with nothing to compare.
+    """
+    if not expected or not actual:
+        raise VacuousComparison(
+            f"{what}: enumerated {len(expected)} file(s) on the expected side and "
+            f"{len(actual)} on the actual side. Two empty sets are equal, so a "
+            f"byte-identity check over neither of them reports every file identical."
+        )
+    for side, tree in (("expected", expected), ("actual", actual)):
+        for path, value in sorted(tree.items()):
+            if not str(value).strip():
+                raise VacuousComparison(
+                    f"{what}: {side} entry {str(path)!r} carries no digest. A path beside "
+                    f"an empty digest is a path with nothing to compare."
+                )
+    shared = expected.keys() & actual.keys()
+    return TreeComparison(
+        compared=len(shared),
+        differing=tuple(sorted(p for p in shared if expected[p] != actual[p])),
+        only_expected=tuple(sorted(expected.keys() - actual.keys())),
+        only_actual=tuple(sorted(actual.keys() - expected.keys())),
     )
 
 

@@ -475,14 +475,66 @@ def case_tampered() -> bool:
 
 
 def case_mirror() -> bool:
+    """The mirror must be byte-identical, and this check must be able to fail.
+
+    Two ways it reported green over a mirror that was not, both measured on
+    2026-10-03:
+
+      * the skip list was tested against each file's *absolute* path, so `out` --
+        the name this repository's own instrument output uses -- anywhere above
+        the checkout silenced the enumeration. Both sides came back empty, two
+        empty sets are equal, and the gate printed "OK  0 files byte-identical"
+        over a mirror that had been altered on purpose. `tools/check_text.py`
+        filters the same list against a relative path; the two must not drift.
+      * nothing here altered a mirror to prove the check still notices.
+
+    So the second half builds a throwaway tree whose parent directory is named
+    `out`, gives it a real skill and a real mirror, alters the mirror, and
+    requires two things: that the files are still enumerated, and that the check
+    refuses. Either half regressing on its own fails this case.
+    """
     result = run([sys.executable, str(REPO_ROOT / "tools" / "sync_adapters.py"), "--check"])
     output = (result.stdout + result.stderr).strip()
     tail = output.splitlines()[-1] if output else ""
     print(f"mirror   exit {result.returncode}  {tail}")
-    if result.returncode != 0:
+    ok = result.returncode == 0
+    if not ok:
         for line in output.splitlines():
             print(f"          {line}")
-    return result.returncode == 0
+
+    spec = importlib.util.spec_from_file_location(
+        "sync_adapters_under_test", REPO_ROOT / "tools" / "sync_adapters.py")
+    sync = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(sync)
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp) / "out" / "repo"
+        src = root / "skills" / "control-skill"
+        dst = root / "plugins" / "elohim" / "skills" / "control-skill"
+        for tree in (src, dst):
+            tree.mkdir(parents=True)
+            (tree / "SKILL.md").write_text("# control\n", encoding="utf-8")
+            (tree / "body.py").write_text("VALUE = 1\n", encoding="utf-8")
+        (dst / "body.py").write_text("VALUE = 2\n", encoding="utf-8")
+
+        enumerated = len(sync.relative_files(src))
+        rc = sync.verify([(src, dst)])
+        if enumerated != 2:
+            ok = False
+            print(f"mirror   FAIL  enumerated {enumerated} file(s) from a skill that holds "
+                  f"two, below a parent directory named 'out'; the skip list is being "
+                  f"matched against an absolute path, so it silences the checkout")
+        if rc == 0:
+            ok = False
+            print("mirror   FAIL  an altered mirror compared equal to its source and the "
+                  "check exited 0")
+        else:
+            print(f"mirror   control fired   {enumerated} file(s) enumerated under a "
+                  f"parent named 'out'; altered mirror refused (rc={rc})")
+
+    if ok:
+        print("mirror   exit 0  mirror byte-identical, and an altered one is refused")
+    return ok
 
 
 def case_text() -> bool:
@@ -633,10 +685,18 @@ def case_compare() -> bool:
     refuses("every field declared volatile",
             lambda: C.compare_documents("wall_seconds: 3\nrate: 1", "wall_seconds: 4\nrate: 1",
                                         volatile=("wall_seconds", "rate"), what="control"))
+    refuses("every field blank on both sides",
+            lambda: C.compare_documents("rate:\nn:", "rate:\nn:", what="control"))
+    refuses("one side enumerated no files",
+            lambda: C.compare_trees({}, {"a.py": "ab"}, what="control"))
+    refuses("both sides enumerated no files",
+            lambda: C.compare_trees({}, {}, what="control"))
+    refuses("a path beside an empty digest",
+            lambda: C.compare_trees({"a.py": "ab"}, {"a.py": ""}, what="control"))
 
-    if fired != 7:
+    if fired != 11:
         ok = False
-        print(f"compare   FAIL  {fired} of 7 refusal controls fired, so the "
+        print(f"compare   FAIL  {fired} of 11 refusal controls fired, so the "
               f"negative-control set changed shape without anyone noticing")
 
     try:
@@ -688,6 +748,43 @@ def case_compare() -> bool:
         else:
             print(f"compare   {agree.compared} field(s) compared; one difference found "
                   f"when one exists")
+
+        # A field neither side filled in must not count toward `compared`, and must
+        # be named rather than dropped in silence. It used to do neither: the
+        # empty value equalled itself and the field was counted.
+        part_blank = C.compare_documents("rate: 0.5\nnote:", "rate: 0.5\nnote:", what="control")
+        if part_blank.compared != 1 or part_blank.blank != ("note",) or part_blank.differences:
+            ok = False
+            print(f"compare   FAIL  a field blank on both sides reported "
+                  f"compared={part_blank.compared} blank={part_blank.blank!r} "
+                  f"differences={part_blank.differences!r}; it must be excluded from the "
+                  f"count and named")
+        else:
+            print("compare   field blank on both sides excluded from the count and named")
+
+        one_present = C.compare_documents("rate: 0.5\nnote:", "rate: 0.5\nnote: x", what="control")
+        if len(one_present.differences) != 1 or one_present.blank:
+            ok = False
+            print(f"compare   FAIL  blank against present reported "
+                  f"{one_present.differences!r} blank={one_present.blank!r}; a side that "
+                  f"filled the field in and a side that did not is a real difference")
+        else:
+            print("compare   blank against present reported as a real difference")
+
+        tree = C.compare_trees({"a.py": "11", "b.py": "22"}, {"a.py": "11", "b.py": "22"},
+                               what="control")
+        drift = C.compare_trees({"a.py": "11", "b.py": "22"}, {"a.py": "11", "b.py": "23"},
+                                what="control")
+        gone = C.compare_trees({"a.py": "11", "b.py": "22"}, {"a.py": "11"}, what="control")
+        if tree.differing or tree.compared != 2 or drift.differing != ("b.py",) \
+                or gone.only_actual:
+            ok = False
+            print(f"compare   FAIL  tree comparison reported equal={tree.differing!r} "
+                  f"compared={tree.compared} drift={drift.differing!r} "
+                  f"only_actual={gone.only_actual!r}")
+        else:
+            print(f"compare   {tree.compared} file(s) compared; a changed digest and a "
+                  f"missing file each reported")
     except Exception as exc:
         ok = False
         print(f"compare   FAIL  the positive checks raised {type(exc).__name__}: {exc}")

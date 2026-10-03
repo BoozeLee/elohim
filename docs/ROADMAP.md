@@ -53,9 +53,12 @@ one of them is a third-party package at runtime. `harness_run.py` and
 that each put `skills/` on `sys.path` and read from there. `tests/test_all.py`
 imports `submit` the same way, and two other test modules import `pytest`, which
 is a pin in the dev group. The shipped package `elohim_gate/` imports nothing
-outside the stdlib at all. Left unscoped the row reads `0` and is simply false
-the moment `pytest` is counted, with nothing in the document to say which
-counting was meant.
+outside the stdlib at all. `tools/sync_adapters.py` now imports
+`elohim_gate.compare` — the package under test, off `sys.path`, and first-party
+for the same reason the others are — which is what took its byte-identity verdict
+out of its own hands. Left unscoped the row reads `0` and is simply false the
+moment `pytest` is counted, with nothing in the document to say which counting
+was meant.
 
 The strongest result is the interpreter matrix, and it needed correcting before
 it could be called one. A 4-year span of CPython produces byte-identical

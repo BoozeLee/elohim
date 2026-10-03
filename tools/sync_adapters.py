@@ -24,6 +24,15 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
 ADAPTER_ROOT = REPO_ROOT / "plugins" / "elohim" / "skills"
 
+sys.path.insert(0, str(REPO_ROOT))
+
+# The comparison lives in the package, not here. This gate used to hold its own
+# verdict, and it held one that could be reached by comparing nothing: two empty
+# file sets are equal, so an enumeration that matched no file printed "OK  0
+# files byte-identical". A second copy of the refusal would be a second thing
+# that can quietly stop firing, which is what the refusal exists to prevent.
+from elohim_gate.compare import VacuousComparison, compare_trees  # noqa: E402
+
 SKIP_DIR_NAMES = frozenset({"out", "__pycache__", ".git", "node_modules", ".venv"})
 SKIP_SUFFIXES = (".pyc", ".pyo")
 
@@ -41,6 +50,15 @@ def discover_skills() -> list[Path]:
 
 
 def is_skipped(path: Path) -> bool:
+    """Whether `path` -- relative to the tree being walked -- is not mirrored.
+
+    The path must already be relative. Matched against an absolute one, every
+    entry in SKIP_DIR_NAMES also silences any checkout that happens to live
+    below a directory of that name, and `out` is a common enough name that the
+    mirror gate once printed "OK  0 files byte-identical" over a tampered tree.
+    `tools/check_text.py` filters the same list against a relative path; the two
+    must not drift.
+    """
     return any(part in SKIP_DIR_NAMES for part in path.parts) or path.suffix in SKIP_SUFFIXES
 
 
@@ -53,10 +71,15 @@ def digest(path: Path) -> str:
 
 
 def relative_files(root: Path) -> list[Path]:
-    return sorted(
-        (p.relative_to(root) for p in root.rglob("*") if p.is_file() and not is_skipped(p)),
-        key=lambda p: p.as_posix(),
-    )
+    files: list[Path] = []
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root)
+        if is_skipped(rel):
+            continue
+        files.append(rel)
+    return sorted(files, key=lambda p: p.as_posix())
 
 
 def clear(target: Path) -> None:
@@ -97,21 +120,24 @@ def verify(pairs: list[tuple[Path, Path]]) -> int:
             continue
         wanted = {rel: digest(src / rel) for rel in relative_files(src)}
         present = {rel: digest(dst / rel) for rel in relative_files(dst)}
-        for rel, want in wanted.items():
-            got = present.get(rel)
-            if got is None:
-                print(f"MISSING  {dst / rel}", file=sys.stderr)
-                bad = True
-            elif got != want:
-                print(
-                    f"DIFFERS  {dst / rel}  {want[:12]} != {got[:12]}",
-                    file=sys.stderr,
-                )
-                bad = True
-        for rel in present:
-            if rel not in wanted:
-                print(f"EXTRA    {dst / rel}", file=sys.stderr)
-                bad = True
+        try:
+            result = compare_trees(wanted, present, what=f"{src.name} mirror")
+        except VacuousComparison as exc:
+            print(f"VACUOUS  {exc}", file=sys.stderr)
+            bad = True
+            continue
+        for rel in result.only_expected:
+            print(f"MISSING  {dst / rel}", file=sys.stderr)
+            bad = True
+        for rel in result.differing:
+            print(
+                f"DIFFERS  {dst / rel}  {wanted[rel][:12]} != {present[rel][:12]}",
+                file=sys.stderr,
+            )
+            bad = True
+        for rel in result.only_actual:
+            print(f"EXTRA    {dst / rel}", file=sys.stderr)
+            bad = True
     for link in find_symlinks():
         print(f"SYMLINK  {link}  (Codex drops symlinks on install)", file=sys.stderr)
         bad = True
