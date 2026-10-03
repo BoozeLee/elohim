@@ -28,6 +28,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -950,6 +951,215 @@ def case_bootstrap() -> bool:
     return ok
 
 
+def case_action() -> bool:
+    """The seam and the Action built on it must refuse what cannot be measured.
+
+    One function used to answer both "where is the instrument code" and "which
+    tree is measured", so a caller could not name its own tree without also
+    shipping this repository's harness. The Action at the repository root exists
+    because of that, and every control below corrupts one input to the
+    resolution and requires the refusal -- including the control-on-control, which
+    removes ELOHIM_TREE and requires the foreign tree to become unreachable.
+
+    What this case does NOT prove, stated plainly: that a full census runs green
+    from a foreign workspace. That needs minutes of wall clock, so it is measured
+    out of band and the measurement is recorded in docs/ROADMAP.md under E4 with
+    the command that reproduces it. A test that quietly cannot run the thing it
+    is named after is worse than one that says so.
+
+    The action.yml assertions are text, not structure, because this repository is
+    stdlib-only and there is no YAML parser in the standard library to hand. So
+    what is asserted is a list of specific load-bearing lines, and separately
+    that every embedded heredoc compiles -- a step that would go red the moment
+    the file stopped being valid Python, whatever happened to the prose.
+    """
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+    try:
+        from elohim_gate import mutation as M
+    except Exception as exc:
+        print(f"action    FAIL  elohim_gate.mutation could not be imported: {exc}")
+        return False
+
+    ok = True
+    fired = 0
+    saved = os.environ.get("ELOHIM_TREE")
+    work = Path(tempfile.mkdtemp(prefix="action-"))
+
+    def refuses(label, fn):
+        nonlocal ok, fired
+        try:
+            value = fn()
+        except (FileNotFoundError, M.ControlFailed) as exc:
+            fired += 1
+            print(f"action    control fired   {label}")
+            print(f"action                    -> {str(exc)[:96]}")
+            return
+        except Exception as exc:
+            ok = False
+            print(f"action    FAIL  control {label!r} raised "
+                  f"{type(exc).__name__}, which is not the refusal it was written "
+                  f"to provoke: {exc}")
+            return
+        ok = False
+        print(f"action    FAIL  control {label!r} did NOT fire — it returned "
+              f"{value!r}. A refusal that returns a value has become a sentinel.")
+
+    try:
+        # A workspace that is not this repository and holds no harness at all.
+        ws = work / "consumer"
+        skill = ws / "skills" / "my-skill"
+        (skill / "instrument").mkdir(parents=True)
+        inst = skill / "instrument" / "m.py"
+        inst.write_text("VALUE = 1\n", encoding="utf-8")
+        os.environ["ELOHIM_TREE"] = str(ws)
+
+        refuses("a tree holding no ledger at all",
+                lambda: M.instrumented_skills())
+        refuses("a skill named but not in the tree",
+                lambda: M.ledger_of(ws / "skills" / "not-here"))
+
+        (skill / "ledger.json").write_text(json.dumps({
+            "label": "my-skill",
+            "instrument": {"path": "instrument/m.py",
+                           "sha256": hashlib.sha256(inst.read_bytes()).hexdigest(),
+                           "bytes": inst.stat().st_size}},
+            indent=2) + "\n", encoding="utf-8")
+        if M.instrumented_skills() != ["my-skill"]:
+            ok = False
+            print(f"action    FAIL  a ledger-bearing foreign tree resolved to "
+                  f"{M.instrumented_skills()}, not ['my-skill']")
+        else:
+            print("action    a ledger-bearing foreign tree resolves to ['my-skill']")
+
+        # The negative control for the seam itself: without the variable the
+        # foreign tree is unreachable, which is the whole reason the variable
+        # exists. If this ever passes anyway, the seam is gone and the controls
+        # above are passing for the wrong reason.
+        del os.environ["ELOHIM_TREE"]
+        if M.tree_root() == ws / "skills":
+            ok = False
+            print("action    FAIL  a foreign tree is reachable with ELOHIM_TREE "
+                  "unset — the seam no longer separates the two trees")
+        else:
+            print(f"action    control fired   a foreign tree is unreachable "
+                  f"without ELOHIM_TREE (resolves to {M.tree_root()})")
+
+        refuses("ELOHIM_TREE naming a repository with no skills/ tree",
+                lambda: _with_tree(M.tree_root, str(ws / "nowhere")))
+        (skill / "ledger.json").write_text("{ not json", encoding="utf-8")
+        refuses("a ledger that is not valid JSON",
+                lambda: M.ledger_of(skill))
+        os.environ["ELOHIM_TREE"] = str(ws)
+        refuses("a census asked for an empty skill list",
+                lambda: _empty_skills())
+    except Exception as exc:
+        ok = False
+        print(f"action    FAIL  the behaviour checks raised "
+              f"{type(exc).__name__}: {exc}")
+    finally:
+        if saved is None:
+            os.environ.pop("ELOHIM_TREE", None)
+        else:
+            os.environ["ELOHIM_TREE"] = saved
+        shutil.rmtree(work, ignore_errors=True)
+
+    ok = _action_manifest(ok) and ok
+
+    if fired != 5:
+        ok = False
+        print(f"action    FAIL  {fired} of 5 refusal controls fired, so the "
+              f"negative-control set changed shape without anyone noticing")
+    if ok:
+        print("action    exit 0  the seam resolves a foreign tree, and every "
+              "unresolvable input is refused")
+    return ok
+
+
+def _with_tree(fn, value: str):
+    """Call fn() with ELOHIM_TREE set, restoring whatever was there after."""
+    saved = os.environ.get("ELOHIM_TREE")
+    os.environ["ELOHIM_TREE"] = value
+    try:
+        return fn()
+    finally:
+        if saved is None:
+            os.environ.pop("ELOHIM_TREE", None)
+        else:
+            os.environ["ELOHIM_TREE"] = saved
+
+
+def _empty_skills():
+    """The census's own refusal for an empty population, not a stand-in."""
+    from elohim_gate import census as K
+    return K.run_census(skills=[], progress=None)
+
+
+def _action_manifest(ok: bool) -> bool:
+    """action.yml must carry the guards it documents, and every heredoc must parse.
+
+    Each line below is one guard. They are asserted by text because this
+    repository is stdlib-only and cannot parse YAML, which is a real limitation:
+    a reformat of action.yml that kept every meaning and moved every one of these
+    lines would turn this case red for no reason. That is the trade, and it is
+    made in the direction that fails loudly.
+    """
+    path = REPO_ROOT / "action.yml"
+    if not path.is_file():
+        print("action    FAIL  no action.yml at the repository root, so "
+              "`uses: BoozeLee/elohim@v...` cannot resolve to it")
+        return False
+    text = path.read_text(encoding="utf-8")
+
+    required = [
+        # A required `ref`, with no default anywhere: an unpinned instrument can
+        # change the operator set under a green run.
+        ("ref:\n", "a `ref` input"),
+        ("    required: true", "the ref is required, not defaulted"),
+        # The seam, named where a reader will look for it.
+        ("ELOHIM_TREE: ${{ github.workspace }}", "the measured tree is the caller's"),
+        # Read-only with respect to the committed tree: the report goes to the
+        # runner's temp directory.
+        ("REPORT: ${{ runner.temp }}/census-report.json", "the report is not written into the tree"),
+        # No limit: a sampled run reports a rate over the sites it attempted
+        # while naming the population it enumerated, which is the mismatch the
+        # coverage guard below exists to catch.
+        ("--limit 0", "the census is not sampled"),
+        # The guard itself, and the refusal when it fires.
+        ('cov["forged_sites_attempted"] != cov["population_sites"]',
+         "the coverage check compares attempted against enumerated"),
+        # Survivors named by identity, not by count, and named whether or not
+        # the gate passed -- otherwise a green run is the only thing you see.
+        ('r["site_index"]', "survivors are identified by site_index"),
+        ('"threshold" not in d', "a report with no threshold block is refused"),
+        ("if: always()", "the naming step runs on a passing run too"),
+    ]
+    for needle, what in required:
+        if needle in text:
+            print(f"action    manifest ok      {what}")
+        else:
+            ok = False
+            print(f"action    FAIL  action.yml no longer carries {what} "
+                  f"(looked for {needle!r})")
+
+    blocks = re.findall(r"<<'PY'\n(.*?)\n\s*PY", text, re.S)
+    if not blocks:
+        ok = False
+        print("action    FAIL  no embedded heredoc found, so the checks above "
+              "were asserted against prose rather than against running code")
+    for i, block in enumerate(blocks):
+        src = "\n".join(line[8:] if line.startswith(" " * 8) else line
+                        for line in block.splitlines())
+        try:
+            compile(src, f"<action.yml block {i}>", "exec")
+            print(f"action    manifest ok      embedded block {i} compiles "
+                  f"({len(src.splitlines())} lines)")
+        except SyntaxError as exc:
+            ok = False
+            print(f"action    FAIL  embedded block {i} does not compile: {exc}")
+    return ok
+
+
 def main() -> int:
     cases = [
         ("mirror", case_mirror),
@@ -960,6 +1170,7 @@ def main() -> int:
         ("index", case_index_drift),
         ("compare", case_compare),
         ("bootstrap", case_bootstrap),
+        ("action", case_action),
     ]
     failures = []
     for name, func in cases:

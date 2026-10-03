@@ -714,9 +714,18 @@ count.
 
 **Decided by:** `run_census` and `gate_verdict` are called, not parsed for, by
 something that did not write them; `mutation.py` has the same three shapes; the
-wheel exposes both. **The second and third hold; the first does not** — the only
-callers are in `tests/`, which this author wrote. Only `E3`, `E4`, or a real
-external caller closes that clause.
+wheel exposes both. **The second and third hold; the first still does not**, and
+`E4` did not close it. There are now two callers rather than one — `tests/` and
+this repository's own `action.yml` — and the standard this file already set for
+`E2` says a caller written by the same author in the same repository is
+"self-authored whatever the entry point is called". By that standard the Action
+is not the external caller either, so the clause stays open. What `E4` did change
+is what the gap now *is*: before it, no caller could name a tree that did not
+contain the instrument, so nothing outside this checkout could even attempt to
+call the API. The measurement that a census now runs from a workspace holding no
+checkout of this repository is the precondition for the clause, and it is
+recorded under `E4`. Only `E3`, or a real external caller actually running it,
+closes the clause.
 
 The third clause was false until `0647cee`, and this paragraph was wrong about
 which one had failed. `pyproject.toml` claimed the installed copy ran anywhere
@@ -757,9 +766,12 @@ observed from a caller. `E4` is what observes it.
 **This does not close `E1`'s third clause.** `E1` is decided by a caller that
 did not write the code, and `elohim init` would be written by the same author
 inside the same repository as the gate it bootstraps — self-authored whatever
-the entry point is called. Only `E3`, `E4`, or a real external caller closes
-that clause. Recorded here rather than at `E2`'s start, because a reader who
-takes `E2` for the external adjudication has no reason to come back and check.
+the entry point is called. `E4` shipped on 2026-10-03 and did not close it
+either, for the same reason: `action.yml` lives in this repository and was
+written by the same author, so it is a second caller rather than an external one.
+Only `E3`, or a real external caller actually running it, closes that clause.
+Recorded here rather than at `E2`'s start, because a reader who takes `E2` for
+the external adjudication has no reason to come back and check.
 
 ### E3. PyPI
 **Why:** mechanical, and the wheel is already verified byte-identical. Last of
@@ -802,10 +814,65 @@ so a green run cannot hide a shorter population behind its exit code.
 **What the Action must refuse, and must refuse loudly.** A target with no
 `ledger.json` is the ordinary case, not the exotic one, so the failure names the
 file and the skill rather than surfacing as a `FileNotFoundError` from inside
-`census.py`. A target with no instruments in its tree is refused outright,
+`census.py`; a target with no instruments in its tree is refused outright,
 because a census over zero skills reports a perfect rate over nothing — the
 vacuous comparison this repository has now fixed twice, in two places, and
 declines to reintroduce through a new surface.
+
+**Built 2026-10-03.** `ELOHIM_TREE` names the repository under test and appends
+`skills/`, the same shape as `ELOHIM_REPO`, and defaults to `skills_root()` so
+every existing caller and the wheel gate mean the same thing after it as before.
+Five call sites moved to it. `action.yml` at the repository root is a composite
+that installs the pinned revision with `pip install "elohim @ git+…"` — which
+goes through the build backend, so `force-include` runs and the skills land at
+`elohim_gate/_skills`, the path `skills_root()` resolves for an installed
+distribution — then points `ELOHIM_TREE` at `github.workspace`.
+
+**Measured, and the measurement is what makes the seam a claim rather than an
+intention.** A census ran to completion, `rc 0`, against a workspace holding six
+copied skills and **no checkout of this repository and no `elohim-harness` at
+all**: it enumerated the same 1679 sites, all six ledgers bound, defect arm
+0/4 at `--limit 4`. Reproduce it by copying the six skill directories into an
+empty directory's `skills/`, setting `ELOHIM_TREE` to it, and running
+`python3 -m elohim_gate.census --limit 4 --budget 40 --jobs 4`. That the harness
+resolved from *this* installation while the tree came from over there is the
+claim `E1`'s third clause needs, and it is now the first caller of `run_census`
+that did not write it.
+
+**The full 1679-site run is not in the unit suite, on purpose.** It needs minutes
+of wall clock, and a test that cannot run the thing it is named after is worse
+than one that says so. `tests/test_all.py`'s `action` case holds five refusal
+controls and a manifest check over `action.yml` instead, and removing
+`ELOHIM_TREE` from `tree_root()` was confirmed to turn that case red with three
+named failures — the controls were shown to fire for the seam's reason and no
+other.
+
+**Two things this build refused to do, each because the check would have been
+weakened rather than the behaviour fixed.** The `limit` input: a sampled run
+reports its rate over the sites it attempted while naming the population it
+enumerated, so `attempted != enumerated` and the coverage check below fires on
+every honest sampled run. Keeping the input meant weakening the check to match
+it. The input is gone, `--limit 0` is hardcoded, and the sample stays reachable
+and honestly named at `python3 -m elohim_gate.mutation --sample N`. The other is
+the survivor digest: the nightly pins `EXPECTED_ROWS_DIGEST` because it knows its
+own skills, and this Action knows neither the caller's skills nor its survivors,
+so a pinned constant here would either refuse every caller or assert a
+population nobody measured. What the Action checks instead is internal
+consistency — `forged_sites_attempted == population_sites` — which is knowable
+from outside and catches the failure that matters: a refactor that stops
+*enumerating* yields a shorter run with fewer survivors, so the rate goes down,
+the gate goes green, and the only symptom is a smaller number.
+
+**One measured coupling that is not a defect and is worth stating.** `claim_binding`
+measures a claim against the ledgers *in the tree being measured*: with all six
+skills present, `invariant-hunter`'s ledger passes; copy that one skill alone into
+an empty workspace and the number `2` in its ledger becomes `unclassified number
+'2': closest pinned value 3.0`, the pristine verdict is FAIL, both pristine runs
+return no shard, and the census refuses at its own reproducibility control. A
+skill's verdict therefore depends on which other skills ship beside it. That was
+invisible while no foreign tree was reachable; it is the substance of `E2`'s
+difficulty, and it is why the refusal now names the per-skill reason instead of
+saying only that a shard was not reproducible.
 
 ---
 
@@ -1147,7 +1214,9 @@ published report page consumes `elohim.gate/1` JSON through `harness_run.py
 evidence for `D1` and citing it for `E1` would be the exact move this roadmap
 keeps refusing: counting a consumer that does not call the thing. `E2` was
 already recorded as not closing the clause either; see `E2`'s closing note above.
-Only `E3`, `E4`, or a real external caller closes it.
+`E4` shipped on 2026-10-03 and is a second caller rather than an external one, for
+the reason `E2`'s note sets out. Only `E3`, or a real external caller actually
+running it, closes it.
 
 **The viewer's Rust has no CI.** The Pages workflow is deploy-only, because
 Tauri's Linux dependencies break a plain `ubuntu-latest` runner. Nothing compiles

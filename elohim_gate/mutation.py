@@ -99,6 +99,36 @@ def skills_root() -> Path:
         + ", ".join(str(p) for p in tried))
 
 
+def tree_root() -> Path:
+    """The skills tree this run MEASURES, which need not be the one it runs from.
+
+    `skills_root()` answers one question -- where the instrument code lives: the
+    harness, the operators, the shipped skills. Until this existed the same
+    function answered both questions, and the census could only measure the tree
+    it shipped inside. That is why `ELOHIM_REPO` cannot be pointed at somebody
+    else's repository: naming their workspace takes the harness with it, and
+    quietly falling back to the packaged copy would measure a tree nobody asked
+    for -- the exact substitution `skills_root()` refuses to make. One function
+    serving two roles meant the role could not be stated, let alone overridden.
+
+    `ELOHIM_TREE` names the root of the repository under test and appends
+    `skills/`, the same shape as `ELOHIM_REPO` so the two read as a pair. It is
+    optional, and the default is `skills_root()` rather than a refusal: the
+    packaged skills ARE the tree to measure unless a caller says otherwise, so
+    every existing caller and the wheel gate mean the same thing after this as
+    before. A variable that must be set to work is a variable nobody sets.
+    """
+    override = os.environ.get("ELOHIM_TREE")
+    if override is None:
+        return skills_root()
+    named = Path(override) / "skills"
+    if not named.is_dir():
+        raise FileNotFoundError(
+            f"ELOHIM_TREE={override} names no skills tree at {named}; refusing to "
+            "measure a different tree than the one that was asked for")
+    return named
+
+
 def harness_path() -> Path:
     """The instrument runner inside whichever skills tree this installation has.
 
@@ -114,8 +144,14 @@ def harness_path() -> Path:
             f"{root} does not contain elohim-harness/scripts/harness_run.py")
     return path
 
-INSTRUMENTED = ["elohim", "estimator-bias", "invariant-hunter",
-                "precision-budget", "reproducibility", "tolerance-prover"]
+
+# This module used to declare INSTRUMENTED -- the six skills of THIS repository,
+# as a literal -- and both entry points defaulted to it. It is gone because the
+# same fact is now measured by `instrumented_skills()`, and a hardcoded list
+# beside a discovery function is two sources for one claim: the list is right
+# until a seventh skill lands, and nothing fails when it stops being right. The
+# ledger is the marker, and on this repository it selects exactly the six the
+# literal held, `elohim-harness` excluded for holding none.
 
 DEFAULT_BUDGET = 45           # the harness's OWN --max-seconds for a mutated run
 STALE_CAP = 40                # stale arm is near-trivial; sample it, don't burn it
@@ -182,15 +218,81 @@ INERT_OPERATORS = set(S.INERT_OPERATORS)
 
 # ---------------------------------------------------------------- mechanics
 
+def ledger_of(skill_dir: Path) -> dict:
+    """Read a skill's ledger, or refuse in words that name what is missing.
+
+    Six call sites parsed ledger.json and every one of them did it as a bare
+    `json.loads((skill_dir / "ledger.json").read_text())`. A missing file
+    surfaced as a FileNotFoundError from five frames below the decision that
+    wanted it, and a malformed one as `Expecting value: line 1 column 1` -- which
+    does not say which file, in a tree that may hold dozens. Both answers were
+    unreadable for the one person who has to act on them, and that person is a
+    caller pointing this at their own repository rather than at ours.
+
+    A ledger is not a config file: it is what binds an instrument to its
+    checksum, and the gate's whole claim is that the checksum was checked. So a
+    directory without one is not an instrument that failed, it is not an
+    instrument, and the message says so instead of naming a path.
+    """
+    path = skill_dir / "ledger.json"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"no ledger at {path}: {skill_dir.name!r} carries no ledger.json, so it "
+            f"is not an instrumented skill. A ledger binds an instrument to its "
+            f"checksum and six call sites read it, so a directory without one has "
+            f"nothing to check. The skills this tree does hold are instrumented if "
+            f"they each have one -- see the census's list, which refuses rather "
+            f"than assuming.")
+    try:
+        return json.loads(path.read_text())
+    except json.JSONDecodeError as exc:
+        raise FileNotFoundError(
+            f"{path} is not valid JSON: {exc}. A malformed ledger names no "
+            f"instrument, so nothing downstream can say what was checked"
+        ) from exc
+
+
+def instrumented_skills(tree: Path | None = None) -> list[str]:
+    """Every skill in this tree that carries a ledger, discovered not declared.
+
+    The census's default population was a hardcoded list of THIS repository's six
+    skills, in a module constant, which is the same shape as a flag that cannot
+    be raised. Pointing the census at any other repository produced six
+    FileNotFoundErrors for skills that tree has never heard of.
+
+    A ledger is the marker, and it is the right one: on this repository the rule
+    yields exactly the six the constant listed, because `elohim-harness` is the
+    harness rather than an instrument and carries no ledger of its own. That
+    exclusion used to be a hand-maintained list in a CI script, which is the same
+    claim in a place nothing checks.
+
+    Refuses rather than returning an empty list. A census over zero skills
+    reports a perfect survival rate over nothing -- the vacuous comparison this
+    repository has now had to fix twice, and the one an empty tree makes
+    inevitable.
+    """
+    root = tree if tree is not None else tree_root()
+    if not root.is_dir():
+        raise FileNotFoundError(f"no skills tree at {root}; nothing to measure")
+    found = sorted(p.name for p in root.iterdir()
+                   if p.is_dir() and (p / "ledger.json").is_file())
+    if not found:
+        raise FileNotFoundError(
+            f"no instrumented skills under {root}: not one directory holds a "
+            f"ledger.json. A census over zero skills reports a perfect rate over "
+            f"nothing, which is the one answer this tool must never give")
+    return found
+
+
 def instrument_path(skill_dir: Path) -> Path:
-    led = json.loads((skill_dir / "ledger.json").read_text())
+    led = ledger_of(skill_dir)
     return skill_dir / led["instrument"]["path"]
 
 
 def repin(skill_dir: Path) -> None:
     """Recompute the ledger's recorded instrument pin so the seal AGREES."""
     led_path = skill_dir / "ledger.json"
-    led = json.loads(led_path.read_text())
+    led = ledger_of(skill_dir)
     target = skill_dir / led["instrument"]["path"]
     data = target.read_bytes()
     led["instrument"]["sha256"] = hashlib.sha256(data).hexdigest()
@@ -291,7 +393,7 @@ def one_mutation(job: dict) -> dict:
     }
     with tempfile.TemporaryDirectory(prefix="a2-") as tmp:
         work = Path(tmp) / "elohim"
-        shutil.copytree(skills_root(), work / "skills",
+        shutil.copytree(tree_root(), work / "skills",
                         ignore=shutil.ignore_patterns("out", "__pycache__"))
         skill_dir = work / "skills" / skill
         src_path = instrument_path(skill_dir)
@@ -335,8 +437,8 @@ def count_sites(skill: str, operator: str | None = None) -> int:
     """
     key = (skill, operator or "*")
     if key not in _SITE_CACHE:
-        root = skills_root()
-        led = json.loads((root / skill / "ledger.json").read_text())
+        root = tree_root()
+        led = ledger_of(root / skill)
         src = (root / skill / led["instrument"]["path"]).read_text()
         found = S.enumerate_sites(src)
         if operator is None:
@@ -425,6 +527,21 @@ def summarise(rows: list[dict]) -> dict:
         "surviving_rate": round(surv / len(sel), 6) if sel else None,
     }
     return out
+
+
+class ControlFailed(RuntimeError):
+    """The measurement refused to classify at all.
+
+    Distinct from a run that measured something and found survivors: a caller
+    that receives a report is holding a measurement, and one that receives this
+    exception is holding nothing. Collapsing the two would let a refusal read
+    as a clean run, which is the failure A1 exists to prevent.
+
+    Declared here rather than in census.py because both entry points raise it and
+    census.py imports this module. A second definition would be two types, and
+    `except ControlFailed` in one module would stop catching the other's --
+    silently, and only on the paths where somebody is already in trouble.
+    """
 
 
 class Verdict(NamedTuple):
@@ -520,9 +637,18 @@ def run_mutations(*, sample: int = 200, seed: int = 0,
 
     Mirrors census.run_census in shape, deliberately: two entry points that
     disagree about what a pass means is the defect that shipped once already.
+
+    `skills=None` discovers the measured tree's instrumented skills rather than
+    naming this repository's six, for the same reason and by the same function.
+    An empty list is refused for the same reason it is refused there.
     """
     if skills is None:
-        skills = list(INSTRUMENTED)
+        skills = instrumented_skills()
+    elif not skills:
+        raise ControlFailed(
+            "asked to sample an empty list of skills; pass None to sample whatever "
+            "the measured tree holds, or name at least one. An empty population "
+            "reports a perfect rate over nothing")
     if workers is None:
         workers = max(1, (os.cpu_count() or 4) - 2)
 
@@ -565,7 +691,10 @@ def main() -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--sample", type=int, default=200)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--skills", default=",".join(INSTRUMENTED))
+    ap.add_argument("--skills", default="",
+                    help="comma-separated skill names. Empty means every skill in "
+                         "the measured tree that carries a ledger.json. The tree is "
+                         "ELOHIM_TREE's, or this installation's own.")
     ap.add_argument("--stale-cap", type=int, default=STALE_CAP)
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 4) - 2))
     ap.add_argument("--budget", type=int, default=DEFAULT_BUDGET,
@@ -586,14 +715,23 @@ def main() -> int:
             print(f"{op['name']:<16} {op['expect']}")
         return 0
 
-    skills = [s for s in args.skills.split(",") if s]
+    skills = [s for s in args.skills.split(",") if s] or None
 
     def emit(line: str) -> None:
         print(line, flush=True)
 
-    report = run_mutations(sample=args.sample, seed=args.seed, skills=skills,
-                           stale_cap=args.stale_cap, budget=args.budget,
-                           workers=args.jobs, progress=emit)
+    try:
+        report = run_mutations(sample=args.sample, seed=args.seed, skills=skills,
+                               stale_cap=args.stale_cap, budget=args.budget,
+                               workers=args.jobs, progress=emit)
+    except ControlFailed as exc:
+        print(f"\nCONTROL FAILED: {exc}", file=sys.stderr)
+        return 2
+    except FileNotFoundError as exc:
+        # Exit 2 for the same reason census.py returns it there: both refusals
+        # mean the tool declined to classify, and neither may read as a pass.
+        print(f"\nREFUSED: {exc}", file=sys.stderr)
+        return 2
     if args.out:
         Path(args.out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
         print(f"report -> {args.out}")

@@ -58,6 +58,7 @@ CASES = [
     ("index", test_all.case_index_drift),
     ("compare", test_all.case_compare),
     ("bootstrap", test_all.case_bootstrap),
+    ("action", test_all.case_action),
 ]
 
 

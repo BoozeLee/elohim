@@ -1,0 +1,273 @@
+name: "Elohim mutation census"
+description: "Measure how many forged-instrument mutations this repository's own skills survive, and fail on the survivors. Enumerates the whole population -- minutes, not seconds, and minutes is the point."
+author: "BoozeLee"
+
+# The measured surface is NOT this repository. `ELOHIM_TREE` below points the
+# census at the caller's workspace, while the instrument code -- the harness,
+# the eight operators, the site predicates -- arrives as an installed
+# distribution. That separation is the whole point: a census over a tree the
+# instrument does not ship inside is the only way to find out whether the
+# instrument works on anything but its author's instruments.
+#
+# It is also the clause E1 has never closed. `run_census` and `gate_verdict`
+# were callable but every caller lived in `tests/`, written by the same author.
+# Until this Action exists there is no caller that did not write them.
+
+inputs:
+  ref:
+    description: >-
+      REQUIRED. The elohim revision to install, as a full 40-character commit
+      sha, a tag, or a branch. There is deliberately no default. The installed
+      code defines the mutation operators and the site predicates, so an
+      unpinned instrument is a census whose population can change under a green
+      run -- and a changed population is exactly what a green run cannot see.
+      Pin a sha; a tag that moves is not a pin.
+    required: true
+
+  skills:
+    description: >-
+      Comma-separated skill names to measure. Empty means every directory under
+      <workspace>/skills that carries a ledger.json, which is what this
+      repository's own six resolve to. Naming skills this workspace does not
+      hold is refused, not skipped.
+    required: false
+    default: ""
+
+  fail-over:
+    description: >-
+      Fail when the defect-arm survival rate exceeds this. Empty means the
+      absolute-gap mode: any survivor at all is a failure.
+    required: false
+    default: ""
+
+  jobs:
+    description: "Parallel gate runs. GitHub runners have 4 cores; 2 is the measured-sane default."
+    required: false
+    default: "2"
+
+  budget:
+    description: "Seconds a single instrument may take before the harness reports its own overrun."
+    required: false
+    default: "45"
+
+  stale-cap:
+    description: "Mutations in the stale-pin arm. Near-trivial, so it is sampled rather than censused."
+    required: false
+    default: "60"
+
+  python-version:
+    description: >-
+      Interpreter for the census. 3.13 by default because the operators' shard
+      provably changes class at the CPython 3.12 sum() boundary, so running the
+      gate on an interpreter its behaviour was not measured on makes a drift in
+      the interpreter look like a change in the caller's ledgers.
+    required: false
+    default: "3.13"
+
+outputs:
+  report:
+    description: "Path to the census report JSON, inside the runner's temp directory. The committed tree is never written to."
+  rate:
+    description: "Defect-arm survival rate, inert operators excluded. Empty when the run was refused."
+  effective:
+    description: "Surviving mutations. Counted, not trusted -- read survivors for the identities."
+  decided:
+    description: "Mutations the gate actually decided (caught, equivalent, effective)."
+  population-sites:
+    description: "The (operator x site) pairs enumerated before the run started."
+  survivors:
+    description: "Newline-separated survivor identities, each `operator|skill|site_index`."
+
+runs:
+  using: composite
+  steps:
+    # 3.13, deliberately. See the python-version input.
+    - name: an interpreter the operators were measured on
+      uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    # A git install, not a checkout of this repository into the caller's tree.
+    # `pip install git+...` goes through the build backend, so force-include
+    # runs and the skills land at elohim_gate/_skills -- which is the path
+    # skills_root() resolves for an installed distribution, and the one
+    # tools/verify_wheel.py builds, installs into a clean venv, and calls from
+    # outside a checkout. Installing is not checking out: the caller's
+    # repository gains no copy of this tree to drift from.
+    #
+    # There is a PyPI release planned (roadmap E3) and this line is the one
+    # place that changes when it lands. Until then the pin is a revision.
+    - name: install the instrument, pinned
+      shell: bash
+      env:
+        ELOHIM_REF: ${{ inputs.ref }}
+      run: |
+        set -euo pipefail
+        if [ -z "${ELOHIM_REF}" ]; then
+          echo "::error::no elohim ref given. The instrument defines the mutation" >&2
+          echo "::error::operators, so an unpinned one is a census whose" >&2
+          echo "::error::population can change under a green run. Pin a sha." >&2
+          exit 2
+        fi
+        python3 -m pip install --disable-pip-version-check --quiet \
+          "elohim @ git+https://github.com/BoozeLee/elohim@${ELOHIM_REF}"
+        # Report what actually got installed rather than what was asked for. A
+        # ref that resolves to something else is a fact the log must carry.
+        python3 -c 'import elohim_gate, pathlib; print("elohim_gate from", pathlib.Path(elohim_gate.__file__).resolve())'
+
+    # The seam. Before it existed, one function answered both "where is the
+    # instrument" and "which tree is measured", so a caller could not name their
+    # own tree without also having to ship this repository's harness. Measured:
+    # this run enumerated the same 1679 sites from a workspace holding no
+    # checkout of this repository and no elohim-harness at all.
+    - name: point the census at the caller's tree
+      shell: bash
+      env:
+        ELOHIM_TREE: ${{ github.workspace }}
+      run: |
+        set -euo pipefail
+        if [ ! -d "${ELOHIM_TREE}/skills" ]; then
+          echo "::error::no skills/ under ${ELOHIM_TREE}" >&2
+          echo "::error::elohim measures skills, so a tree without skills/" >&2
+          echo "::error::has nothing to census. Point this at the repository" >&2
+          echo "::error::root, not a subdirectory." >&2
+          exit 2
+        fi
+
+    - name: the census, against the whole population
+      shell: bash
+      env:
+        ELOHIM_TREE: ${{ github.workspace }}
+        REPORT: ${{ runner.temp }}/census-report.json
+        SKILLS: ${{ inputs.skills }}
+        FAIL_OVER: ${{ inputs.fail-over }}
+        JOBS: ${{ inputs.jobs }}
+        BUDGET: ${{ inputs.budget }}
+        STALE_CAP: ${{ inputs.stale-cap }}
+      run: |
+        set -euo pipefail
+        # No --limit, deliberately. A sampled run reports its rate over the
+        # sites it attempted while naming the population it enumerated, so
+        # attempted != enumerated and the coverage check below would refuse a
+        # run that was never lying to anybody. The alternative was to keep the
+        # input and weaken the check to match it, and a check weakened to
+        # accommodate a flag is a check that no longer catches the thing it was
+        # written for. The sample still exists and is still reachable --
+        # `python3 -m elohim_gate.mutation --sample N` -- and it is called a
+        # sample there, in the output, which is the distinction this Action is
+        # not. The measured reason a sample is not a census is in
+        # .github/workflows/mutation-census.yml: 200 draws reach only the first
+        # site of 47 cells, which is structural bias, not noise, so the rate
+        # does not converge on the population rate as N grows.
+        args="--seed 1 --limit 0 --jobs ${JOBS} --budget ${BUDGET} --stale-cap ${STALE_CAP}"
+        if [ -n "${SKILLS}" ]; then
+          args="${args} --skills ${SKILLS}"
+        fi
+        if [ -n "${FAIL_OVER}" ]; then
+          args="${args} --fail-over ${FAIL_OVER}"
+        fi
+        # The report goes to the runner's temp directory, never into the
+        # caller's tree. The committed tree is read-only here; mutations happen
+        # in a temporary copy the census makes per row.
+        set +e
+        python3 -m elohim_gate.census ${args} --out "${REPORT}"
+        rc=$?
+        set -e
+        # Exit 2 is the census refusing to classify: an unresolvable tree, a
+        # skill with no ledger, a tree with no instrumented skills at all, or a
+        # pristine shard that is not reproducible. Every one of those is a
+        # refusal, and a refusal that printed a traceback would be a claim
+        # about the tool sent when the fault is in the caller's tree.
+        if [ "$rc" -eq 2 ]; then
+          echo "::error::the census refused to classify. Nothing was measured." >&2
+        fi
+        exit "$rc"
+
+    # This step runs whether or not the census passed, because the population
+    # check is the one failure a green run cannot report on its own.
+    #
+    # A refactor that stops ENUMERATING part of the population yields a shorter
+    # run with fewer survivors: the rate goes down, the gate goes green, and the
+    # only symptom is a smaller number. This repository shipped that failure in
+    # a different costume -- a gate that measured nothing and reported success
+    # -- so the population is pinned from outside the run here too.
+    #
+    # What differs from the nightly census is what can be pinned. That workflow
+    # knows its own skills and digests this tree's survivors; this one knows
+    # neither, and inventing a constant here would either refuse every caller or
+    # assert a population nobody measured. So the check is internal
+    # consistency -- enumerated versus attempted -- which is knowable from
+    # outside, and the survivor identities are RECORDED rather than compared.
+    - name: name the surviving mutations, and prove the population was covered
+      if: always()
+      shell: bash
+      env:
+        REPORT: ${{ runner.temp }}/census-report.json
+      run: |
+        set -euo pipefail
+        python3 - "$REPORT" <<'PY'
+        import hashlib, json, os, sys
+        path = sys.argv[1]
+        if not os.path.isfile(path):
+            print("::error::no census report: the run died before it wrote one. "
+                  "A missing report is not a clean run.", file=sys.stderr)
+            raise SystemExit(1)
+        d = json.load(open(path))
+        if "threshold" not in d:
+            print(f"::error::report has no threshold block (schema {d.get('schema')}). "
+                  "That is version skew, not a measurement: refusing to report a "
+                  "gated rate the report does not carry.", file=sys.stderr)
+            raise SystemExit(1)
+
+        cov = d["summary"]["coverage"]
+        if cov["forged_sites_attempted"] != cov["population_sites"]:
+            print(f"::error::the census attempted {cov['forged_sites_attempted']} of "
+                  f"{cov['population_sites']} sites. The population was not covered, "
+                  "so the rate below was measured on less ground than the report "
+                  "names.", file=sys.stderr)
+            raise SystemExit(1)
+
+        rows = [r for r in d["rows"] if r.get("arm") == "forged"
+                and r.get("outcome") == "EFFECTIVE"]
+        # By identity, not by count: N survivors is equally consistent with the
+        # right N and with N different ones. site_index identifies a site and
+        # survives being moved between files; lineno does not, because it moves
+        # whenever an unrelated edit shifts a line.
+        ident = sorted((r["operator"], r["skill"], r["site_index"]) for r in rows)
+        digest = hashlib.sha256(
+            "\n".join("|".join(map(str, i)) for i in ident).encode()).hexdigest()[:16]
+
+        t = d["threshold"]
+        print(f"measured {', '.join(d['skills'])}")
+        print(f"population {cov['population_sites']} sites, all attempted")
+        print(f"defect-arm survival rate {t['rate_measured']} "
+              f"({t['defect_arm']['effective']}/{t['defect_arm']['n']}, inert excluded)")
+        print(f"not gated: forged rate including inert {t['forged_including_inert']} "
+              f"-- {t['basis']}")
+        print(f"{len(rows)} surviving mutation(s), digest {digest}")
+        for op, skill, site in ident:
+            print(f"  {op} {skill} site {site}")
+
+        with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+            print(f"report={path}", file=fh)
+            print(f"rate={t['rate_measured']}", file=fh)
+            print(f"effective={t['defect_arm']['effective']}", file=fh)
+            print(f"decided={t['defect_arm']['n']}", file=fh)
+            print(f"population-sites={cov['population_sites']}", file=fh)
+            print("survivors<<EOFMARKER", file=fh)
+            for op, skill, site in ident:
+                print(f"{op}|{skill}|{site}", file=fh)
+            print("EOFMARKER", file=fh)
+        PY
+
+    # Unconditionally, and with the report in the runner's temp directory rather
+    # than the tree, so the caller's committed files are never touched by a
+    # measurement of the caller's committed files.
+    - name: publish the report
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: elohim-census-report
+        path: ${{ runner.temp }}/census-report.json
+        retention-days: 30
+        if-no-files-found: warn

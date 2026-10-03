@@ -72,7 +72,7 @@ def shard_of(skill_dir: Path) -> str | None:
 def pristine_shard(skill: str, budget: int) -> tuple[str | None, str | None]:
     with tempfile.TemporaryDirectory(prefix="a2-base-") as tmp:
         work = Path(tmp) / "elohim"
-        shutil.copytree(M.skills_root(), work / "skills",
+        shutil.copytree(M.tree_root(), work / "skills",
                         ignore=shutil.ignore_patterns("out", "__pycache__"))
         payload = M.run_gate(work, skill, budget)
         text = shard_of(work / "skills" / skill)
@@ -91,7 +91,7 @@ def one(job: dict) -> dict:
            "site": job["site"]}
     with tempfile.TemporaryDirectory(prefix="a2-census-") as tmp:
         work = Path(tmp) / "elohim"
-        shutil.copytree(M.skills_root(), work / "skills",
+        shutil.copytree(M.tree_root(), work / "skills",
                         ignore=shutil.ignore_patterns("out", "__pycache__"))
         skill_dir = work / "skills" / skill
         src = M.instrument_path(skill_dir)
@@ -159,8 +159,8 @@ def build_population(skills: list[str]) -> tuple[list[dict], dict]:
     jobs: list[dict] = []
     population: dict = {}
     for skill in skills:
-        root = M.skills_root()
-        led = json.loads((root / skill / "ledger.json").read_text())
+        root = M.tree_root()
+        led = M.ledger_of(root / skill)
         src = (root / skill / led["instrument"]["path"]).read_text()
         enum = S.enumerate_sites(src)
         population[skill] = {op: len(rows) for op, rows in sorted(enum.items())}
@@ -222,14 +222,15 @@ def summarise(rows: list[dict], population_size: int) -> dict:
     return out
 
 
-class ControlFailed(RuntimeError):
-    """The census refused to classify at all.
+ControlFailed = M.ControlFailed
+"""The census refused to classify at all.
 
-    Distinct from a run that measured something and found survivors: a caller
-    that receives a report is holding a measurement, and one that receives this
-    exception is holding nothing. Collapsing the two would let a refusal read
-    as a clean run, which is the failure A1 exists to prevent.
-    """
+Re-exported from mutate rather than redeclared here, for the same reason Verdict
+is: two structurally identical exception classes are two types, and `except
+ControlFailed` in one module would quietly stop catching the other's. Raised by
+this module's `run_census` and by mutate's sampled runner alike, and the two
+entry points are required to agree about what a refusal means.
+"""
 
 
 def run_census(*, seed: int = 1, skills: list[str] | None = None,
@@ -244,10 +245,24 @@ def run_census(*, seed: int = 1, skills: list[str] | None = None,
     here: judging the measurement is gate_verdict's job, so that a policy number
     never becomes part of the thing that measures it.
 
+    `skills=None` means whatever the measured tree holds, discovered rather than
+    declared; an empty list is a caller asking for a census over nothing and is
+    refused. The tree is `M.tree_root()`, which is this installation's own unless
+    `ELOHIM_TREE` names another -- so the same call measures our skills or a
+    caller's without a second code path.
+
     Raises ControlFailed rather than returning a sentinel, so "measured and
-    found survivors" can never be confused with "measured nothing".
+    found survivors" can never be confused with "measured nothing". Raises
+    FileNotFoundError when the tree or a ledger cannot be resolved at all,
+    which is the same refusal arriving from the resolver rather than from here.
     """
-    skills = list(skills) if skills is not None else list(M.INSTRUMENTED)
+    if skills is None:
+        skills = M.instrumented_skills()
+    elif not skills:
+        raise ControlFailed(
+            "asked to census an empty list of skills; pass None to census whatever "
+            "the measured tree holds, or name at least one. An empty population "
+            "reports a perfect rate over nothing")
     workers = workers if workers is not None else max(1, (os.cpu_count() or 4) - 2)
     budget = budget if budget is not None else M.DEFAULT_BUDGET
 
@@ -273,9 +288,19 @@ def run_census(*, seed: int = 1, skills: list[str] | None = None,
         if a is not None:
             baselines[skill] = a
     if skills and not all(c["agree"] for c in control):
+        # The per-skill `error` was computed and then dropped, so the refusal
+        # said "not reproducible" and nothing else. Measured: a tree holding one
+        # skill whose ledger pins a number no other ledger in that tree publishes
+        # fails `claim_binding` with 'unclassified number', the pristine verdict
+        # is FAIL rather than PASS, both pristine runs return no shard, and the
+        # caller was told only that a shard was not reproducible -- which is a
+        # statement about the tool, sent when the fault was in the tree.
+        why = "; ".join(
+            f"{c['skill']}: {c['error'] or 'the two pristine runs disagreed'}"
+            for c in control if not c["agree"])
         raise ControlFailed(
             "the pristine shard is not reproducible, so shard equality cannot "
-            "classify anything")
+            f"classify anything. Per skill -- {why}")
 
     jobs, population = build_population(skills)
     population_size = len(jobs)
@@ -382,7 +407,10 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seed", type=int, default=1)
-    ap.add_argument("--skills", default=",".join(M.INSTRUMENTED))
+    ap.add_argument("--skills", default="",
+                    help="comma-separated skill names. Empty means every skill in "
+                         "the measured tree that carries a ledger.json. The tree is "
+                         "ELOHIM_TREE's, or this installation's own.")
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 4) - 2))
     ap.add_argument("--budget", type=int, default=M.DEFAULT_BUDGET)
     ap.add_argument("--stale-cap", type=int, default=60,
@@ -400,7 +428,7 @@ def main() -> int:
         if not args.quiet:
             print(line, flush=True)
 
-    skills = [s for s in args.skills.split(",") if s]
+    skills = [s for s in args.skills.split(",") if s] or None
     try:
         report = run_census(seed=args.seed, skills=skills, workers=args.jobs,
                             budget=args.budget, stale_cap=args.stale_cap,
@@ -408,6 +436,13 @@ def main() -> int:
                             progress=emit)
     except ControlFailed as exc:
         print(f"\nCONTROL FAILED: {exc}", file=sys.stderr)
+        return 2
+    except FileNotFoundError as exc:
+        # Exit 2 is the same code ControlFailed returns, and deliberately: both
+        # mean the tool refused to classify. Traced, this surfaced as a
+        # FileNotFoundError from inside shutil.copytree naming a directory the
+        # person running it had never heard of, which is not a diagnosis.
+        print(f"\nREFUSED: {exc}", file=sys.stderr)
         return 2
 
     summary = report["summary"]

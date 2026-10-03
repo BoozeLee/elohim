@@ -167,7 +167,77 @@ range** is the last heading, and it is a sum rather than a bullet count.
   having failed to find either pin would be the defect this repository exists to
   catch, wearing the costume of its fix.
 
+**`E4` — a GitHub Action, and the seam it needed first.**
+
+- **`ELOHIM_TREE` names the repository under test.** `skills_root()` answered two
+  questions at once — where the instrument code lives, and which tree is measured
+  — so a caller could not point the census at its own skills without also shipping
+  this repository's harness, and pointing `ELOHIM_REPO` at a foreign workspace
+  removed the harness along with the tree. The new variable appends `skills/` the
+  same way `ELOHIM_REPO` does and **defaults to `skills_root()`**, so every
+  existing caller and the wheel gate mean the same thing after the split as
+  before; a variable that must be set to work is a variable nobody sets. Five
+  call sites moved to it.
+- **`action.yml`, a composite action at the repository root**, so
+  `uses: BoozeLee/elohim@<sha>` resolves. It installs the pinned revision with
+  `pip install "elohim @ git+…"` — which goes through the build backend, so
+  `force-include` runs and the skills land at `elohim_gate/_skills`, the path
+  `skills_root()` resolves for an installed distribution — points `ELOHIM_TREE` at
+  `github.workspace`, and writes its report to the runner's temp directory, because
+  read-only with respect to the committed tree means the caller's files are never
+  written to by a measurement of the caller's files.
+- **The `ref` input is required and has no default.** The installed code defines
+  the mutation operators and the site predicates, so an unpinned instrument is a
+  census whose population can change under a green run.
+- **Measured, not asserted:** a census ran to completion, `rc 0`, from a
+  workspace holding six copied skills and **no checkout of this repository and no
+  `elohim-harness` at all**, enumerating the same 1,679 sites. The full run is
+  deliberately not in the unit suite — it needs minutes, and a test that cannot
+  run the thing it is named after is worse than one that says so — so
+  `tests/test_all.py` carries five refusal controls and a manifest check instead,
+  and removing `ELOHIM_TREE` from `tree_root()` was confirmed to turn that case
+  red with three named failures.
+- **`E1`'s third clause is still open.** `E4` did not close it, by the standard
+  this project already set for `E2`: a caller written by the same author in the
+  same repository is self-authored whatever the entry point is called. What
+  changed is the gap — before this, no caller could name a tree that did not
+  contain the instrument, so nothing outside the checkout could attempt the call.
+- **A measured coupling, stated rather than filed.** `claim_binding` measures a
+  claim against the ledgers *in the tree being measured*: copy one of this
+  repository's skills alone into an empty workspace and a number in its ledger
+  becomes `unclassified number '2'`, the pristine verdict is FAIL, and the census
+  refuses at its own reproducibility control. A skill's verdict depends on which
+  other skills ship beside it. This was invisible while no foreign tree was
+  reachable, and it is the substance of `E2`'s difficulty.
+
 ### Changed
+
+- **The census's default skill list is discovered, not declared.** `INSTRUMENTED`
+  was a literal naming this repository's six skills, and both entry points
+  defaulted to it — the same shape as a flag that cannot be raised: pointing the
+  census at any other repository produced six `FileNotFoundError`s for skills that
+  tree had never heard of. It is now `instrumented_skills()`, which selects every
+  directory carrying a `ledger.json`. On this repository that yields exactly the
+  six the literal held, because `elohim-harness` is the harness rather than an
+  instrument and carries no ledger — an exclusion that used to be a hand-maintained
+  list in a CI script. The constant is removed rather than left beside its
+  replacement, because two sources for one claim means the hardcoded one is right
+  until it is not and nothing fails when it stops being right.
+- **A missing or malformed ledger now names itself.** Six call sites parsed
+  `ledger.json` as a bare `json.loads(...)`. A missing file surfaced five frames
+  below the decision that wanted it, and a malformed one as `Expecting value: line
+  1 column 1` — which does not say which file, in a tree that may hold dozens.
+  `ledger_of()` is the single reader and refuses in words that name the skill and
+  the path.
+- **Both `main()` entry points return exit 2 on an unresolvable tree**, alongside
+  the existing refusal code. Traced, an unresolvable tree surfaced as a
+  `FileNotFoundError` from inside `shutil.copytree` naming a directory the person
+  running it had never heard of, which is not a diagnosis.
+- **`ControlFailed` is declared once, in `mutation.py`,** and re-exported from
+  `census.py` the way `Verdict` already was. Both entry points raise it; a second
+  definition would be two types, and `except ControlFailed` in one module would
+  stop catching the other's — silently, and only on the paths where somebody is
+  already in trouble.
 
 - **`tools/{census,mutate,sites}.py` moved into the `elohim_gate` package.**
   Breaking for anything importing `tools.census`, `tools.mutate` or `tools.sites`.
@@ -192,6 +262,14 @@ range** is the last heading, and it is a sum rather than a bullet count.
 
 ### Fixed
 
+- **The census's reproducibility refusal discarded the reason it had just
+  computed.** `run_census` builds a per-skill `error` for every pristine run and
+  then raised `ControlFailed("the pristine shard is not reproducible")` without
+  reading any of them. Measured on a foreign workspace: `claim_binding` failed
+  with `unclassified number '2'`, the pristine verdict was FAIL rather than PASS,
+  both pristine runs returned no shard, and the caller was told only that a shard
+  was not reproducible — a statement about the tool, sent when the fault was
+  entirely in the tree being measured. The refusal now names the per-skill reason.
 - **A shipped ledger could have its `instrument.sha256` deleted and still report
   PASS.** `verify_pin` returned `status: unpinned`, and both consumers of that
   status accepted it — `gate_skill` holds `{"PASS", "unpinned"}` and
