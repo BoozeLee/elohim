@@ -978,6 +978,46 @@ where the position moved, what moved it. Nothing here was deleted silently.
   direction: `--expect-findings` turns "found nothing" into a failure. A
   negative control that cannot fail is not evidence that anything is checked.
 
+- **A path-existence gate over the commands `AGENTS.md` names.** Considered and
+  refused, and the refusal is the measurement rather than a preference. `ci.yml`
+  invokes every gate *by path* in a `run:` block, so renaming or deleting a gate
+  file already turns CI red on its own: `python3` exits 2 with "can't open file".
+  A test asserting those four files exist would therefore re-report a failure CI
+  already produces, and would pass unchanged against a gate that had been
+  neutered to `return []`. It catches a rename, which CI catches, and nothing
+  else. What is not measurable that way is the failure that was actually live
+  when `AGENTS.md` was written, and it is now gated instead, below.
+
+  Two rounds of asking whether `AGENTS.md` should have a gate at all disagreed
+  with each other, and the disagreement is recorded because the resolution is
+  the interesting part. Round 1 chose "one assertion against a single source of
+  truth" at probability 0.83, confidence 0.77. Round 2, told that a
+  path-existence gate cannot detect a neutered gate, chose "no gate at all" at
+  0.76/0.68 and collapsed the round-1 winner to **0.02**. Both sat under the
+  0.78 working threshold, so the question went to the user, who asked for a
+  third round. That round was framed on a fact neither earlier round had — what
+  `ci.yml` actually does with a missing path — and returned
+  "gate the drift against `ci.yml`" at **0.97 probability, 0.97 confidence**.
+
+  The pattern is the reason this is written down: two rounds on one framing
+  produced two different answers and a 0.83 → 0.02 swing, and a third on a
+  measured fact produced a confident answer that is a *different option* from
+  both. The first two were not judgements about the gate; they were artefacts of
+  a framing that never mentioned the thing that decides it. Asked against the
+  measurement, the question was not close.
+
+### Declined on 2026-10-03, the second entry: what the drift gate does not claim
+
+- **A path-existence check on the documented commands**, and the drift gate's
+  own scope is narrower still. `tools/verify_agents_drift.py` proves one thing:
+  the command list in `AGENTS.md` and `CONTRIBUTING.md` has not diverged from
+  the set of commands `ci.yml`'s `core` job runs. It does **not** prove the
+  commands are the right ones, that they are a complete guide to checking this
+  repository, or that they pass when run — CI runs them, and a gate claiming more
+  than it measures is the defect this repository exists to catch, so the claim is
+  written in the tool's docstring and asserted by a test that fails if the
+  docstring is broadened.
+
 ### Reopened and now in scope
 
 - **Distribution.** The `elohim` console script, the wheel, and the nightly

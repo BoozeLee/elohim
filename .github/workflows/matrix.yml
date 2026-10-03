@@ -113,3 +113,26 @@ jobs:
           python3 tools/verify_skill_frontmatter.py
           python3 tools/verify_skill_frontmatter.py \
             --skill-root tests/fixtures/skill_frontmatter --expect-findings
+
+      # The third of the fixture-paired gates, and the one that was red on this
+      # tree before a line of it was edited. `ci.yml`'s `core` job ran five gates
+      # and both AGENTS.md and CONTRIBUTING.md named four, so an agent following
+      # either document ran a smaller suite than the one gating every push. The
+      # gate below reported it; the documents were then corrected.
+      #
+      # What makes this one worth its step, given the two above it already prove a
+      # gate can fire: neither a path-existence test nor CI can see this failure.
+      # CI invokes each gate BY PATH, so a renamed or missing file already turns
+      # CI red by itself -- `python3` exits 2 with "can't open file", measured, not
+      # assumed. What CI cannot produce is the file still existing, the command
+      # still running, and the prose an agent acts on naming a different set.
+      #
+      # The fixture pairs a synthetic workflow with a synthetic document that
+      # forgets one command, and the forgetting command is named in the fixture's
+      # prose and its layout table on purpose: only a fenced code block counts as
+      # a command list, so the fixture would pass vacuously if prose were read.
+      - name: the documented gates are the gates CI runs
+        run: |
+          python3 tools/verify_agents_drift.py
+          python3 tools/verify_agents_drift.py \
+            --root tests/fixtures/agents_drift --doc AGENTS.md --expect-findings

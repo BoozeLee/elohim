@@ -1,0 +1,29 @@
+# A synthetic workflow for tools/verify_agents_drift.py. It is not the real
+# ci.yml and is never run by CI; it exists so the gate can be observed failing.
+#
+# The `core` job here runs three gates. The AGENTS.md beside it names two. That
+# is the whole defect, and it is the defect that was live in the real tree on the
+# day this fixture was written.
+name: Fixture CI
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  core:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: shipped text is clean
+        run: python3 tools/check_text.py
+      - name: derived mirrors are byte-identical
+        run: python3 tools/sync_adapters.py --check
+      - name: the fixture-only gate this document forgets
+        run: python3 tools/verify_fixture_only.py
+      - name: install the unit-test runner
+        run: python3 -m pip install --disable-pip-version-check "pytest==9.0.3"
+      - name: the unit suite is green
+        run: python3 -m pytest -q
