@@ -17,8 +17,19 @@ second copy of it is a second thing that can quietly disagree with the first.
     python3 tools/matrix.py                  # every interpreter it can find
     python3 tools/matrix.py --interpreter /usr/bin/python3.14
     python3 tools/matrix.py --json
+    python3 tools/matrix.py --expect-interpreters 5
 
-Exit 0 when every observed seal is pinned, 1 when one is not.
+Exit 0 when every observed seal is pinned, 1 when one is not, 2 when it could not
+run or ran short.
+
+Why `--expect-interpreters` exists. This tool answers one question: do the pinned
+classes hold across the range. A run over one interpreter answers a smaller one --
+does a single pinned class hold -- which wears the same exit code and is
+indistinguishable from it. `skills/reproducibility/references/traps.md` names five
+specific interpreters as the range its pins were measured across, so a caller that
+cares about that claim has to be able to say so and be told when the machine did
+not deliver it. Without the flag this stays a local operator tool that reports
+whatever it found; with it, a short run is a refusal rather than a pass.
 """
 
 from __future__ import annotations
@@ -43,6 +54,42 @@ DEFAULT_GLOBS = (
 )
 
 INSTRUMENT_BUDGET = 300
+
+
+class ShortRun(ValueError):
+    """The matrix ran, but over fewer interpreters than the claim names.
+
+    Not a subclass of nothing in particular on purpose: it is a ValueError because
+    the arguments were wrong for the machine, and a caller that catches ValueError
+    around `main()` keeps working if this is ever renamed.
+    """
+
+
+def refuse_short_run(rows, expected: int) -> None:
+    """Raise `ShortRun` unless `rows` holds at least `expected` interpreter runs.
+
+    `rows` is `main()`'s row list, one entry per interpreter actually exercised.
+    The message names what *was* exercised, because "expected 5 interpreters, got
+    1" is a shrug and "expected 5, got these 1: 3.14.7" is a diagnosis. An operator
+    reading this at 3am needs to know which interpreter was missing, not how many.
+
+    `expected <= 0` means no expectation was stated, and returns without raising.
+    That is the flag's own default: a tool that refuses to run because nobody told
+    it the range would be a tool nobody runs.
+    """
+    if expected <= 0:
+        return
+    found = len(rows)
+    if found >= expected:
+        return
+    versions = ", ".join(row.get("version", "?") for row in rows) or "none"
+    raise ShortRun(
+        "expected %d interpreter(s), exercised %d: %s. The claim this run was meant "
+        "to check is measured across a range, and a shorter range is a smaller "
+        "claim wearing the same exit code. Pass --interpreter PATH to name the "
+        "missing ones, or lower --expect-interpreters to what this machine "
+        "actually has." % (expected, found, versions)
+    )
 
 
 def load_instrument_module():
@@ -130,6 +177,14 @@ def seal_under(skill: Path, python: Path) -> tuple:
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--interpreter", action="append", default=[])
+    parser.add_argument(
+        "--expect-interpreters",
+        type=int,
+        default=0,
+        metavar="N",
+        help="refuse rather than report success if fewer than N interpreters were "
+             "exercised; 0 (the default) states no expectation",
+    )
     parser.add_argument("--json", action="store_true")
     args = parser.parse_args()
 
@@ -164,6 +219,12 @@ def main() -> int:
         for version, seal12 in sorted(observed[name].items()):
             if seal12 and seal12 not in pinned:
                 unpinned.append({"skill": name, "version": version, "seal12": seal12})
+
+    try:
+        refuse_short_run(rows, args.expect_interpreters)
+    except ShortRun as exc:
+        sys.stderr.write("matrix: REFUSED: %s\n" % exc)
+        return 2
 
     payload = {
         "rows": rows,
