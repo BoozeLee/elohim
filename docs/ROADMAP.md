@@ -626,6 +626,50 @@ Commissioned 2026-10-02, after `A2` closed and the list above was reopened. The
 order is fixed and the reasoning is recorded, because two of the four are the
 wrong order intuitively.
 
+> **The order changed on 2026-10-03, and this is the record of it.** As
+> commissioned the build order was `E1`, `E2`, `E3`, `E4` — the numbering order,
+> which is also the order they happened to be written down in. It is now
+> **`E1`, `E4`, `E2`, `E3`**: `E4` moved ahead of `E2`, and `E3` is still last.
+> Two swaps, one reason, measured rather than preferred.
+>
+> `E4` is the only remaining item that can close `E1`'s third clause without a
+> version promise. `E3` closes it too, and it is the dearer way to do it:
+> publishing to an index is a commitment that outlives the code, and doing it
+> while nothing outside this repository has called the API is precisely the
+> "version promise made twice" that `E3` itself names as the reason it goes
+> last. `E2` cannot close the clause at all — it is written by the same author
+> inside the same repository as the gate it bootstraps. So between the two items
+> that can, `E4` costs a wrapper and `E3` costs a promise.
+>
+> The second reason is that `E2` is currently unspecified, and `E4` is what
+> specifies it. `ledger.json` is resolved at six sites: inside the package at
+> `mutation.py` `instrument_path`, `repin` and `count_sites`, and
+> `census.py` `build_population`; outside it at `harness_run.py` and
+> `claim_binding.py`. `elohim init` has to emit a file six readers already
+> depend on, and what those readers require of it is presently known only from
+> the six ledgers this repository wrote by hand. `E4` is the first caller that
+> did not write that schema, so building it is what turns `E2` from a guess into
+> a derivation: an Action pointed at a foreign tree either reads that tree's
+> ledger or refuses, and which of those two happens is evidence about what an
+> external ledger has to carry.
+>
+> **This records a change of order; it does not claim `E4` is ready.** Two things
+> must become true before an Action can measure a repository holding no
+> checkout of this one, and neither has. Both were measured, not inferred.
+>
+> First, a `ledger.json` per skill, or `build_population` raises out of
+> `census.py` on the first skill name it is handed — which is why the refusal
+> `E4` ships has to name the missing ledger rather than let `FileNotFoundError`
+> arrive from inside the census.
+>
+> Second, `skills_root()` returns a *single* directory serving two different
+> roles. `harness_path()` reads the instrument runner out of it, while
+> `census.py` copies that same directory into the temporary copy as the tree
+> under test. `ELOHIM_REPO` therefore cannot name a foreign workspace, because
+> doing so removes the harness along with the tree — and falling back to the
+> packaged copy instead would measure something other than the tree that was
+> asked for, which is the one substitution `skills_root` was written to refuse.
+
 ### E1. The measurement core, callable rather than runnable
 **Status: both slices shipped 2026-10-02 (`1c7c6c6`, `90f02a8`, and the
 relocation that moved all three into the package); every entry point is done and
@@ -701,6 +745,15 @@ be the repository's own failure reproduced in a convenience feature.
 **Decided by:** `elohim init` on a skill with no ledger produces one that passes
 `verify_published` and is refused by `claim_binding` until promoted.
 
+**Built third, after `E4` and before `E3`,** which is a change from the order
+this track was commissioned in; the record and its reason are at the top of the
+track. The dependency is not that `E4` blocks `E2` — an Action pointed at a
+tree with no ledger is perfectly runnable once it refuses. It is that `E2`'s
+deliverable is a file that six readers already parse, and until one of those
+readers has been pointed at a tree this author did not write, the set of fields
+such a file must carry is inferred from six hand-written examples rather than
+observed from a caller. `E4` is what observes it.
+
 **This does not close `E1`'s third clause.** `E1` is decided by a caller that
 did not write the code, and `elohim init` would be written by the same author
 inside the same repository as the gate it bootstraps — self-authored whatever
@@ -713,6 +766,12 @@ takes `E2` for the external adjudication has no reason to come back and check.
 the four because publishing an API that E1 has not finished stabilising is a
 version promise made twice.
 
+**Still last after the 2026-10-03 reorder,** which moved `E4` past `E2` and left
+this item where it was. The reorder makes the case for lastness stronger rather
+than weaker: by the time this ships, an Action has already called the API from a
+tree that did not contain it, so the promise would be the second such promise
+and the first one would be on record.
+
 **Decided by:** `pip install elohim` in a clean environment runs `elohim --all`
 to `verdict PASS` from outside the checkout.
 
@@ -722,6 +781,31 @@ committed tree — mutations happen in a temporary copy.
 
 **Decided by:** the Action runs the census on a repository with no checkout of
 this one, and a red run names the survivors the way `MUTATION_SURVIVAL.md` does.
+
+**Built second, ahead of `E2`,** for the reason recorded at the top of this
+track. The work splits into the seam and the surface, and the seam is the part
+that decides the other one.
+
+The seam: `skills_root()` names where the *instrument code* lives, and three
+call sites need it to name where the tree *under test* lives instead — the two
+`copytree` calls and the `build_population` read in `census.py`, and
+`count_sites` in `mutation.py`. Splitting it is what lets one installation
+carry the harness while measuring a different tree. It is also the half that can
+be proven without a GitHub runner, so it goes first and the Action is built on
+top of a seam already known to hold.
+
+The surface: a composite `action.yml` that installs the pinned artifact, points
+it at the caller's workspace, and names the survivors on a red run the way
+`MUTATION_SURVIVAL.md` does — by identity, not by count, and unconditionally,
+so a green run cannot hide a shorter population behind its exit code.
+
+**What the Action must refuse, and must refuse loudly.** A target with no
+`ledger.json` is the ordinary case, not the exotic one, so the failure names the
+file and the skill rather than surfacing as a `FileNotFoundError` from inside
+`census.py`. A target with no instruments in its tree is refused outright,
+because a census over zero skills reports a perfect rate over nothing — the
+vacuous comparison this repository has now fixed twice, in two places, and
+declines to reintroduce through a new surface.
 
 ---
 
