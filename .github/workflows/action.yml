@@ -1,0 +1,134 @@
+name: Action
+
+# The Action is a shipped artifact, so CI runs it the way a caller runs it.
+#
+# `tests/test_all.py` reads action.yml as text: it asserts ten load-bearing
+# strings are present and that every embedded Python block compiles. That catches
+# a malformed manifest and a syntax error in the namer, and nothing else. A
+# manifest can be perfectly well-formed and still be an Action that installs the
+# wrong thing, resolves the wrong tree, or reports success having measured
+# nothing -- every one of which this repository has shipped once already, in a
+# different costume. So something has to execute the steps.
+#
+# The layout is the point. This repository is checked out into a SUBdirectory, so
+# the workspace root holds no checkout of it, and a synthetic caller tree is
+# assembled at the workspace root holding the six instrument skills and not the
+# harness. The Action then measures that tree while its instrument code arrives
+# as an installed distribution. That is the arrangement the whole seam exists to
+# support, and it is the only arrangement in which running the Action proves
+# anything: checked out at the root, the run would pass whether or not the seam
+# worked.
+#
+# Push to main rather than pull_request, and only on paths the Action reads. The
+# Action installs elohim from `git+...@<ref>`, so the ref has to exist on the
+# remote; a pull_request's github.sha is a merge commit that has never been
+# pushed, and pointing the Action at it would fail in the install step for a
+# reason that has nothing to do with the Action. Pull requests are covered by the
+# text assertions above, which need no network; the executed path is proven on
+# the commits where it would actually ship.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - action.yml
+      - pyproject.toml
+      - elohim_gate/**
+      - skills/**
+      - .github/workflows/action.yml
+  workflow_dispatch:
+    inputs:
+      fail_over:
+        description: "Survival rate above which the run fails. Empty means the absolute-gap mode."
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: action-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  runs-the-action:
+    runs-on: ubuntu-latest
+    # Well above the expected time rather than at it, for the reason
+    # .github/workflows/mutation-census.yml records: a timeout here produces no
+    # verdict, and "no verdict" reads exactly like "nothing is wrong". The whole
+    # population is 1679 (operator x site) pairs; a GitHub runner has 4 cores,
+    # jobs defaults to 2, and the nightly measured 600s on 12.
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Not the workspace root. See the header.
+          path: instrument
+
+      - name: assemble a caller tree that holds no checkout of this repository
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/skills"
+          # Everything except the harness: elohim-harness is the instrument's
+          # own code, and shipping it in the measured tree would let
+          # skills_root() find a harness by walking up from the installed
+          # package instead -- which is the substitution the seam was written
+          # to refuse, and which would make this job pass without the seam.
+          for d in instrument/skills/*/; do
+            name="$(basename "$d")"
+            if [ "$name" = "elohim-harness" ]; then
+              continue
+            fi
+            cp -R "$d" "${GITHUB_WORKSPACE}/skills/${name}"
+          done
+          skills="$(find "${GITHUB_WORKSPACE}/skills" -maxdepth 2 -name ledger.json | wc -l)"
+          echo "caller tree holds ${skills} ledger(s) and no harness:"
+          ls "${GITHUB_WORKSPACE}/skills"
+          if [ -d "${GITHUB_WORKSPACE}/skills/elohim-harness" ]; then
+            echo "::error::the caller tree carries a harness, so this run cannot" >&2
+            echo "::error::prove the seam resolves instrument code from the install" >&2
+            exit 1
+          fi
+
+      # The negative control, and it runs first because it is cheap and a
+      # control that cannot fail is not a control. Naming a skill the tree does
+      # not hold must refuse rather than skip: a census that silently measured
+      # one fewer skill than it was asked about is the exact failure this
+      # repository shipped in census.py when a dropped __main__ guard made the
+      # module import cleanly, exit 0, print nothing and write no report.
+      - name: the Action refuses a skill this tree does not hold
+        id: refusal
+        continue-on-error: true
+        uses: ./
+        with:
+          ref: ${{ github.sha }}
+          skills: not-a-skill-this-tree-holds
+
+      - name: the refusal was a refusal, not a pass
+        run: |
+          set -euo pipefail
+          if [ "${{ steps.refusal.outcome }}" != "failure" ]; then
+            echo "::error::the Action reported success for a tree holding no such" >&2
+            echo "::error::skill. A caller naming a skill it does not have would" >&2
+            echo "::error::read a green run as a clean measurement." >&2
+            exit 1
+          fi
+          echo "the Action refused a skill its tree does not hold, as it must"
+
+      - name: the census, through the Action, on a tree with no checkout of this one
+        id: census
+        uses: ./
+        with:
+          ref: ${{ github.sha }}
+          fail-over: ${{ inputs.fail_over || '0.05' }}
+
+      - name: the Action named a population and refused nothing
+        run: |
+          set -euo pipefail
+          echo "population-sites: ${{ steps.census.outputs.population-sites }}"
+          echo "defect-arm rate:  ${{ steps.census.outputs.rate }}"
+          echo "effective:        ${{ steps.census.outputs.effective }}"
+          echo "decided:          ${{ steps.census.outputs.decided }}"
+          echo "survivors:"
+          printf '%s\n' "${{ steps.census.outputs.survivors }}"

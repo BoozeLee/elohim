@@ -69,17 +69,58 @@ def shard_of(skill_dir: Path) -> str | None:
         return None
 
 
+def why_not(payload: dict) -> str:
+    """Whatever the gate itself said went wrong, in the gate's own words.
+
+    A verdict is a conclusion, not a cause. Measured: a caller tree holding one
+    skill whose ledger cites a number no other ledger in that tree publishes
+    fails `claim_binding` with 'unclassified number 2: closest pinned value 3.0',
+    the pristine verdict comes back FAIL, and both refusals below reported only
+    `verdict FAIL` -- a statement about the tool, sent when the fault was in the
+    tree, naming nothing the caller could act on. The payload already carries the
+    reason; nothing was reading it.
+
+    Returns "" rather than a guess when the payload carries nothing
+    diagnosable. Inventing a cause for a FAIL nobody explained is the same
+    defect as inventing agreement for a comparison that measured nothing, so an
+    unexplained FAIL stays unexplained in the message.
+    """
+    binding = payload.get("claim_binding")
+    if isinstance(binding, dict) and binding.get("ok") is False:
+        found = [str(f.get("problem", "")) for f in binding.get("failures") or []
+                 if str(f.get("problem", ""))]
+        found += [str(f.get("problem", "")) for f in binding.get("id_failures") or []
+                  if str(f.get("problem", ""))]
+        total = len(binding.get("failures") or []) + len(binding.get("id_failures") or [])
+        head = f"claim binding: {total} unbound claim(s)"
+        if found:
+            return f"{head} -- {found[0]}" + (
+                f" (+{len(found) - 1} more)" if len(found) > 1 else "")
+        return head
+    hygiene = payload.get("hygiene")
+    if isinstance(hygiene, dict) and hygiene.get("ok") is False:
+        findings = [str(f.get("detail", f)) for f in hygiene.get("findings") or []]
+        if findings:
+            head = f"hygiene: {len(findings)} finding(s)"
+            return f"{head} -- {findings[0]}" + (
+                f" (+{len(findings) - 1} more)" if len(findings) > 1 else "")
+    return ""
+
+
 def pristine_shard(skill: str, budget: int) -> tuple[str | None, str | None]:
     with tempfile.TemporaryDirectory(prefix="a2-base-") as tmp:
         work = Path(tmp) / "elohim"
         shutil.copytree(M.tree_root(), work / "skills",
                         ignore=shutil.ignore_patterns("out", "__pycache__"))
         payload = M.run_gate(work, skill, budget)
+        verdict = payload.get("verdict")
+        because = why_not(payload)
+        because = f" -- {because}" if because else ""
         text = shard_of(work / "skills" / skill)
         if text is None:
-            return None, f"no shard (verdict {payload.get('verdict')})"
-        if payload.get("verdict") != "PASS":
-            return None, f"pristine tree is not PASS ({payload.get('verdict')})"
+            return None, f"no shard (verdict {verdict}){because}"
+        if verdict != "PASS":
+            return None, f"pristine tree is not PASS ({verdict}){because}"
         return text, None
 
 
