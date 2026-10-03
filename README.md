@@ -121,9 +121,23 @@ runner's own:
 | `--fail-under N` | exit non-zero below N |
 | `--max-seconds N` | budget the run |
 
-**elohim is not on PyPI yet.** `pip install .` and `pip install` of a locally
-built wheel are the only verified paths; treat `pip install elohim` as unproven
-until a release exists and the index is measured.
+**elohim 0.3.0 is on PyPI.** Measured on 2026-10-03, from a clean virtual
+environment, in a directory outside this checkout:
+
+```console
+$ pip install elohim==0.3.0
+$ elohim --version
+elohim 0.3.0
+$ elohim --all
+skills 6/6 pass, facts 81/81 verified, traps 38/38 hold,
+hygiene 0 findings, claims 0 unbound
+verdict PASS
+```
+
+`pip install .` from a clone still works and is still the path to test a change
+against. The index is where a stranger starts, and it is now measured rather
+than assumed — which it was not for most of this project's life, and the
+sentence that used to stand here said so.
 
 ## Verify
 

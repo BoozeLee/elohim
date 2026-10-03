@@ -787,6 +787,20 @@ and the first one would be on record.
 **Decided by:** `pip install elohim` in a clean environment runs `elohim --all`
 to `verdict PASS` from outside the checkout.
 
+**Shipped 2026-10-03, and the deciding condition above is the reason this entry
+reads "shipped" rather than "done".** `elohim 0.3.0` is on the index
+(`elohim-0.3.0-py3-none-any.whl`, 530202 bytes; `elohim-0.3.0.tar.gz`, 698298
+bytes; sigstore attestation over the sdist), and the condition was run rather
+than reasoned about: a clean venv, outside the checkout, `pip install
+elohim==0.3.0` then `elohim --all` returning `verdict PASS` at exit 0, with the
+imported module resolving inside that venv's `purelib` so the instruments came
+from the distribution. Getting there took three dispatches of run
+`publish.yml`, and the two that failed are part of the record: `invalid-publisher`
+at token exchange, twice, because the trusted publisher held
+`BoozeLee/Elohim` where the OIDC claim is `BoozeLee/elohim`. Nothing was
+uploaded by either. The full measurement, and the eleven conditions it rests on,
+are under **The definition of done for 0.3.0** at the end of this document.
+
 ### E4. A GitHub Action
 **Why:** the same product on a different surface. Read-only with respect to the
 committed tree — mutations happen in a temporary copy.
@@ -1595,15 +1609,14 @@ was put, and the judge picked the same measurement without being shown it.
 > and the answers come from the installed distribution rather than from a
 > checkout.
 
-**State: every part measured, except the one that needs the index.**
-
-Measured on 2026-10-03 against a locally built wheel, installed into a fresh
-venv, run from a directory outside the checkout:
+**State: MET. Run on 2026-10-03 against the index, by the form the judge named.**
 
 ```text
+$ pip install elohim==0.3.0                       rc=0
 $ elohim --version
-elohim 0.3.0                                    rc=0
-
+elohim 0.3.0                                      rc=0
+$ python -c "import elohim_gate, os; print(os.path.realpath(elohim_gate.__file__))"
+/tmp/verify.ECsFo0/env/lib/python3.14/site-packages/elohim_gate/__init__.py
 $ elohim --all
 PASS elohim               pin PASS      facts 25/25   traps 6/6
 PASS estimator-bias       pin PASS      facts 15/15   traps 7/7
@@ -1614,27 +1627,47 @@ PASS tolerance-prover     pin PASS      facts 23/23   traps 7/7
 --------------------------------------------------------------------------
 skills 6/6 pass, facts 81/81 verified, traps 38/38 hold,
 hygiene 0 findings, claims 0 unbound
-runtime  30.208s
+runtime  14.264s
 ==========================================================================
 verdict PASS                                              rc=0
 ```
 
+This is the measurement the whole section was written to await, and the three
+things that make it the right one rather than a restatement of the local run
+are all checkable in the output above. `pip` resolved from the index rather than
+from a local path. The imported module resolved to
+`.../site-packages/elohim_gate/__init__.py`, and the realpath check confirmed it
+sits inside this venv's `purelib` — so the instruments came from the
+distribution, and the skills root resolved one level down to
+`.../site-packages/elohim_gate/_skills`. And the working directory was a
+directory outside the checkout, so no parent walk could have found the source
+tree and quietly answered in its place.
+
+The same command against a **locally built** wheel, run earlier the same day,
+returned the identical 6/6, 81/81, 38/38, `verdict PASS` in 30.208 s. Same
+answer, different provenance — which is the point: the second run is the one
+that closes the condition, because the first could have been answered by a
+checkout that no stranger will ever have.
+
+**Published artefacts, as the index reports them:**
+
+```text
+elohim-0.3.0-py3-none-any.whl     530202 bytes  bdist_wheel
+elohim-0.3.0.tar.gz               698298 bytes  sdist
+```
+
+with a sigstore attestation over the sdist
+(`https://docs.pypi.org/attestations/publish/v1`), emitted by
+`pypa/gh-action-pypi-publish` during run `37112863992`.
+
 Two details in that output are load-bearing and were checked rather than
 assumed:
 
-- The skills root resolved to `.../site-packages/elohim_gate/_skills`, so the
-  instruments came from the install. This is the seam the GitHub Action job
-  exists to prove, reached here by a different route.
 - Six skills, not seven. The wheel ships all seven; `elohim-harness` ships
   without a `ledger.json` because it is the instrument's own code rather than a
   skill that owns one, and `--all` gates "every skill that owns an instrument".
   The Action's caller tree assembles the same six for the same reason. The
   local suite's seven is seven *gate cases*, which is a different count.
-
-**Not yet measured:** `pip install elohim` *from PyPI*. No such upload exists.
-The local wheel is the same artefact the workflow would upload, but "the same
-artefact by construction" is an argument and not a measurement, and it is the
-one step of this condition that cannot be closed from here.
 
 ### The preconditions, and who owns each
 
@@ -1643,8 +1676,8 @@ attemptable, and a failure in any of them wastes the attempt.
 
 | # | Condition | State, measured 2026-10-03 |
 |---|---|---|
-| 1 | A PyPI trusted publisher exists for `BoozeLee/elohim` / `publish.yml` / environment `pypi` | **NOT MET — owner's browser.** No `~/.pypirc`, no `pypi.toml`, and no `PYPI_*` or `TWINE_*` variable on any host this work is done from. `twine`, `poetry` and `uv` are installed and all three *upload*; none can register a trusted publisher. The four values above are verified; the registration is not made. |
-| 2 | The name `elohim` is still free on PyPI at the moment of upload | 404 on 2026-10-03. Re-check immediately before publishing, not now — a name free today can be taken tomorrow, and a taken name is a rename, which is a version decision, not a retry. |
+| 1 | A PyPI trusted publisher exists for `BoozeLee/elohim` / `publish.yml` / environment `pypi` | **MET — registered by the owner on 2026-10-03, and used.** The `pypi` GitHub environment did not need creating: GitHub auto-created it at 08:00:13Z when the dry run first dispatched a job declaring `environment: pypi`, with `protection_rules: []` and no branch policy, so the publish job never waits for an approval. Two runs then failed at token exchange with `invalid-publisher` before anything was uploaded, because the repository name had been entered as `BoozeLee/Elohim` while the OIDC claim is `BoozeLee/elohim`. The failure is safe and was left to fail rather than retried blindly: it occurs at token exchange, before any transfer, and the rejection echoes the full claim set, which is what identified the mismatch. Run `37112863992` then succeeded with step 6 `publish to PyPI` reported `success` rather than `skipped`. |
+| 2 | The name `elohim` is still free on PyPI at the moment of upload | **MET.** Checked immediately before each of the three dispatches, by the JSON API and not the web page — `https://pypi.org/pypi/elohim/json` returned `{"message": "Not Found"}` every time. The distinction is not pedantic: `https://pypi.org/project/elohim/` returns **HTTP 200 for names that do not exist**, because PyPI serves an anti-scraping "Client Challenge" page with a 200 status. An availability check written against the status code reports a free name as taken, and one written against the page body reports a taken name as free. The JSON API is the only one of the two that can be trusted, and the control is that `requests` and `pytest` must return real `info` from it or the endpoint is not answering. |
 | 3 | The `0.3.0` changelog range accounts for every commit intended to be in it | **MET — measured 2026-10-03, after being written down as an open question.** `git cherry origin/main <branch>` compares by patch-id, so it sees through a rebase or a reword: `push/c1-through-b1` is `-` on all 11 commits, and `feat/roadmap-corrections` is `-` on 16 of 17. The seventeenth, `86c82cb` *"ROADMAP: name the conditions on three pinned measurements"*, is `+` — and then was checked by content rather than by sha, because `+` means "no patch-identical commit", not "missing work". All four of its corrections are on `main`, reworded and expanded: the `A2` "measure before building" ordering (lines 144–147, 1279–1280), the 31.2 s contention analysis with the same 17.23–18.38 s uncontended band and 0.96 ratio (431–446), the retracted *"three items and none of them is code"* count, and `D3` marked shipped against `isDraft: false` / `isPrerelease: false` / HTTP 200 (504–505). The commit was superseded, not lost. The range is complete and both branches are safe to delete. |
 | 4 | The publish workflow has executed at least once without uploading | **MET.** Run `37108217139`, branch `dry-run/publish-gate`, conclusion `success`. Step 6 `publish to PyPI` reported `skipped`; steps 5 (build) and 7 (verify) both ran. |
 | 5 | The built wheel is the one the workflow would upload, and it says so | **MET.** Same run's log: `built: elohim-0.3.0-py3-none-any.whl`, then `version: elohim 0.3.0 \| metadata: 0.3.0 \| pyproject: 0.3.0`. |
@@ -1655,29 +1688,35 @@ attemptable, and a failure in any of them wastes the attempt.
 | 10 | The Action's own numbers hold | **MET.** 1,679 population sites, 1,679 attempted, `share_of_population` 1.0, defect arm 3.94% against a 5% threshold, all six control digests agreeing. |
 | 11 | Every pinned action sha still resolves | **MET — by hand, because nothing in the suite can.** `tests/test_workflow_pins.py` reads the workflow text; whether a sha still names a commit a runner can fetch has no answer without a network, which is the one item this plan named as a person's job. Re-resolved 2026-10-03 against the GitHub API: **all six match** — `actions/checkout@v7`, `actions/setup-python@v7`, `actions/upload-artifact@v7.0.1`, `github/codeql-action/init@v4`, `github/codeql-action/analyze@v4`, `pypa/gh-action-pypi-publish@v1.14.2` — and all six commits are reachable (HTTP 200). Two wrong answers came first and are worth recording, because both were confident. A URL built from the whole `uses:` path asks for a repository called `github/codeql-action/init`, and reports two pins unresolved. And for an **annotated** tag, `GET /git/ref/tags/<name>` returns the sha of the *tag object*, with the commit one level deeper, so comparing it to a pin reports every annotated tag as moved: three false positives here, and the count grows with every annotated pin added. Dereference once on `type == "tag"` and all six match. Execution is the stronger form of the same claim — CodeQL ran green on this branch, so both codeql pins were downloaded and run by a real runner, and dry run `37108217139` downloaded `pypa/gh-action-pypi-publish@dc37677b` and reported that exact SHA. |
 
-Condition 1 is the release. It is not code, and it cannot be finished from a
-machine that has no credential for it. Condition 3 was the other open question
-when this table was written and was closed by measurement an hour later, which
-is worth noting for what it says about writing down a doubt: a flagged unknown
-that could have been answered from the repository is indistinguishable, in the
-moment, from one that cannot.
+Conditions 1 and 3 were the two that were not met when this table was written,
+and both are now closed — one by the owner in a browser, one by `git cherry` an
+hour later. Neither needed code, and the second is worth noting for what it says
+about writing down a doubt: a flagged unknown that could have been answered from
+the repository is indistinguishable, in the moment, from one that cannot.
 
 ### What this section is not
 
-It is not a claim that 0.3.0 is published, or ready, or done. The package is
-not on PyPI. Every green line above describes a **local wheel** or a **CI run**,
-and the distinction is kept explicit in each row because the failure this
-repository has shipped before is a sentence written while true that was left
-behind when the event it was waiting for landed — twice, in this very document,
-in the viewer claims corrected in the previous release.
+It is not a claim that 0.3.0 is finished. It is a record of eleven conditions,
+each marked from a measurement, and a measurement has a date on it. Every green
+row above describes either the published artefact or a CI run, and the
+distinction is kept explicit in each because the failure this repository has
+shipped before is a sentence written while true that was left behind when the
+event it was waiting for landed — twice, in this very document, in the viewer
+claims corrected in the previous release. This section is the third place that
+correction was applied, and it is recorded here because the first two were.
 
-The deciding condition has exactly one line outstanding, and it is the one no
-amount of work on this repository can close:
+What this section does claim is narrower and checkable: on 2026-10-03, a
+process with no access to this repository installed `elohim==0.3.0` from the
+public index, in a clean virtual environment, from a directory outside the
+checkout, and got `verdict PASS`. That is the condition jev named at
+probability 1.00, and it is closed.
 
-```console
-$ /tmp/check/bin/pip install elohim==0.3.0
-```
-
-Until that line has been run by someone, every other row in this table is a
-precondition and the release is unmeasured at exactly the point where it starts
-mattering.
+What it does **not** claim is that the next version will publish the same way.
+`publish.yml` is `workflow_dispatch`-only by decision, so a tag push publishes
+nothing; the next release is another manual dispatch, and the thing that would
+break first is somebody renaming the repository or the environment, which
+invalidates the publisher on PyPI's side with no error anywhere in this
+repository. That is a standing cost of the arrangement and is recorded here
+rather than solved, because solving it means either a tag-triggered publish —
+declined at probability 0.29 when the decision was put — or a repository
+rename policy nobody has agreed to.
