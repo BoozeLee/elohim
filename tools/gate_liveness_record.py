@@ -18,6 +18,17 @@ Writes into `tools/gate_liveness_log.json`, preserving every other record. A
 record is only ever added or refreshed, never removed: the question this
 answers is "has this *ever* passed", and a later pass does not un-do an earlier
 absence. That is why an entry carries the run that produced it.
+
+**The committed log is a snapshot, and this script does not make it a feed.** A
+runner's working tree is discarded when the job ends, so the write above is
+thrown away with the checkout and nothing commits it. Refreshing the file in the
+repository is a person's job. What this script does instead is append the
+*delta* -- the records this run added or refreshed -- to `$GITHUB_STEP_SUMMARY`
+when GitHub sets it, so each run carries its own observations on the run page
+and a person has the exact records to commit rather than re-running anything to
+recover them. The delta is bounded on purpose: the file is per-step, capped at
+1 MiB, and at most 20 step summaries are shown per job, so the whole log never
+goes there.
 """
 
 from __future__ import annotations
@@ -73,7 +84,42 @@ def record(root: Path, job: str, run_id: str, at: str, suite: bool = False) -> l
         )
 
     log_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _write_step_summary(touched, gates, job, run_id, at)
     return touched
+
+
+def _write_step_summary(touched, gates, job, run_id, at) -> None:
+    """Append this run's delta to `$GITHUB_STEP_SUMMARY`, when there is one.
+
+    Absent the variable -- every local invocation -- this writes nothing and
+    creates no file. That absence is a tested property, not an accident: a
+    recorder that invented a summary path would leave litter behind the one
+    place it is run most often.
+
+    Appended, never truncated: GitHub groups every step's summary into the job
+    summary, and `>>` is the documented way to add to it.
+    """
+    target = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not target:
+        return
+    rows = ["| gate | status | run | at |", "|---|---|---|---|"]
+    for gate in touched:
+        record = gates.get(gate, {})
+        rows.append(
+            "| `%s` | %s | %s | %s |"
+            % (gate, record.get("status", "?"), record.get("run", run_id), record.get("at", at))
+        )
+    with open(target, "a", encoding="utf-8") as handle:
+        handle.write(
+            "\n### Gate liveness recorded by this job\n\n"
+            "%d gate(s) observed passing in `%s` (run `%s`, at `%s`).\n\n"
+            "This is the **delta**, not the log: the committed "
+            "`tools/%s` is a snapshot and this run's write to it is discarded "
+            "with the runner's checkout. Committing these records is a person's "
+            "job; they are here so nobody has to re-run anything to recover "
+            "them.\n\n%s\n"
+            % (len(touched), job, run_id, at, gl.LOG_NAME, "\n".join(rows))
+        )
 
 
 def main(argv=None) -> int:
