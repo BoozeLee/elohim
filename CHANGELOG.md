@@ -6,6 +6,95 @@ All notable changes to this project are recorded here. The format follows
 rather than promising compatibility: the tip of `main` is the only supported
 version, and no version is covered by a stability guarantee.
 
+## [0.4.0] — 2026-10-04
+
+`elohim 0.3.0` is on PyPI, so this release is the first one that can be
+published at all: a released version is never replaced, and the previous tree
+could not have shipped without a bump. Nothing here has been uploaded — the
+release is prepared, and `publish.yml` is the only thing that uploads.
+
+The range is measured, not asserted, and it needs a different command from the
+one below it. `0.3.0` was published at **09:23:35Z on 2026-10-03** and was
+never tagged, so `v0.3.0` does not exist to bound a range with:
+
+```
+git log --since=2026-10-03T09:23:35Z --oneline origin/main     52
+```
+
+Fifty-two commits. **Not every one of them has an entry below**, and that is
+stated rather than hidden: the remainder is owed and is the same debt the
+`[0.3.0]` section already declares. The entries here group the work by what it
+changed, not one per commit, for the reason `[0.3.0]` gives.
+
+### Added
+
+- **`tools/verify_repo_state.py`** — a fifth gate, and the only one that asks a
+  remote question. It re-measures the repository's own state: that the
+  hardening files are present, that `main` has not diverged from `origin/main`,
+  and that the repository is public. The third is a remote property, so it
+  needs `GITHUB_TOKEN`; without one it *raises* rather than returning an empty
+  list, because an empty list is indistinguishable from "all good" to every
+  caller. On a runner it runs `--require visibility` and an unobservable claim
+  is a failure.
+- **`pay-signal` and `claim-ledger`** — two more gate-ledger-backed skills,
+  plus a design note for five more at the front of the pipeline. None of those
+  five are built.
+- **The publish gate now runs on every push.** `verify_wheel.py --dist` is
+  asked in `ci.yml`'s `wheel` job on every push, not only on the way to an
+  index, and its two failure modes are each refused by name: a selected wheel
+  that is not a regular file, and a `--dist` path that is not what the caller
+  meant.
+
+### Fixed
+
+- **A gate that could never have passed, and never said so.** `--dist dist/` is
+  relative, and the install subprocess runs with its working directory in a
+  scratch tree outside the checkout, so pip was asked for a path that does not
+  exist. The gate printed a clean selection, passed every content check, and
+  then died at the install — after everything above it had reported nothing
+  wrong. **Every test passed, because every one of them passed an absolute
+  path.** A mode that refused everything and a mode that worked were identical
+  to the whole suite. `_one_wheel` now returns an absolute path and
+  `tests/test_wheel_dist.py` pins that shape; the assertion fails when the
+  absolutising is removed.
+- **An order test that could not fail.** The filter left a one-element
+  candidate set, so no ordering was observable. The listing order is now
+  injected.
+- **The pinned build backend was decoration.** `publish.yml` pinned hatchling
+  and then built through an isolated environment, so the pin never reached the
+  artifact. Both workflows now build `--no-isolation`, and two assertions hold
+  the line between them.
+- **The upload read a directory by a name that was never bound.**
+  `packages-dir: dist/` is now named in the workflow rather than inherited from
+  a deprecated alias, and a test asserts the value reaching the upload is the
+  one the gate read.
+- **A publish whose version the index already held.** `verify_release_slot.py`
+  refuses before anything is uploaded, and it asks the JSON API rather than the
+  web page, which answers 200 for names that do not exist.
+
+### Changed
+
+- **The repository is public, and that is what made CI run again.** Between
+  13:25:44Z and 18:05Z on 2026-10-04 this repository received no run that
+  executed a single step: runs were created and completed in seconds with zero
+  steps, no log blob and no annotation, and the cause was not measurable from
+  inside. It was the repository's own visibility — GitHub blocks usage on a
+  private repository once the free-plan quota is spent. Making it public
+  restored execution, verified by reading a dispatched run's steps array rather
+  than its conclusion. The step numbers this changelog quotes for the publish
+  workflow were true as of their run; read them by name.
+- **The population is derived rather than written into the workflow that
+  measures it**, the shard is checked for determinism, and the two places that
+  still said 1,679 are now read by a gate. A wall clock in the shard turned
+  `main` red twice and is gone.
+
+### Not claimed
+
+- That `E1`'s third clause is closed. It is not, and this release does not
+  close it.
+- That any number in this section was measured on a runner *before* 18:05Z on
+  2026-10-04. It was not, because no runner was executing.
+
 ## [0.3.0] — 2026-10-03
 
 Twenty-seven commits past `v0.2.0`, grouped by the item each closes rather than

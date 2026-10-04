@@ -111,8 +111,11 @@ jobs:
       # a released version. So a dispatch offering a version that is already
       # published cannot succeed, and without this step it fails at the upload:
       # after the build, after the token exchange, having established nothing
-      # except the number to bump. `elohim` 0.3.0 is released, which makes that
-      # the state this repository is actually in.
+      # except the number to bump. `elohim` 0.3.0 is released, and until the
+      # bump to 0.4.0 that was the version in `pyproject.toml` — so this step
+      # fired on every dispatch and correctly refused, and the only way to
+      # publish was to edit the number. It is written now: 0.4.0 is not on the
+      # index, which is the first time that has been true since 0.3.0 shipped.
       #
       # It asks the JSON API and never the web page, because the web page
       # answers HTTP 200 for names that do not exist. `docs/PUBLISHING.md`
