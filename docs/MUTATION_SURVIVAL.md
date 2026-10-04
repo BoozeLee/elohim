@@ -644,13 +644,41 @@ sites, and a population of 1,916 enumerated in full. A gate whose decision-level
 count is 0 because it found and fixed its last real gap is a gate that has
 earned a narrower schedule, not one that should be switched off.
 
-**What this does not settle, deliberately:** the clause's own consequence is
-"a release gate, not a CI gate, and it stops earning runner time". This document
-does not execute that. Moving the census off CI is a project decision with a
-cost either way — a nightly that runs 10 minutes and finds nothing is 10 minutes
-× 365, and a release-gated census that only runs at tag time can miss a defect
-that lands on a Tuesday. The measurement is recorded; the decision is named as
-open below.
+**The decision: the clause is overridden, the nightly stays.** Taken 2026-10-04,
+by the repository's owner, on this measurement. Recorded here rather than left
+implicit, because a clause that is disobeyed without a written reason is a clause
+that has stopped being a criterion and become a decoration.
+
+- **The census keeps its nightly schedule.** It is not moved to a release gate.
+- **The reason is that the instrument demonstrated its worth on the previous
+  run.** It found a real defect in one skill — 13 survivors, all one cause, none
+  anywhere else — and that defect is now fixed. Retiring the instrument in the
+  same change that answers its last finding inverts what it was built for. A
+  gate that finds nothing because its last finding was handled is not a gate
+  that has run out of signal.
+- **The cost is named rather than waved at:** the full census is 602.8 s on
+  6 workers, so the nightly is roughly 3.7 runner-hours a year. That is the
+  price of this decision, and it is being paid knowingly rather than by not
+  looking.
+
+**The review trigger, so the override is not permanent by default.** Re-open
+this decision when *any* of these holds:
+
+1. `defect-arm effective` rises above 0 — the instrument is live again and the
+   clause stops applying in the other direction.
+2. **`REPORTED` reaches 0.** This is the one that matters. The decision rests on
+   the claim that the instrument still moves things the gate does not decide on.
+   If 141 goes to 0, that claim is false and the 0.0 is saturation after all.
+3. **20 consecutive green nightlies with 0 effective** — roughly 20 days. A
+   quarter-year of the nightly finding nothing is the cost becoming unjustifiable
+   on its own terms, independent of the clause.
+4. The population moves by more than 50 sites without the figures here being
+   re-measured, since the 0.0 was measured against 1,916 sites and a 0.0 is not
+   a property that transfers across populations.
+
+None of these is currently close. Recorded so that the next person does not have
+to reconstruct the reasoning from a git log, and so that "we decided to keep it"
+is not mistaken for "nobody ever looked".
 
 The fate of the mutator follows from the criterion rather than from taste, as the
 item requires:
@@ -669,9 +697,10 @@ item requires:
   with the clause's silence named as the reason: `0.05`, on the defect-arm rate,
   which is 1.33 times the recorded 0.039424. It is wired into
   `.github/workflows/mutation-census.yml`, nightly over the whole population, and
-  has run green. **The clause firing now puts the "release gate, not a CI gate"
-  consequence back in play, and the bullet above is left in the past tense
-  because the decision has not been taken.**
+  has run green. **The clause fired on 2026-10-04 and was overridden on the same
+  day; the override, its reason, its price and its review triggers are recorded
+  under "The kill criterion" above.** It stays a nightly, and it is a nightly by
+  decision rather than by the clause never having been read.
 - The **decided-by is met.** It requires "the report is committed, and a
   regression in survival rate turns CI red." Both hold. The report is committed,
   and the gate returns 1 in either mode -- no threshold means any survivor fails, a
