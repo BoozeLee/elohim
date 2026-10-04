@@ -120,46 +120,38 @@ Two further defects in the same surface:
   `37c6b34` exists to add, and `skills.sh.json` has never heard of it. The
   changelog has never mentioned it either.
 
-## Phase 0 — Week 1, blocking, do this before anything else
+## Phase 0 — resolved, and this record was stale until 2026-10-04
 
-**The public repository does not contain the code on disk.**
+**This section used to say the public repository did not contain the code on
+disk, and it was right when written. It is false now.** It claimed `main` and
+`origin/main` had diverged by 6 local-only and 7 remote-only commits, that the
+trees differed, and — the reason it was marked *blocking* — that a force-push
+would delete a security hardening commit, because local was missing
+`.github/dependabot.yml`, `.github/workflows/codeql.yml` and `CODEOWNERS`.
 
-`main` and `origin/main` have diverged: 6 local-only commits, 7 remote-only,
-same messages on both tips, different SHAs, and the trees differ. `git fetch
-origin` reports no new changes, so this is real divergence, not a stale ref.
-The extra remote commit is `44fb602 "harden public repository controls"`, and
-the whole divergence is four files:
+Measured 2026-10-04 on `main` at `f1f790d`:
 
 ```
-.github/dependabot.yml        6 ------
-.github/workflows/ci.yml      4 ++--
-.github/workflows/codeql.yml  25 -------------------------
-CODEOWNERS                    1 -
+git fetch origin
+git rev-list --left-right --count main...origin/main     0  0
 ```
 
-Read that direction carefully: those are the changes going *from* `origin/main`
-*to* local `HEAD`, so **local is missing the remote's hardening.** Local has no
-CodeQL workflow, no Dependabot config and no CODEOWNERS.
+No divergence, identical tips, nothing local-only and nothing remote-only. All
+three hardening files are present. The sha this section named, `44fb602`, is no
+longer an ancestor of `main` — not because the hardening was dropped but
+because the history was rewritten for commit signing, which is recorded at
+`docs/ROADMAP.md:126` and is why `v0.1.0`'s tag is orphaned.
 
-**Therefore: never push local `main` over `origin/main`.** A force-push would
-delete a security hardening commit from a public repository. The fix is to pull
-the hardening in, resolve, and move forward.
+Re-derive rather than trusting the sentence above it, and note that it was true
+when written. A correction that only said "this was false" would be the same
+defect wearing the other hat: a record that cannot say when a claim was true is
+not evidence that it was ever false.
 
-1. Snapshot both tips before touching anything: record `37c6b34` and `f95f96e`
-   in this file's log so the pre-merge state is recoverable.
-2. `git fetch origin`, then inspect `44fb602` in full — the four files it
-   touches and why they were removed locally, if that is knowable.
-3. Bring the four files from `origin/main` into the working tree.
-4. Re-run the full gate: `python3 tests/test_all.py`, `python3
-   tools/check_text.py`, `python3 tools/sync_adapters.py --check`, `python3
-   tools/submit.py --check`. All must pass before any commit.
-5. Confirm the CodeQL workflow actually runs on the public repo. A registered
-   workflow that never executes is the RepoTruth failure repeating, and this
-   box has already paid for that lesson once.
-
-**Kill criterion:** if the four hardening files cannot be reconciled with the
-local tree without weakening a gate, stop and report. Do not resolve a security
-control by deleting it.
+**The instruction it gave — never force-push local `main` over `origin/main` —
+is withdrawn.** Its reason no longer exists. The kill criterion it set, *do not
+resolve a security control by deleting it*, is not withdrawn: it was a good
+rule, it was attached to a problem that is gone, and it is worth keeping as a
+rule rather than as a remediation step.
 
 ## Phase 1 — Week 1, ship A3 and make the public tree equal the local tree
 

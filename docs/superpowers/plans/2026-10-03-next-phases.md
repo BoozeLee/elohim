@@ -588,6 +588,16 @@ keeps `README.md:242-243` and `docs/ROADMAP.md:590-593` correct, a consequence
 of dropping the mirror worth re-checking rather than assuming; all three
 fixture-paired gates green in both directions.
 
+> **Superseded on 2026-10-04, kept rather than rewritten.** The mirror was
+> re-added, so `sync_adapters --check` now reports **85 files byte-identical
+> across 9 skills** — including the `elohim-harness` this plan counted as
+> shared. The line references have moved too: `README.md:242-243` is a census
+> output table now, not the figure this criterion pointed at. The figures above
+> were true when this plan was written on 2026-10-03 and are left as written,
+> because a dated plan that silently absorbs later measurements stops
+> describing the plan that ran. Re-derive the current figure with
+> `python3 tools/sync_adapters.py --check` rather than quoting either number.
+
 **The falsifiable claim.** After G, a change that weakens any of the four gates so
 it stops finding its fixture turns CI red, **on a runner that has actually
 executed**. Before G that claim is untested, because no runner has ever run it.

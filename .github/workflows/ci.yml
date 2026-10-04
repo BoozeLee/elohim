@@ -55,6 +55,23 @@ jobs:
       - name: claim sentences are bound to pinned values
         run: python3 skills/elohim-harness/scripts/claim_binding.py --root .
 
+      # The repository's own state, and the only gate here that asks the
+      # network a question. `--require-visibility` is the point of running it
+      # here and not in the unit suite: on a runner GITHUB_TOKEN exists, so
+      # "I could not check whether the repository is public" is a failure
+      # rather than a shrug. Locally the same command without the flag reports
+      # it as UNVERIFIED and still refuses to call that a pass.
+      #
+      # This step exists because `docs/DISTRIBUTION.md` once carried a blocking
+      # claim that main and origin/main had diverged, and nothing re-measured
+      # it. The claim was true when written and false for months; a gate that
+      # had existed would have said so on the first push after it stopped
+      # being true.
+      - name: the repository's own state is re-measured
+        run: python3 tools/verify_repo_state.py --require-visibility
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       # The 43-test unit suite, and the reason this step exists: until it was
       # added, pytest was wired to nothing. Every gate above reported rc=0 at a
       # point in this repository's history while pytest had a genuine failure,
