@@ -310,9 +310,6 @@ def doc_figure_controls() -> int:
                        "the exact-facts prose", pristine, doc)
 
     must_catch = [
-        (traps_row,
-         re.sub(r"\| \d+ \|", "| 38 |", traps_row, count=1),
-         "a stale trap count is the exact drift this was written for"),
         (facts_row,
          re.sub(r"\| \d+ across \d+ ", "| 81 across 6 ", facts_row, count=1),
          "the figure the table actually carried before the fix"),
@@ -340,13 +337,31 @@ def doc_figure_controls() -> int:
          "Tier C narrative stays true of the tree it names and must not be bound"),
     ]
 
+    # Figures that CANNOT be checked in an ungated tree must be NAMED, never
+    # silently passed. This group did not exist until CI caught the reason it
+    # needed to: a doc figure whose derivation is absent used to skip in
+    # silence, so a document could say anything at all about it and the check
+    # agreed. Locally the stale shards in a developer's working tree hid it
+    # completely -- the control passed here and returned rc=0 in a clean clone,
+    # which is the worst possible shape for a control.
+    #
+    # So the assertion is not "the check fails" -- the check must NOT fail, or
+    # every ungated tree would be red over a figure nobody measured. The
+    # assertion is that it NAMES the figure as unchecked, by document and by
+    # key. A pass in silence is the defect; a loud UNCHECKED is the fix.
+    must_be_named = [
+        (traps_row, "| traps re-derived independently | 38 |",
+         "docs/ROADMAP.md", "total_traps"),
+        (_row(r"\d+ independent trap re-derivations,", "README trap total", readme, readme_rel),
+         "77 independent trap re-derivations,",
+         "README.md", "total_traps"),
+    ]
+
     # The README set. One case per bound figure, and the anchor is derived so the
     # case cannot expire the way the ROADMAP ones did.
     readme_cases = []
     for pattern, wrong, what in (
         (r"\d+ pinned facts,", "999 pinned facts,", "README total facts"),
-        (r"\d+ independent trap re-derivations,", "77 independent trap re-derivations,",
-         "README total traps"),
         (r"\d+ instrument pins\. Every", "5 instrument pins. Every", "README instrument pins"),
         (r"claims adjudicated \d+,", "claims adjudicated 21,", "README claims adjudicated"),
         (r"of which contradicted \d+,", "of which contradicted 4,", "README claims contradicted"),
@@ -363,6 +378,20 @@ def doc_figure_controls() -> int:
             ignore=shutil.ignore_patterns(".git", "__pycache__"),
         )
         target = work / doc
+
+        # Make the copied tree deterministically UNGATED before any case runs.
+        #
+        # `skills/*/out/` is gitignored, so whether it exists depends entirely on
+        # whether the developer ran the gate recently. That made these controls
+        # environment-dependent in the worst way: with shards present, a
+        # post-run-only figure was genuinely checkable and the control passed; in
+        # a clean clone it was not, and the control returned rc=0 -- the same
+        # source producing opposite results depending on who ran it. Removing the
+        # shards makes every case below run in the state CI sees, on every
+        # machine, which is the only state a control is worth anything in.
+        for shard in work.glob("skills/*/out"):
+            shutil.rmtree(shard, ignore_errors=True)
+
         for old, new, why in must_catch:
             if old not in pristine:
                 print(f"  SKIP {old[:40]!r} is not in the document any more")
@@ -429,6 +458,31 @@ def doc_figure_controls() -> int:
                 if line:
                     print(f"    {line.strip()[:150]}")
         readme_target.write_text(readme, encoding="utf-8")
+
+        # The figures that cannot be checked here must SAY SO. These cases assert
+        # the fix rather than the old behaviour: rc is 0, because a figure nobody
+        # measured is not a failure, but the output must name the document, the
+        # key, and the word UNCHECKED. A silent rc=0 is the defect this repository
+        # was founded to catch, so it is now a control that fails.
+        for old, new, rel, key in must_be_named:
+            doc_target = work / rel
+            original = doc_target.read_text(encoding="utf-8")
+            if old not in original:
+                print(f"  SKIP {old[:40]!r} is not in {rel} any more")
+                bad += 1
+                continue
+            doc_target.write_text(original.replace(old, new, 1), encoding="utf-8")
+            rc, out = run_check(work)
+            named = ("UNCHECKED" in out and f"doc:rel={rel}" in out and key in out)
+            ok = rc == 0 and named
+            print(f"  NAMED  {rel + ' ' + key:<52} {'NAMED' if ok else 'SILENT rc=%d' % rc}")
+            if not ok:
+                bad += 1
+            else:
+                line = next((ln for ln in out.splitlines() if "UNCHECKED" in ln), "")
+                if line:
+                    print(f"    {line.strip()[:150]}")
+            doc_target.write_text(original, encoding="utf-8")
 
     sys.path.insert(0, str(HARNESS_SCRIPTS))
     import claim_binding as cb

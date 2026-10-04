@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import hashlib
 import json
 import re
 import sys
@@ -551,16 +552,23 @@ def derivations(root: Path) -> dict[str, int | None]:
     base = root / "skills" if (root / "skills").is_dir() else root
     payloads = sorted(p for p in base.glob("*/out/last-run.json") if p.is_file())
     traps = None
-    pins = None
     if len(payloads) == len(ledgers) and payloads:
         total = 0
-        statuses = []
         for path in payloads:
             payload = json.loads(path.read_text(encoding="utf-8"))
             total += len(payload.get("traps", []))
-            statuses.append((payload.get("instrument_pin") or {}).get("status"))
         traps = total
-        pins = sum(1 for s in statuses if s == "PASS")
+
+    # `pins_passing` used to be read from those same shards, which made it inert
+    # everywhere a gate has not run -- including every CI job, because `out/` is
+    # gitignored and CI gates in temporary copies. A declared doc figure with no
+    # derivation to compare against used to pass silently, so a document could say
+    # anything at all about instrument pins and the check would agree. The count is
+    # derivable from committed bytes, so it is derived from them: each ledger pins its
+    # instrument by sha256 and byte count, and the instrument is committed beside it.
+    # That is the same question the shard answered, asked of files that exist in a
+    # fresh clone.
+    pins = _pins_passing(root, ledgers)
 
     # The recall figure is not in any ledger's shard -- it is read from a hand-
     # adjudicated label fixture, which is a different kind of evidence and would be
@@ -580,6 +588,37 @@ def derivations(root: Path) -> dict[str, int | None]:
         "pins_passing": pins,
         **replay,
     }
+
+
+def _pins_passing(root: Path, ledgers: list[Path]) -> int | None:
+    """Instrument pins that hold, counted from committed bytes only.
+
+    A ledger records the sha256 and byte count its instrument must have. The
+    instrument is committed beside it, so the question "does this pin still hold?"
+    is answerable in a fresh clone with no gate run and no generated file. Returns
+    None when a ledger carries no instrument pin at all, rather than reporting a
+    count over a population that was never defined.
+    """
+    base = root / "skills" if (root / "skills").is_dir() else root
+    held = 0
+    pinned = 0
+    for ledger_path in ledgers:
+        try:
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        pin = ledger.get("instrument") or {}
+        rel = pin.get("path")
+        if not rel:
+            continue
+        pinned += 1
+        instrument = base / ledger_path.parent.name / rel
+        if not instrument.is_file():
+            return None
+        blob = instrument.read_bytes()
+        if hashlib.sha256(blob).hexdigest() == pin.get("sha256") and len(blob) == pin.get("bytes"):
+            held += 1
+    return held if pinned else None
 
 
 def _replay_figures(root: Path) -> dict[str, int]:
@@ -625,22 +664,41 @@ def _applicable_figures(root: Path) -> list[tuple[str, str, str, str]]:
     return DOC_FIGURES if (root / "docs").is_dir() else []
 
 
-def check_doc_figures(root: Path, exemptions: dict[str, str]) -> list[dict[str, str]]:
-    """Every declared doc figure that does not match the tree it describes.
+# Figures whose only source is a gate's generated output, and which therefore
+# cannot be checked in a tree that has not been gated.
+#
+# `out/last-run.json` is gitignored on purpose -- it is a run's output, not a
+# source of truth -- so in a fresh clone, and in every CI job, these read as
+# absent. They used to be skipped in silence, which made a document free to say
+# anything at all about them and the check would agree: a false green wearing
+# the costume of a gate. `total_traps` is in this set because no committed
+# artifact records how many traps a skill has; only running the trap checker
+# produces that number, and there is no honest way to derive it without doing
+# the thing it is supposed to be checking.
+#
+# So they are not failed -- failing them would redden every ungated tree over a
+# figure nobody claimed to measure -- and they are not silently passed either.
+# They are named, and the summary says how many of the declared figures went
+# unchecked, so the count a reader takes away is the count that was checked.
+POST_RUN_ONLY = frozenset({"total_traps"})
 
-    Scoped to a root that actually holds the documents. The harness runs this
-    check once per skill with `<repo>/skills` as the root, so that a
-    documentation figure naming `docs/ROADMAP.md` is genuinely not applicable
-    there -- reporting it missing would fail all eight skills over a path that
-    is not supposed to exist from that directory. At a real checkout root,
-    `docs/` is present and a missing document is still a loud failure, because
-    then the figure really has stopped being read.
+
+def check_doc_figures(
+    root: Path, exemptions: dict[str, str]
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Declared doc figures that disagree with the tree, and those that cannot be checked.
+
+    Returns `(failures, unchecked)`. The second list is not a softer kind of
+    first list: a failure is a figure that was checked and is wrong, and an
+    unchecked figure is one that was never compared to anything. Collapsing
+    them is how an inert binding gets reported as a working gate.
     """
     figures = _applicable_figures(root)
     if not figures:
-        return []
+        return [], []
     values = derivations(root)
     failures: list[dict[str, str]] = []
+    unchecked: list[dict[str, str]] = []
     for rel, anchor, side, key in figures:
         path = root / rel
         name = "doc:rel=%s" % rel
@@ -650,9 +708,10 @@ def check_doc_figures(root: Path, exemptions: dict[str, str]) -> list[dict[str, 
             continue
         if "doc:rel=%s#%s" % (rel, anchor) in exemptions:
             continue
-        stated = _int_near(path.read_text(encoding="utf-8"), anchor, side)
+        text = path.read_text(encoding="utf-8")
+        stated = _int_near(text, anchor, side)
         if stated is None:
-            hits = path.read_text(encoding="utf-8").count(anchor)
+            hits = text.count(anchor)
             problem = (f"the anchor {anchor!r} is missing from {rel}, so this figure "
                        f"stopped being read" if hits == 0 else
                        f"the anchor {anchor!r} occurs {hits} times in {rel}, so no "
@@ -661,15 +720,19 @@ def check_doc_figures(root: Path, exemptions: dict[str, str]) -> list[dict[str, 
             continue
         current = values.get(key)
         if current is None:
-            # Reported, never failed: the tree has not been gated, so nothing
-            # has been measured to contradict the figure.
+            if key in POST_RUN_ONLY:
+                unchecked.append({"fact": name, "key": key,
+                                  "problem": f"{rel} states {stated} for {key}, which is "
+                                             f"only measurable after a gate run; this tree "
+                                             f"has not been gated, so the figure is "
+                                             f"UNCHECKED here and not agreed"})
             continue
         if stated != current:
             failures.append({
                 "fact": name,
                 "problem": f"{rel} states {stated} for {key}, the tree measures {current}",
             })
-    return failures
+    return failures, unchecked
 
 
 def collect(root: Path) -> tuple[list[Path], list[dict[str, Any]], list[float]]:
@@ -722,7 +785,7 @@ def main(argv: list[str] | None = None) -> int:
         for f in check_fact(fact, universe, exemptions):
             failures.append({"file": "ledger.json", **f})
 
-    doc_failures = check_doc_figures(root, exemptions)
+    doc_failures, doc_unchecked = check_doc_figures(root, exemptions)
     doc_declared = sum(
         1 for k in exemptions if k.startswith("doc:rel=")
     )
@@ -738,6 +801,7 @@ def main(argv: list[str] | None = None) -> int:
         ),
         "doc_figures": len(_applicable_figures(root)),
         "doc_figures_declared": doc_declared,
+        "doc_figures_unchecked": doc_unchecked,
         "id_failures": id_failures,
         "failures": failures,
         "doc_failures": doc_failures,
@@ -757,12 +821,18 @@ def main(argv: list[str] | None = None) -> int:
             )
         for f in doc_failures:
             print(f"claim_binding: FAIL {f['fact']}: {f['problem']}", file=sys.stderr)
+        for f in doc_unchecked:
+            print(f"claim_binding: UNCHECKED {f['fact']}: {f['problem']}", file=sys.stderr)
         if not failures and not id_failures and not doc_failures:
             unverified = report["unverified_exemptions"]
+            declared = len(_applicable_figures(root))
+            checked = declared - len(doc_unchecked)
+            suffix = (f", {len(doc_unchecked)} of them post-run only and UNCHECKED "
+                      f"here" if doc_unchecked else "")
             print(
                 f"claim_binding: OK  {len(facts)} facts, {len(universe)} pinned values, "
-                f"{len(exemptions)} declared exemptions, {len(_applicable_figures(root))} doc figures, "
-                f"0 unclassified"
+                f"{len(exemptions)} declared exemptions, {declared} doc figures "
+                f"({checked} checked){suffix}, 0 unclassified"
             )
             if unverified:
                 print(
