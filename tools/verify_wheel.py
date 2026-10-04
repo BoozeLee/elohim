@@ -49,7 +49,9 @@ job so it runs in parallel with the unit gates instead of extending them.
 
 import argparse
 import ast
+import os
 import re
+import stat
 import subprocess
 import sys
 import tempfile
@@ -240,7 +242,7 @@ class Refusal(Exception):
 
 
 def _readable(wheel: Path) -> None:
-    """Raise a `Refusal` unless `wheel` is a file this process can open.
+    """Raise a `Refusal` unless `wheel` is a regular file this process can open.
 
     A name ending in `.whl` is not a wheel. `dist/` can hold a *directory*
     called `elohim-0.3.0-py3-none-any.whl`, a wheel left mode `000`, or a
@@ -251,16 +253,33 @@ def _readable(wheel: Path) -> None:
     rather than the artifact that was wrong -- the same defect `_entries` exists
     to prevent, one step earlier.
 
-    Opened rather than stat'd, because the three cases do not agree on what a
-    stat says: a directory stats fine and is not a wheel, and a mode-`000` file
-    stats fine and cannot be read. All three raise `OSError` from `open`, and
-    all three fail closed.
+    Three checks, and the order is the point. `os.stat` follows symlinks, so a
+    dangling one and a symlink loop both arrive as the `OSError` they are. The
+    mode is then required to be a *regular file*, and that is what stops a named
+    pipe from hanging the gate: `open()` on a FIFO for reading blocks until a
+    writer appears, so an `elohim-0.3.0-py3-none-any.whl` that happened to be a
+    FIFO did not raise, it waited -- with no output, until something killed it.
+    The file is opened only once the type says opening it cannot block. Last,
+    `open()` itself, because a mode-`000` wheel stats perfectly and still cannot
+    be read.
 
-    Called from `_one_wheel` and not from `_entries` so the two problems stay
-    two sentences: a path that is not a readable file is a different defect
-    from a readable file that is not a zip, and the caller prints a line about
-    the selected artifact that must not be printed for either.
+    A named pipe, a device node, a socket and a directory are all refused by
+    that one type check, and none of them is ever opened. A symlink loop is
+    refused by the `stat`. A FIFO is the one that used not to be refused at all.
+
+    Called from `_one_wheel` and not from `_entries` so the unreadable-path and
+    not-a-zip cases stay two different sentences: a path that is not a readable
+    file is a different defect from a readable file that is not a zip, and the
+    caller prints a line about the selected artifact that must not be printed
+    for either.
     """
+    try:
+        mode = os.stat(wheel).st_mode
+    except OSError as exc:
+        raise Refusal("%s cannot be read as a wheel: %s" % (wheel.name, exc))
+    if not stat.S_ISREG(mode):
+        raise Refusal("%s is not a regular file, so it is not a wheel"
+                      % wheel.name)
     try:
         with open(wheel, "rb"):
             pass

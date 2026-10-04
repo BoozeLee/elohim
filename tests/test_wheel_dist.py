@@ -226,9 +226,12 @@ def test_a_directory_named_like_a_wheel_is_refused_rather_than_announced():
         with pytest.raises(vw.Refusal) as caught:
             vw._one_wheel(dist)
         message = str(caught.value)
-        assert "cannot be read as a wheel" in message, message
+        # A directory is caught by the type check rather than by the open, so
+        # it gets the sharper of the two sentences: it is not a regular file,
+        # which is the actual reason, rather than the generic unreadability.
+        assert "is not a regular file" in message, message
         assert "elohim-0.3.0-py3-none-any.whl" in message
-        # A distinct sentence from the two-count refusal, because a typo that
+        # Distinct sentences from the two-count refusal, because a typo that
         # produced a directory should not read as "two wheels were found".
         assert "found 2" not in message, message
 
@@ -624,6 +627,151 @@ def test_dist_accepts_a_relative_path_the_way_publish_yml_passes_it():
         # The name it was selected under is what the messages use, so
         # absolutising must not rename it.
         assert got.name == "elohim-0.3.0-py3-none-any.whl"
+
+
+# --------------------------------------------------------------------------
+# Not a regular file, and the shapes that used not to be refused at all
+# --------------------------------------------------------------------------
+
+
+def test_a_regular_file_still_passes_the_type_check():
+    # The other direction, and the one that stops the checks above from being
+    # a gate that refuses everything: a plain file of the right name is
+    # selected, and a readable file that is not yet a zip is left for
+    # `_entries` to name.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-regular-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        plain = dist / "elohim-0.3.0-py3-none-any.whl"
+        plain.write_bytes(b"")
+        assert vw._one_wheel(dist) == plain
+        with pytest.raises(vw.Refusal) as caught:
+            vw._entries(vw._one_wheel(dist))
+        assert "is not a readable wheel" in str(caught.value)
+
+
+def test_a_symlink_loop_named_like_a_wheel_is_refused():
+    # `os.stat` follows symlinks, so a loop arrives as ELOOP rather than as a
+    # type this function can inspect. It has to be an `OSError` here, or the
+    # loop would surface as a traceback, which is the whole reason this
+    # function exists.
+    #
+    # One `*.whl` only, because two would be refused by the count check first
+    # and the loop would never be reached -- which is what a first attempt at
+    # this test did, and it passed for the wrong reason.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-loop-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        wheel = dist / "elohim-0.3.0-py3-none-any.whl"
+        target = dist / "not-a-wheel"  # no suffix, so the count stays at one
+        wheel.symlink_to(target)
+        target.symlink_to(wheel)
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_wheel(dist)
+        message = str(caught.value)
+        assert "cannot be read as a wheel" in message, message
+        assert "Too many levels" in message or "ELOOP" in message, message
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "mkfifo"), reason="no mkfifo on this platform")
+def test_a_wheel_that_is_a_named_pipe_is_refused_rather_than_waited_on():
+    # A named pipe is the shape that makes a gate hang instead of fail. `open()`
+    # on a FIFO for reading blocks until a writer appears, so a
+    # `elohim-0.3.0-py3-none-any.whl` that happened to be a pipe did not raise:
+    # it waited, with no output, until something killed it.
+    #
+    # The refusal has to arrive *promptly*, so the second half runs the tool in
+    # a subprocess it is allowed to kill. A test that only called `_one_wheel`
+    # would hang the suite rather than fail it, which is the defect reproducing
+    # itself inside its own test.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-fifo-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        os.mkfifo(dist / "elohim-0.3.0-py3-none-any.whl")
+
+        # The subprocess runs FIRST, and deliberately. If the type check is ever
+        # removed, the in-process call below would block on the pipe and hang
+        # the suite -- the defect reproducing itself inside its own test. The
+        # subprocess is allowed to be killed, so a regression arrives as a
+        # failure with a message instead of a hung run.
+        try:
+            result = subprocess.run(
+                [sys.executable, str(TOOL), "--dist", str(dist)],
+                capture_output=True, text=True, cwd=str(REPO), timeout=30)
+        except subprocess.TimeoutExpired:
+            raise AssertionError(
+                "the tool blocked on a named pipe instead of refusing it")
+        assert result.returncode == 1, (result.returncode, result.stdout,
+                                       result.stderr)
+        assert "is not a regular file" in result.stderr, result.stderr
+        # The selection must not be announced for something that is not a wheel.
+        assert "not built by this run" not in result.stdout, result.stdout
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_wheel(dist)
+        message = str(caught.value)
+        assert "is not a regular file" in message, message
+        assert "elohim-0.3.0-py3-none-any.whl" in message
+
+
+def test_the_entries_oserror_arm_has_a_control():
+    # `_entries` keeps an `OSError` arm for a wheel that becomes unreadable
+    # between the selection and the read. `_readable` opens the file first, so
+    # without this test the arm is new code with no fixture in either direction,
+    # which per AGENTS.md is a decorator rather than a gate.
+    #
+    # The race is produced for real rather than simulated: select the wheel,
+    # then take its permissions away, then read it. Dropping the arm turns this
+    # red, because the `PermissionError` would then escape as a traceback out of
+    # `main` instead of a refusal naming the artifact.
+    import zipfile
+
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        pytest.skip("root opens a mode-000 file, so this input cannot go red")
+
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-race-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        built = dist / "elohim-0.3.0-py3-none-any.whl"
+        with zipfile.ZipFile(built, "w") as zf:
+            zf.writestr("elohim_gate/__init__.py", "")
+
+        # Selected while it is still readable -- this is the "before".
+        assert vw._entries(vw._one_wheel(dist)) == ["elohim_gate/__init__.py"]
+
+        # And unreadable after, which is the "after" the arm exists for.
+        built.chmod(0o000)
+        try:
+            with pytest.raises(vw.Refusal) as caught:
+                vw._entries(built)
+            message = str(caught.value)
+            assert "elohim-0.3.0-py3-none-any.whl" in message
+            # Its own sentence, distinct from the "this is not a zip" one: the
+            # bytes were never wrong, the path stopped being readable.
+            assert "not a readable wheel" not in message, message
+        finally:
+            built.chmod(0o600)
+
+
+def test_no_workflow_passes_a_dist_path_this_file_does_not_test():
+    # Both workflows that point the tool at a build directory pass it as
+    # `--dist dist/`: `publish.yml`, and the `ci.yml` step added when this gate
+    # grew its `--dist` arm. The form is the point, because it is the form
+    # the relative-path test above drives -- an absolute path in a workflow
+    # would be untested, which is how the last version of this gate stayed
+    # broken. A third `--dist` step has to match as well, and this is what
+    # makes that a failure rather than a review note.
+    workflows = (REPO / ".github" / "workflows")
+    for path in sorted(workflows.glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        for line in text.splitlines():
+            if "verify_wheel.py" not in line or "--dist" not in line:
+                continue
+            assert "--dist dist/" in line, (
+                "%s invokes the tool as %r, a form this file does not test"
+                % (path.name, line.strip()))
 
 
 if __name__ == "__main__":
