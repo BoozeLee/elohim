@@ -1686,14 +1686,23 @@ unsigned commits stay unsigned — signing them would mean rewriting published
 history. `v0.2.0`'s tag **is** signed, and GitHub reports that tag object
 `verified: true, reason: valid`.
 
-**The account is an explicit bypass actor on the only branch ruleset.** Ruleset
+~~**The account is an explicit bypass actor on the only branch ruleset.** Ruleset
 `24365691`, "protect-all-branches", target `branch`, enforcement `active`, applies
 to `~ALL`, with rules `deletion`, `non_fast_forward` and `pull_request`. It has
 exactly one `bypass_actor`: actor id `96494827`, type `User`, **`bypass_mode:
 "always"`** — the account owner. That is why two direct pushes to `main` succeeded
 while the remote reported `Changes must be made through a pull request.` No audit
 log is reachable from this account (`repos/…/audits` and `orgs/…/audit-log` both
-404), so those bypass events cannot be independently audited.
+404), so those bypass events cannot be independently audited.~~ **True when
+written on 2026-10-04, and superseded the same day.** The bypass actor has been
+removed: the live ruleset reports `bypass_actors: []` against the same id, target,
+enforcement and `~ALL` scope, with the same three rules. The open decision
+immediately below was therefore made and acted on, and this record was not
+updated when it was. The consequence is concrete rather than theoretical: a push
+to any **existing** branch is now refused with `GH013`, including a feature
+branch that already has an open pull request against it. Creating the branch and
+opening the pull request still work, so a change gets exactly one push — which
+means all of its verification has to happen before that push, not after it.
 
 **This is left as an open decision on purpose.** Removing the bypass actor would
 make the pull-request rule mandatory, and with one person on the account that

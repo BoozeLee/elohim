@@ -149,8 +149,9 @@ runner's own:
 | `--fail-under N` | exit non-zero below N |
 | `--max-seconds N` | budget the run |
 
-**elohim 0.3.0 is on PyPI.** Measured on 2026-10-03, from a clean virtual
-environment, in a directory outside this checkout:
+**elohim is on PyPI.** Two releases, each measured from the index rather than
+asserted. **0.3.0**, measured 2026-10-03, from a clean virtual environment, in a
+directory outside this checkout:
 
 ```console
 $ pip install elohim==0.3.0
@@ -162,17 +163,31 @@ hygiene 0 findings, claims 0 unbound
 verdict PASS
 ```
 
+**0.4.0**, measured 2026-10-04 by the same procedure — the run took 12.376s:
+
+```console
+$ pip install elohim==0.4.0
+$ elohim --version
+elohim 0.4.0
+$ elohim --all
+skills 8/8 pass, facts 103/103 verified, traps 53/53 hold,
+hygiene 0 findings, claims 0 unbound
+verdict PASS
+```
+
 `pip install .` from a clone still works and is still the path to test a change
 against. The index is where a stranger starts, and it is now measured rather
 than assumed — which it was not for most of this project's life, and the
 sentence that used to stand here said so.
 
-Read that block as a measurement of **the published 0.3.0 wheel**, taken on the
-date beside it. It is a true record of what that artifact reported, and it is not
-the current tree: the tree has since grown to eight gated skills holding 103 facts
-and 53 traps, which is the table above. A release figure and a tree figure drift
-apart by design, and conflating them is how a README ends up describing a version of
-this project that never existed.
+Read each block as a measurement of **the wheel of that version**, taken on the
+date beside it. Both are true records of what those artifacts reported, and
+neither is the current tree. The two disagree with each other, and that is the
+point: 0.3.0 reported six gated skills holding 81 facts and 38 traps, and the
+tree has since grown to eight holding 103 facts and 53 traps, which is the table
+above. A release figure and a tree figure drift apart by design, and conflating
+them is how a README ends up describing a version of this project that never
+existed.
 
 ## Verify
 
