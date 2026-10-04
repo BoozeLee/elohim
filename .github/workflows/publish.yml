@@ -88,8 +88,24 @@ jobs:
       # import a value from another workflow, and because a pin that drifts
       # between the job that proves the artifact and the job that uploads it
       # proves it for one build and ships another.
+      #
+      # That sentence described a defect rather than a property until this line
+      # existed. `python3 -m build` isolates by default: it creates a fresh
+      # virtual environment and installs the backend named in pyproject's
+      # `requires = ["hatchling"]` into it, which names no version. So the step
+      # above installed hatchling==1.32.4, and the build then ignored it and
+      # resolved whatever was newest on PyPI. The pin was decoration, the
+      # artifact that shipped was built by an unpinned backend, and the job that
+      # proved it in ci.yml was pinning a build that this one did not perform.
+      #
+      # `--no-isolation` is what makes the pin load-bearing. It is an
+      # *installation* option, not a build option: it changes where the backend
+      # comes from and not what gets built, so this still writes the sdist *and*
+      # the wheel into dist/. build then checks the backend is already importable
+      # and fails by name if it is not, which is the check an isolated build
+      # would have done by quietly installing whatever it liked.
       - name: build the distribution
-        run: python3 -m build --outdir dist/
+        run: python3 -m build --no-isolation --outdir dist/
 
       # `pyproject.toml` is edited by a person, and the index does not replace
       # a released version. So a dispatch offering a version that is already

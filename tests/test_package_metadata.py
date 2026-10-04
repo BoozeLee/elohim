@@ -318,6 +318,24 @@ PUBLISH_NAME = re.compile(
 PACKAGES_DIR = re.compile(
     r"^[ \t]+packages-dir:[ \t]*(?P<dir>[^\n#]*?)[ \t]*$", re.MULTILINE)
 
+# A pinned build backend, and a build that is allowed to ignore it.
+#
+# `python3 -m build` isolates by default: it makes a fresh venv and installs the
+# backend named in pyproject's `requires`, which names no version. A workflow
+# that pins a backend and then builds isolated has installed a decoration. The
+# pins existed in both publish.yml and ci.yml, and in publish.yml the build
+# ignored them -- so the artifact that shipped was built by whatever was newest
+# on PyPI, while the job that proved the wheel in ci.yml was pinning a build
+# that publish.yml did not perform. The comment above the publish step named
+# that exact failure ("a pin that drifts between the job that proves the
+# artifact and the job that uploads it proves it for one build and ships
+# another") and described a property the file did not have.
+BUILDER_PIN = re.compile(
+    r"^[ \t]*\"build==[^\"]*\"[ \t]+\"hatchling==[^\"]*\"[ \t]*$", re.MULTILINE)
+BUILD_RUN = re.compile(
+    r"^[ \t]*(?:-[ \t]+)?run:[ \t]+python3[ \t]+-m[ \t]+build(?P<args>[^\n]*)$",
+    re.MULTILINE)
+
 
 def _line_of(pattern, text, what):
     """The line number of the only match, or a failure naming what was absent.
@@ -501,6 +519,82 @@ def test_the_upload_is_told_the_directory_the_gate_reads():
         % (given, declared))
 
 
+def _pinned_build_backends() -> dict:
+    """{workflow filename: the build-backend pins it installs}, for those that do."""
+    out = {}
+    for path in sorted(REPO_ROOT.glob(".github/workflows/*.yml")):
+        text = path.read_text(encoding="utf-8")
+        hits = sorted({m.group(0).strip() for m in BUILDER_PIN.finditer(text)})
+        if hits:
+            out[path.name] = hits
+    return out
+
+
+def _why_a_pin_is_decoration(text: str, name: str, pins) -> list:
+    """Why `text` pins a build backend that its build ignores.
+
+    A function of text rather than of the file, so the control below can run it
+    against a mutation and see which half of the claim noticed.
+    """
+    builds = list(BUILD_RUN.finditer(text))
+    if not builds:
+        return ["%s installs %s but never runs `python3 -m build`; the pin is "
+                "decoration" % (name, ", ".join(pins))]
+    return ["%s builds with `python3 -m build%s` and no --no-isolation, so "
+            "`build` makes its own environment and resolves the backend from "
+            "pyproject instead of the %s this workflow pinned. The pin does not "
+            "reach the artifact, and the artifact is what ships."
+            % (name, m.group("args"), ", ".join(pins))
+            for m in builds if "--no-isolation" not in m.group("args")]
+
+
+def test_a_pinned_build_backend_is_the_one_that_builds():
+    """A pin the build ignores is not a pin.
+
+    `python3 -m build` isolates unless told not to: it makes a fresh virtual
+    environment and installs the backend named in pyproject's
+    `requires = ["hatchling"]`, which carries no version. A workflow that pins
+    a backend and then builds isolated has installed decoration -- the artifact
+    is built by whatever was newest on the index that day, and the number in the
+    workflow is a claim about a build that never happened.
+
+    That is not hypothetical here. Both workflows pinned `build==1.5.0` and
+    `hatchling==1.32.4`, and publish.yml then built isolated, so the artifact
+    that shipped was built by an unpinned backend while the job in ci.yml was
+    pinning a build that publish.yml did not perform. The comment above the
+    publish step described that failure in its own words and asserted the
+    property the file did not have.
+    """
+    pinned = _pinned_build_backends()
+    assert pinned, (
+        "no workflow pins a build backend, so this assertion has nothing to "
+        "check and would pass against a repository with no pins at all")
+    for name, pins in sorted(pinned.items()):
+        text = (REPO_ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8")
+        problems = _why_a_pin_is_decoration(text, name, pins)
+        assert not problems, "; ".join(problems)
+
+
+def test_the_workflows_that_build_pin_the_same_backend():
+    """The comment in publish.yml says the two are duplicated on purpose.
+
+    It gives the reason: *a pin that drifts between the job that proves the
+    artifact and the job that uploads it proves it for one build and ships
+    another.* A workflow cannot import a value from another workflow, so the
+    only thing holding them together is an assertion that they still agree.
+    """
+    pinned = _pinned_build_backends()
+    assert len(pinned) >= 2, (
+        "expected at least two workflows to pin a build backend -- the one that "
+        "proves the artifact and the one that uploads it -- found %d: %r"
+        % (len(pinned), sorted(pinned)))
+    distinct = {tuple(v) for v in pinned.values()}
+    assert len(distinct) == 1, (
+        "the workflows that pin a build backend do not agree: %r. One of them "
+        "will prove an artifact the other does not build."
+        % {name: pins for name, pins in sorted(pinned.items())})
+
+
 def test_these_assertions_can_fail():
     """The control. Every assertion above is a regular expression over a file,
     and a regular expression that cannot fail proves nothing. Deleting the
@@ -599,6 +693,33 @@ def test_these_assertions_can_fail():
         "this control no longer isolates the upload side: removing "
         "packages-dir: also changed the gate's argument, so it would not prove "
         "the coupling assertion is the only one that can see it")
+
+    # Control 7: --no-isolation dropped from the publish build, which is the
+    # state the file was in for its whole life. The pin, the packages-dir, the
+    # gate's argument and the order of the steps all survive, so nothing else in
+    # this file can see it -- only the assertion that a pin has to be the one
+    # doing the building. Both directions: the pristine text is clean, and the
+    # mutation is caught by exactly that one reason.
+    original = PUBLISH.read_text(encoding="utf-8")
+    isolated = BUILD_RUN.sub(
+        lambda m: m.group(0).replace(" --no-isolation", ""), original)
+    assert isolated != original, "the control removed no --no-isolation"
+    pins = sorted({m.group(0).strip() for m in BUILDER_PIN.finditer(isolated)})
+    assert not _why_a_pin_is_decoration(original, "publish.yml", pins), (
+        "the pristine publish.yml is already reported as decorative, so the "
+        "control below would be proving nothing")
+    problems = _why_a_pin_is_decoration(isolated, "publish.yml", pins)
+    assert len(problems) == 1 and "no --no-isolation" in problems[0], (
+        "dropping --no-isolation should leave exactly one complaint, that the "
+        "build is isolated; got %r" % (problems,))
+    # And the mutation must be invisible to the coupling assertions above, or
+    # this control is no longer isolating the pin.
+    assert _line_of(WHEEL_RUN, isolated, "the wheel gate step") < _line_of(
+        PUBLISH_NAME, isolated, "the upload step")
+    assert _wheel_gate_args(isolated) == "--dist dist/"
+    assert PACKAGES_DIR.findall(_publish_step(isolated)), (
+        "the control removed the upload's packages-dir as well, so it would not "
+        "prove the pin assertion is the only one that can see this")
 
 
 if __name__ == "__main__":
