@@ -94,7 +94,7 @@ jobs:
         if: always()
         run: |
           python3 - <<'PY'
-          import hashlib, json, pathlib
+          import hashlib, json, pathlib, re
           p = pathlib.Path("census-report.json")
           if not p.exists():
               raise SystemExit("census-report.json is absent: the run died before it could write one")
@@ -117,32 +117,77 @@ jobs:
           # smaller number in this log. A gate that goes green on less evidence
           # than it went green on last time is the one outcome it must never
           # report, so the population is pinned from outside the run.
-          EXPECTED_SKILLS = [
-              "elohim",
-              "estimator-bias",
-              "invariant-hunter",
-              "precision-budget",
-              "reproducibility",
-              "tolerance-prover",
-          ]
+          #
+          # Both facts below used to be literals in this file -- the number 1679
+          # and a six-skill list -- which is two more copies of things the tree
+          # already decides, and the skill list was stale the moment
+          # claim-ledger and pay-signal landed: the nightly would have failed on
+          # its own list rather than on anything about the census. The skill set
+          # is now derived from the ledgers, which is also what makes
+          # elohim-harness's absence structural rather than a name somebody
+          # remembered to leave out: it ships no ledger, so it cannot appear.
+          EXPECTED_SKILLS = sorted(
+              p.parent.name for p in pathlib.Path("skills").glob("*/ledger.json"))
+          if not EXPECTED_SKILLS:
+              raise SystemExit(
+                  "no ledger-bearing skill was found under skills/, so the expected "
+                  "set is empty and every comparison below would pass vacuously.")
           got = sorted(d.get("skills") or [])
           if got != EXPECTED_SKILLS:
               raise SystemExit(
                   f"the census covered {got}, not {EXPECTED_SKILLS}. elohim-harness "
                   f"is deliberately absent from that list: it is the harness, not an "
-                  f"instrument. A different set means some instruments were not found, "
-                  f"so every number below is measured on a population that is not "
-                  f"this one.")
+                  f"instrument, and it carries no ledger. A different set means some "
+                  f"instruments were not found, so every number below is measured on "
+                  f"a population that is not this one.")
           if cov["forged_sites_attempted"] != cov["population_sites"]:
               raise SystemExit(
                   f"the census attempted {cov['forged_sites_attempted']} of "
                   f"{cov['population_sites']} sites: the population was not covered.")
-          if cov["population_sites"] != 1679:
+
+          # The figures this run is measured against are read from the one
+          # document that records them, docs/MUTATION_SURVIVAL.md, which holds
+          # a "recorded figures" table for exactly this purpose. Every one of
+          # them used to be a literal in this file -- 1679, a six-skill list,
+          # 9f26bde149ed0526, 63, 1598 -- and all five were stale the moment
+          # claim-ledger and pay-signal landed, so the nightly would have failed
+          # on its own copies of the answers rather than on anything about the
+          # census. One home, read from here.
+          #
+          # A changed population is a fact a human owes a reading, so nothing
+          # below self-updates. The table is edited by hand, after a
+          # measurement, and editing it wrongly is what claim_binding catches
+          # from the other side by re-deriving the population from the tree.
+          DOC = pathlib.Path("docs/MUTATION_SURVIVAL.md")
+          if not DOC.is_file():
+              raise SystemExit(f"{DOC} is absent, so there is nothing to measure against")
+          doc_text = DOC.read_text(encoding="utf-8")
+          RECORDED = {}
+          for _name, _value in re.findall(
+                  r"^\| (population sites|defect-arm effective|defect-arm n|"
+                  r"survivor identity digest) \| ([^|]+?) \|$",
+                  doc_text, re.MULTILINE):
+              if _name in RECORDED:
+                  raise SystemExit(
+                      f"{DOC} records {_name!r} more than once, so the figure it "
+                      f"states cannot be read unambiguously")
+              RECORDED[_name] = _value.strip().replace(",", "")
+          missing = {"population sites", "defect-arm effective", "defect-arm n",
+                     "survivor identity digest"} - set(RECORDED)
+          if missing:
               raise SystemExit(
-                  f"the census enumerated {cov['population_sites']} sites, not the 1679 "
-                  f"this tree has. Adding a site is the only legitimate way to move it, "
-                  f"and that should turn the nightly red until a human looks, because a "
-                  f"changed population is a fact a human owes a reading.")
+                  f"{DOC} no longer records {sorted(missing)}, so the census has "
+                  f"nothing to be measured against. A gate that stops pinning is "
+                  f"not a gate that passed.")
+          EXPECTED_POPULATION = int(RECORDED["population sites"])
+
+          if cov["population_sites"] != EXPECTED_POPULATION:
+              raise SystemExit(
+                  f"the census enumerated {cov['population_sites']} sites, not the "
+                  f"{EXPECTED_POPULATION} docs/MUTATION_SURVIVAL.md records this tree "
+                  f"as having. Adding a site is the only legitimate way to move it, "
+                  f"and that should turn the nightly red until a human looks, because "
+                  f"a changed population is a fact a human owes a reading.")
 
           # The three checks above prove the census ENUMERATED everything. None
           # of them can see which sites it then concluded survive. A stale
@@ -158,9 +203,11 @@ jobs:
           # being moved between files; lineno deliberately does not enter the
           # digest, because it moves whenever an unrelated edit shifts a line,
           # and a pin that fires on unrelated edits is a pin that gets ignored.
-          EXPECTED_ROWS_DIGEST = "9f26bde149ed0526"
-          EXPECTED_EFFECTIVE = 63
-          EXPECTED_DEFECT_ARM_N = 1598
+          # Read from the recorded-figures table above, for the reasons given
+          # there: as literals they were three more stale copies of the answer.
+          EXPECTED_ROWS_DIGEST = RECORDED["survivor identity digest"]
+          EXPECTED_EFFECTIVE = int(RECORDED["defect-arm effective"])
+          EXPECTED_DEFECT_ARM_N = int(RECORDED["defect-arm n"])
 
           rows = [r for r in d["rows"] if r.get("arm") == "forged" and r.get("outcome") == "EFFECTIVE"]
           ident = sorted((r["operator"], r["skill"], r["site_index"]) for r in rows)
