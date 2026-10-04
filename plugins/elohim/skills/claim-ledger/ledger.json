@@ -14,6 +14,13 @@
     "note": "The file under judgement is pinned as well as the instrument. Without this the ledger would keep re-proving the previous change's claims forever, and the gate would read PASS on a measurement about something else. Applied mode -- a run's own claims file -- therefore reports claims_are_the_pinned_ones false and its verdict FAIL by construction, which is the correct answer and not a defect."
   },
   "seal_at_heading": "d340ce3a75ccfbdd07e4c4a7b78594f5e4fbfea7b03908c39de2c61041c15f41",
+  "replay": {
+    "path": "tests/fixtures/session-03-33-40-878.labels.json",
+    "labels_sha256": "54defe7236f2aedbc4c8c558d0ca32c0a271b514b295cb2f87ff169d1069bab9",
+    "note": "The measured recall figure lives in the label fixture, not here, because it is ground truth a human wrote rather than a number this instrument produced. It is pinned for the same reason claims_pin is: the labels ARE the measurement, so an unpinned edit would leave a figure that re-derives cleanly from a ground truth that had been moved under it. scripts/check_traps.py holds `the_labels_are_pinned` and `the_labels_counts_agree` over it.",
+    "figure": "RECALL 2/2 (100.0%) PRECISION 2/2 (100.0%) COVERAGE 2/14 (14.3%) CONTRADICTED 0/0 UNVERIFIED 2",
+    "figure_caveat": "The figure is IDENTICAL when scripts/replay.py is neutered to echo the labels instead of reading the transcript, because every binding in this corpus happens to agree with its label. The controls in tests/test_replay_negative_controls.py -- not this number -- are the evidence that the gate is wired to the transcript. Zero claims were contradicted, so recall-on-contradiction is 0/0 and undefined; the 100 percent is carried entirely by the unverified class. One agent, one session, fourteen claims."
+  },
   "facts": [
     {
       "id": "corpus_pinned",

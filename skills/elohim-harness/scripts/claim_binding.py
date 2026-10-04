@@ -465,6 +465,16 @@ DOC_FIGURES: list[tuple[str, str, str, str]] = [
     ("docs/ROADMAP.md", "line of it. Of the", "after", "total_facts"),
     ("docs/ROADMAP.md", "facts, **", "after", "exact_fact_count"),
     ("docs/ROADMAP.md", "record a constant. Of the", "after", "nonzero_tolerance_count"),
+    # The recall row. Each anchor is a phrase that carries no digit of its own, for the
+    # same reason the table's are: an anchor holding the figure it locates is a second
+    # copy to drift. The three are separate anchors rather than one because three
+    # figures share the row, and a reader who changes one must not silently change the
+    # other two.
+    ("docs/ROADMAP.md", "claims adjudicated ", "after",
+     "replay_claims_adjudicated"),
+    ("docs/ROADMAP.md", "of which contradicted ", "after", "replay_claims_contradicted"),
+    ("docs/ROADMAP.md", "asserted-but-never-measured ", "after",
+     "replay_claims_unverified"),
 ]
 
 _INT = re.compile(r"\d[\d,]*")
@@ -534,6 +544,15 @@ def derivations(root: Path) -> dict[str, int | None]:
         traps = total
         pins = sum(1 for s in statuses if s == "PASS")
 
+    # The recall figure is not in any ledger's shard -- it is read from a hand-
+    # adjudicated label fixture, which is a different kind of evidence and would be
+    # invisible to a derivation that only reads out/last-run.json. Deriving it here
+    # closes the chain in one direction: the published sentence names numbers that come
+    # from the fixture, the fixture is checksummed by the claim-ledger trap, so editing
+    # the sentence or the ground truth both go red instead of one being quietly
+    # updated to match the other.
+    replay = _replay_figures(root)
+
     return {
         "total_facts": total_facts,
         "ledger_bearing_skills": len(ledgers),
@@ -541,7 +560,42 @@ def derivations(root: Path) -> dict[str, int | None]:
         "nonzero_tolerance_count": nonzero,
         "total_traps": traps,
         "pins_passing": pins,
+        **replay,
     }
+
+
+def _replay_figures(root: Path) -> dict[str, int]:
+    """Counts re-read from the adjudicated label fixture, or absent if it is not here.
+
+    Declared counts only. They are what the fixture says about itself, and the trap
+    `the_labels_counts_agree` is what proves those declared counts still match the
+    claims array -- so reading them here is reading a figure that is itself gated,
+    rather than a number typed into a document twice.
+    """
+    path = root / "skills" / "claim-ledger" / "tests" / "fixtures" / "session-03-33-40-878.labels.json"
+    if not path.is_file():
+        return {}
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    measured = doc.get("measured") or {}
+    out: dict[str, int] = {}
+    for key, name in (
+        ("adjudicated", "replay_claims_adjudicated"),
+        ("contradicted", "replay_claims_contradicted"),
+        ("unverified", "replay_claims_unverified"),
+    ):
+        value = measured.get(key)
+        if isinstance(value, int):
+            out[name] = value
+    recall = str(measured.get("recall", ""))
+    if "/" in recall:
+        caught, _, expected = recall.partition("/")
+        if caught.isdigit() and expected.isdigit():
+            out["replay_recall_caught"] = int(caught)
+            out["replay_recall_expected"] = int(expected)
+    return out
 
 
 def _applicable_figures(root: Path) -> list[tuple[str, str, str, str]]:

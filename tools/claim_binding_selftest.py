@@ -271,25 +271,52 @@ def doc_figure_controls() -> int:
     doc = "docs/ROADMAP.md"
     pristine = (ROOT / doc).read_text(encoding="utf-8")
 
+    # These three literals are DERIVED from the document, not written out here.
+    #
+    # They used to be hardcoded, and that was a control that quietly stopped
+    # proving anything. When the tree gained two traps, the row legitimately read 53
+    # and the control's replace() found nothing to replace, so the case printed
+    # `SKIP ... is not in the document any more` and the group still reported a
+    # result. Nothing failed. A control that degrades to a skip the moment the thing
+    # it watches legitimately changes is the same defect this file exists to catch,
+    # committed inside the file that catches it -- and the same shape as the anchor
+    # bug in 8985ea3: a checker holding its own copy of the expectation.
+    #
+    # So each literal is read out of the pristine document and only the WRONG value
+    # is written here. If the row is ever renamed, the controls refuse to run rather
+    # than silently passing.
+    def _row(pattern: str, what: str) -> str:
+        found = re.search(pattern, pristine)
+        if not found:
+            raise SystemExit(
+                f"selftest: {what} is no longer in {doc}, so these controls cannot run. "
+                "A doc-figure control that skips is worse than one that fails."
+            )
+        return found.group(0)
+
+    traps_row = _row(r"\| traps re-derived independently \| \d+ \|", "the traps row")
+    facts_row = _row(r"\| facts promoted \| \d+ across \d+ ledger-bearing skills \|", "the facts row")
+    exact_prose = _row(r"Of the \d+ facts, \*\*\d+ are exact", "the exact-facts prose")
+
     must_catch = [
-        ("| traps re-derived independently | 51 |",
-         "| traps re-derived independently | 38 |",
+        (traps_row,
+         re.sub(r"\| \d+ \|", "| 38 |", traps_row, count=1),
          "a stale trap count is the exact drift this was written for"),
-        ("| facts promoted | 103 across 8 ledger-bearing skills |",
-         "| facts promoted | 81 across 6 ledger-bearing skills |",
+        (facts_row,
+         re.sub(r"\| \d+ across \d+ ", "| 81 across 6 ", facts_row, count=1),
          "the figure the table actually carried before the fix"),
-        ("Of the 103 facts, **74 are exact",
-         "Of the 81 facts, **52 are exact",
+        (exact_prose,
+         re.sub(r"Of the \d+ facts, \*\*\d+ are exact", "Of the 81 facts, **52 are exact",
+                exact_prose, count=1),
          "the prose restatement drifted in the same commit as the table"),
     ]
     # Removing the anchor and duplicating it are both ways the figure silently
     # stops being read, which is the failure a scanner cannot notice by itself.
     must_catch_anchor = [
         ("anchors: the row is deleted", lambda t: t.replace(
-            "| traps re-derived independently | 51 |\n", "", 1)),
+            traps_row + "\n", "", 1)),
         ("anchors: the anchor is duplicated", lambda t: t.replace(
-            "| traps re-derived independently | 51 |",
-            "| traps re-derived independently | 51 |\n| traps re-derived independently | 51 |", 1)),
+            traps_row, f"{traps_row}\n{traps_row}", 1)),
     ]
     # These MUST NOT fire. The first is a declared Tier B row, the second is
     # Tier C narrative the repo ruled must never be edited to match the tree.

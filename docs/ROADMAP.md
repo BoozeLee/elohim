@@ -48,7 +48,8 @@ sweep and are only meaningful as a set.
 | claim | measurement |
 |---|---|
 | facts promoted | 103 across 8 ledger-bearing skills |
-| traps re-derived independently | 51 |
+| traps re-derived independently | 53 |
+| claims a real agent made, read by hand from one real session | hand-adjudicated from one real session \| claims adjudicated 14, of which contradicted 0, and asserted-but-never-measured 2; the gate flags both of those with no false alarm |
 | instrument checksums pinned | 8, all PASS |
 | interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** † |
 | instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** † |

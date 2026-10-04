@@ -56,6 +56,14 @@ LEDGER = ROOT / "ledger.json"
 CLAIMS = ROOT / "fixtures" / "claims" / "healthy.json"
 AUTHOR_ENV = "ELOHIM_CLAIM_AUTHOR"
 
+# The four labels the replay corpus is adjudicated into. Restated here rather than
+# imported from scripts/replay.py for the reason the whole file is written this way: a
+# trap that imported the thing it is checking would agree with it by construction.
+SUPPORTED_KEY = "SUPPORTED"
+CONTRADICTED_KEY = "CONTRADICTED"
+UNVERIFIED_KEY = "UNVERIFIED"
+NOT_A_CLAIM_KEY = "NOT_A_CLAIM"
+
 # Restated rather than imported. See the module docstring.
 NOOP_ARGV0 = frozenset({
     "true", "/bin/true", ":", "yes", "echo", "pwd", "env", "printf", "cat",
@@ -257,6 +265,59 @@ def traps() -> list[dict]:
                 "at 3,300x lower latency, and false acceptance rises with agent "
                 "capability, so a judgement step here would make the gate worse "
                 "than the thing it gates"),
+    })
+    # The replay corpus has no instrument counterpart -- it is ground truth a human
+    # wrote, not something the instrument produced -- so these two are stated directly
+    # rather than through add(). The pin matters for the same reason claims_pin does:
+    # the labels ARE the measurement, so editing them without saying so would leave a
+    # recall figure that re-derives cleanly from a ground truth that was quietly moved.
+    labels_path = ROOT / "tests" / "fixtures" / "session-03-33-40-878.labels.json"
+    label_doc = json.loads(labels_path.read_text(encoding="utf-8")) if labels_path.is_file() else {}
+    declared = label_doc.get("measured") or {}
+    tally = {SUPPORTED_KEY: 0, CONTRADICTED_KEY: 0, UNVERIFIED_KEY: 0, NOT_A_CLAIM_KEY: 0}
+    bound = 0
+    for entry in label_doc.get("claims") or []:
+        key = str(entry.get("label", "")).upper()
+        if key in tally:
+            tally[key] += 1
+        if entry.get("tool_call_id"):
+            bound += 1
+    out.append({
+        "id": "the_labels_are_pinned",
+        "expected": "the adjudicated label fixture still hashes to the value the ledger pinned",
+        "measured": {
+            "independent": hashlib.sha256(labels_path.read_bytes()).hexdigest()
+            if labels_path.is_file() else None,
+            "instrument": (ledger.get("replay") or {}).get("labels_sha256"),
+        },
+        "pass": bool(labels_path.is_file()
+                     and hashlib.sha256(labels_path.read_bytes()).hexdigest()
+                     == (ledger.get("replay") or {}).get("labels_sha256")),
+        "residual": 0.0,
+        "why": ("the label file is the ground truth the recall figure is computed over, "
+                "so editing it without re-pinning would leave a figure that re-derives "
+                "cleanly from a ground truth that had been moved under it"),
+    })
+    counts_agree = (
+        declared.get("adjudicated") == sum(tally.values())
+        and declared.get("supported") == tally[SUPPORTED_KEY]
+        and declared.get("contradicted") == tally[CONTRADICTED_KEY]
+        and declared.get("unverified") == tally[UNVERIFIED_KEY]
+        and declared.get("not_a_claim") == tally[NOT_A_CLAIM_KEY]
+        and declared.get("bound_to_a_recorded_result") == bound
+    )
+    out.append({
+        "id": "the_labels_counts_agree",
+        "expected": "the counts this fixture declares are the counts its claims array holds",
+        "measured": {"independent": counts_agree, "instrument": None,
+                     "declared": declared.get("adjudicated"),
+                     "recounted": sum(tally.values())},
+        "pass": bool(counts_agree),
+        "residual": 0.0,
+        "why": ("a claim added or relabelled without updating the declared totals would "
+                "leave the published figure describing a corpus that no longer exists, "
+                "which is the exact drift the claim_binding doc-figure check exists to "
+                "stop, one level down"),
     })
     return out
 

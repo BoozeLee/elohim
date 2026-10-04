@@ -97,12 +97,50 @@ create false confidence"* (ExecCritic, arXiv:2609.09133). So the expectations
 live in a **pinned ledger**, the instrument is **pinned by checksum**, and a
 control that edits the instrument turns the gate red.
 
+## Measured on a real session
+
+The fixture corpus is two hand-written claims. `scripts/replay.py` measures the gate
+against a real one instead: 14 claims read by hand out of a 1.9 MB agent session, each
+labelled against that session's own recorded tool results.
+
+```
+RECALL 2/2 (100.0%)   PRECISION 2/2 (100.0%)   COVERAGE 2/14 (14.3%)
+CONTRADICTED 0/0 (undefined)   UNVERIFIED 2   NO_EXIT_CODE 0
+```
+
+**Zero** of the 14 claims were contradicted by the agent's own transcript. The two
+defects are both UNVERIFIED: the agent asserted that CI had been red "for the 26th
+consecutive run" and that a ratchet figure "had been 655/1161" — and neither figure
+appears anywhere in the session's 165 recorded tool results. So recall on *contradiction*
+is `0/0`, undefined; the 100% above is carried entirely by the unverified class, and
+must never be restated as a contradiction rate.
+
+Three things that figure is not, all of which cost something to find:
+
+- **It does not prove this gate works.** With `replay.py` neutered to echo the labels
+  instead of reading the transcript, the output was byte-identical, exit code included,
+  because every binding in this corpus happens to agree with its label. The evidence
+  that the gate is wired to the transcript is
+  `tests/test_replay_negative_controls.py`, not the number.
+- **It is one agent, one afternoon, fourteen claims.** It bounds what happened in that
+  session and supports nothing about agents in general.
+- **It reaches half the corpus.** 434 of 895 tool results across 25 sessions carry no
+  exit code at all, so the check adjudicates shell-shaped claims and nothing else.
+
+There is no claim classifier in `replay.py` and there will not be one. Two were built
+and measured on this corpus first: a failure-keyword classifier called 15 of 19 real
+failures undisclosed at roughly a 79% false-positive rate, and a metric-noun binding
+reported 120 contradictions of which the sampled rows were 100% false positive. The
+human supplies the binding, the transcript supplies the truth, the script joins them.
+`references/limits.md` has both measurements and the rows that fooled them.
+
 ## Traps
 
-Seven, each of which produced a confident wrong answer before it was written
-down, plus one fact with a control of its own. `check_traps.py` re-derives all of
-them with its own code and never imports the instrument, so a regression is
-visible rather than agreed with.
+Nine, plus one fact with a control of its own. Seven produced a confident wrong answer
+before they were written down; the two over the label fixture were added after the
+recall measurement showed the ground truth had no gate at all. `check_traps.py`
+re-derives all of them with its own code and never imports the instrument, so a
+regression is visible rather than agreed with.
 
 | id | the wrong answer it catches |
 |---|---|
@@ -113,6 +151,8 @@ visible rather than agreed with.
 | `the_stale_ledger` | a ledger re-proving the previous change's claims forever |
 | `the_author_claims_itself` | a run that wrote the claims it asks to be judged by |
 | `the_edited_instrument` | an instrument edited to agree with the run it judges |
+| `the_labels_are_pinned` | ground truth edited under a recall figure that still re-derives |
+| `the_labels_counts_agree` | a corpus changed while the published counts still describe the old one |
 
 `tests/negative_controls_claim_ledger.py` proves every one of them can go red.
 Each control names the trap it targets and fails unless *that* trap broke — a
