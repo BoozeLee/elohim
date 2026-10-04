@@ -43,8 +43,20 @@ mutate = importlib.import_module("elohim_gate.mutation")
 sites = importlib.import_module("elohim_gate.sites")
 census = importlib.import_module("elohim_gate.census")
 
-SKILLS = ["elohim", "estimator-bias", "invariant-hunter", "precision-budget",
-          "reproducibility", "tolerance-prover"]
+# Discovered from the tree, not written out here.
+#
+# This was a literal list of six skills, and it was the same shape as the defect
+# elohim_gate/mutation.py already documents in instrumented_skills(): "the census's
+# default population was a hardcoded list of THIS repository's six skills, in a module
+# constant, which is the same shape as a flag that cannot be raised." Reintroduced here,
+# in the test rather than the module, where nothing checks it.
+#
+# The cost was not a failure but something worse. pay-signal and claim-ledger arrived,
+# the census's population became 1,937, and test_population_is_1679... still PASSED --
+# because it measured six skills and 1,679 is what six skills measure. A green test
+# guarding a population the census no longer runs is the exact false green this
+# repository keeps finding in its own prose. Derived, it cannot happen again.
+SKILLS = mutate.instrumented_skills()
 
 
 def instrument_source(skill: str) -> str:
@@ -92,8 +104,8 @@ def test_mutators_is_derived_from_sites_and_keeps_one_row_per_operator():
         assert m["expect"] == sites.BY_NAME[m["name"]]["expect"]
 
 
-def test_population_is_1679_and_counts_are_not_structurally_zero():
-    """The population figure the roadmap publishes, recomputed from the tree.
+def test_population_is_derived_and_counts_are_not_structurally_zero():
+    """The population the census enumerates, recomputed from the tree.
 
     This is the regression test for the defect that made coverage meaningless.
     The old `count_sites()` built an `ast.NodeTransformer`, never visited the
@@ -103,16 +115,33 @@ def test_population_is_1679_and_counts_are_not_structurally_zero():
     zero. A report that claims to have enumerated sites and prints none of them
     is indistinguishable from one that enumerated nothing.
 
-    The 1,679 is asserted rather than merely "greater than zero" because it is
-    a published figure: `docs/MUTATION_SURVIVAL.md` and the A2 block of the
-    roadmap both state 1,679 sites with 63 effective survivors. If the
-    population moves, one of those documents is wrong, and a test that only
-    asserted non-zero would let it drift silently.
+    What this test deliberately does NOT do is assert the published number. It
+    used to assert 1,679, and it kept passing while that was wrong: two skills
+    arrived, the census's population moved to 1,937, and this test still read
+    1,679 because SKILLS was a literal list of six and 1,679 is what six skills
+    measure. A pinned number here was a third copy of a figure the tree owns.
+
+    So the number's single home is `docs/MUTATION_SURVIVAL.md`, and
+    `claim_binding.py` re-derives it from this same tree to check the document
+    against it. What is left here is what only this test can see: that the
+    population is discovered rather than declared, that it covers every skill the
+    tree actually holds, and that no skill enumerates zero sites.
     """
+    assert SKILLS == mutate.instrumented_skills(), (
+        "the population must be discovered, not declared; if this fails, something "
+        "wrote the skill list out again"
+    )
     per_skill = {skill: mutate.count_sites(skill) for skill in SKILLS}
-    assert sum(per_skill.values()) == 1679, per_skill
+    assert len(SKILLS) >= 8, (
+        f"the tree holds eight instrumented skills and this measured {SKILLS}"
+    )
     for skill, n in per_skill.items():
         assert n > 0, f"{skill} enumerates zero sites"
+    # Not a pinned figure: printed so a human sees the population move when a
+    # skill lands, which is the moment docs/MUTATION_SURVIVAL.md owes a reading.
+    print(f"\n  population: {sum(per_skill.values())} sites across {len(SKILLS)} skills")
+    for skill, n in sorted(per_skill.items()):
+        print(f"    {skill:<22} {n:5d}")
 
 
 def test_site_rows_point_at_lines_in_the_pristine_source():
@@ -257,15 +286,26 @@ def test_population_report_says_which_population_it_drew_from():
     """A sampled rate and an exhaustive rate are not comparable silently.
 
     The sampled arm mutates site #1 of each operator x skill cell, so `sample`
-    counts cells visited rather than sites mutated: the N=200 run draws from
-    47 cells while the population holds 1,679 sites, and its 26.9 % rate is
-    therefore not an estimate of the census's 3.75 %. If the report stops
-    saying so, the two numbers get compared anyway.
+    counts cells visited rather than sites mutated: an N=200 run draws from far
+    fewer cells than the population holds sites, and its rate is therefore not
+    an estimate of the census's. If the report stops saying so, the two numbers
+    get compared anyway.
+
+    Both figures are derived here rather than pinned. They used to be 1,679 and
+    47, which was a third and fourth copy of numbers the tree owns, and they went
+    stale silently: the population is 1,937 now, and the cells are 61 rather than
+    47 because `tol_widen` has no site in three of the eight skills. The single
+    home for the published population is docs/MUTATION_SURVIVAL.md, checked
+    against this tree by claim_binding.
     """
     report = mutate.population_report(SKILLS)
-    assert report["sites_total"] == 1679
-    assert report["operator_skill_cells_total"] == 47
+    assert report["sites_total"] == sum(mutate.count_sites(s) for s in SKILLS)
+    # A cell with no site is not a cell, and must not be counted as one.
+    assert report["operator_skill_cells_total"] == len(mutate.plannable_cells(SKILLS))
     assert report["operator_skill_cells_total"] < report["sites_total"]
+    assert report["operator_skill_cells_total"] < len(mutate.MUTATORS) * len(SKILLS), (
+        "every cell is non-empty, so the distinction this report draws has gone"
+    )
     assert "census.py" in report["note"]
     assert "cells visited" in report["note"]
 
