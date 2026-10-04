@@ -103,7 +103,22 @@ PINNED_CLASSES = {
     # bac7bcd15a64, so the split did not move -- one value still serves both
     # classes, and the entry is updated to a measured prefix rather than to
     # whatever the instrument happened to emit last.
-    "claim-ledger": {PRE312: "bac7bcd15a64", POST312: "bac7bcd15a64"},
+    #
+    # Re-measured again the same day, bac7bcd15a64 -> 9f229b28e802. This one is
+    # not a drift: claim_ledger's verdict and its seven traps were written out
+    # twice by hand and had drifted apart, and they are now derived from one
+    # CONDITIONS table. Two conditions that gated the exit code had no trap at
+    # all, and the instrument's own pin was reported by a trap but never read by
+    # the verdict, so an edited instrument could resolve to PASS. Editing the
+    # instrument changes the shard, so the seal moves; that is the pin doing its
+    # job rather than failing. Measured before re-pinned, not assumed: all five
+    # interpreters above return 9f229b28e802 on both sides of the 3.12 boundary,
+    # so this is still one class and not a new one.
+    #
+    # It is also the fourth pin for this instrument in one day
+    # (d340ce3a -> bac7bcd1 -> 9f229b28). Each is paid for by an edit someone
+    # made on purpose, which is the cost the pin exists to charge.
+    "claim-ledger": {PRE312: "9f229b28e802", POST312: "9f229b28e802"},
 }
 
 # Skills that ship no instrument of their own.

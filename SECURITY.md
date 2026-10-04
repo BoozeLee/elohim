@@ -13,8 +13,8 @@ makes accidental drift impossible: edit the instrument without updating the
 ledger and the gate fails with both hashes.
 
 It is **not** protection against a hostile edit. Anyone can satisfy the pin by
-editing `ledger.json` too. The protection is **integrity by visibility** — 81
-pinned facts, 38 traps re-derived by independent code, and byte-identical
+editing `ledger.json` too. The protection is **integrity by visibility** — 103
+pinned facts, 53 traps re-derived by independent code, and byte-identical
 mirrors mean any edit has to be made consistently in several places, in public,
 in the commit history, and it is reviewable there. Read the diff, not the
 badge.

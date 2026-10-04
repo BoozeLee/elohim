@@ -16,7 +16,7 @@ not noticed. That is the difference between a test that can fail and a test
 that is merely green.
 
 The census is expensive, so nothing here runs it. `census.py` takes minutes over
-the full population -- around thirteen for the 1,937 sites this tree measures on
+the full population -- around ten for the 1,916 sites this tree measures on
 six workers, and it was ten for the 1,679 it measured when this file last said so
 in a figure nothing checked. What is cheap and what is slow are different kinds
 of evidence: the slow one is committed as `docs/MUTATION_SURVIVAL.md`, and what

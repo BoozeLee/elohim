@@ -66,11 +66,11 @@ workflow red instead.
 | interpreters the gate was run under | **17 binaries, 8 versions, 3.10.20 → 3.14.7** † *(not re-measured since the population moved; still describes a five-instrument tree; lower endpoint corrected 3.10.13 → 3.10.20 on 2026-10-04, see below)* |
 | instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** † *(same)* |
 | recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** † *(same)* |
-| instrument mutation sites enumerated exhaustively, seal forged | **1,937** † |
-| mutations that passed the full gate | **13 of 1,848 (0.70 %)**, defect arm † |
-| mutants that moved only fields the gate does not decide on | 145 of 1,848 (7.85 %), reported and not counted † |
-| survivors that were fact-bound and outside declared tolerance | **0** † — and no longer for the reason it first read: none of the 13 touches a fact-pinned field at all † |
-| runs left undetermined by a harness artefact | 1 of 1,937 (reported, not counted) † |
+| instrument mutation sites enumerated exhaustively, seal forged | **1,916** † |
+| mutations that passed the full gate | **0 of 1,824 (0.0 %)**, defect arm † — was 13 of 1,848 (0.70 %); the one defect it found has been fixed, and the population fell 1,937 → 1,916 as a direct consequence † |
+| mutants that moved only fields the gate does not decide on | 141 of 1,824 (7.73 %), reported and not counted † |
+| survivors that were fact-bound and outside declared tolerance | **0** † — and no longer for the reason it first read: none of the 13 touches a fact-pinned field at all † *(a third reason now: there are no effective survivors left to classify, so the question no longer arises. The `REPORTED` 141 is unaffected and none of them is fact-bound.)* |
+| runs left undetermined by a harness artefact | 1 of 1,916 (reported, not counted) † |
 | shipped ledgers whose prose contradicted their pins | 1 (`precision-budget`, fixed) |
 | shard leaves swept twice, once with the seal forged and once left stale | **789, across 8 skills** † |
 | traps measured to fire without the checksum | **33 of 53** † |
