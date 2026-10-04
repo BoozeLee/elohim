@@ -125,10 +125,45 @@ def test_a_directory_that_is_not_there_is_refused_differently():
 
 
 def test_the_selection_does_not_depend_on_the_order_the_directory_lists():
-    picked = {d.name: vw._one_wheel(d).name
-              for d in sorted(FIXTURES.iterdir())
-              if d.is_dir() and len(list(d.glob("*.whl"))) == 1}
-    assert picked == {"one_wheel": "elohim-0.3.0-py3-none-any.whl"}
+    # The version of this test that filtered the fixtures down to the
+    # directories holding exactly one wheel could not fail: after the filter the
+    # candidate set was the single element "one_wheel", and no ordering of a
+    # one-element set was ever going to be observed. It asserted the name of a
+    # wheel and was named for a property it never touched.
+    #
+    # So the order is manufactured instead of inherited. The two wheels are
+    # created in an order that is not the sorted order, and the refusal has to
+    # name them sorted -- which is the only way the claim can be true for a
+    # directory that holds more than one wheel. A selection that took "the
+    # first entry the directory happened to list" would pass the count check
+    # and then report a different wheel than it picked.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-order-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        (dist / "zzz-0.3.0-py3-none-any.whl").write_bytes(b"")
+        (dist / "aaa-0.3.0-py3-none-any.whl").write_bytes(b"")
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_wheel(dist)
+        message = str(caught.value)
+        assert "found 2" in message
+        # Sorted, not listing order: whichever of the two the filesystem hands
+        # back first, "aaa" is reported first because that is the rule.
+        assert message.index("aaa-") < message.index("zzz-"), message
+
+
+def test_one_wheel_is_selected_however_many_other_names_the_directory_holds():
+    # The other half of the same property, and the half that can produce a
+    # selection at all: a directory holding one wheel and some unrelated files
+    # still yields the wheel, and does not depend on where that name sorts
+    # among the names the directory happens to list.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-select-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        for name in ("aaa-0.3.0.tar.gz", "elohim-0.3.0-py3-none-any.whl",
+                     "zzz-0.3.0.tar.gz"):
+            (dist / name).write_bytes(b"")
+        assert vw._one_wheel(dist).name == "elohim-0.3.0-py3-none-any.whl"
 
 
 # --------------------------------------------------------------------------
