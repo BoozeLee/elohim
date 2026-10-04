@@ -140,6 +140,18 @@ jobs:
   # the backend for anyone installing the package, which is a different
   # question from reproducing one build. They cannot drift against each other
   # because one of them names no version.
+  #
+  # Two questions, then, and neither is the other's. The first is what the job
+  # already asked: does this checkout build an installable artifact at all? The
+  # second is the one publish.yml asks, and until this job asked it too, nothing
+  # did -- the same tool in its `--dist` mode, pointed at an artifact rather than
+  # asked to make one, which is the invocation the publish gate uses. Those two
+  # are not the same question: a gate that builds its own wheel has verified a
+  # second build of the same checkout, so the first can be green while the
+  # artifact on its way to the index is unverified. publish.yml is the only
+  # other place that asks the second question, and this repository has already had
+  # two workflows that had never executed and were both defective. So it is asked
+  # here, on every push, where a failure is free.
   wheel:
     runs-on: ubuntu-latest
     steps:
@@ -155,6 +167,28 @@ jobs:
 
       - name: the installed wheel runs the API
         run: python3 tools/verify_wheel.py
+
+      # The same tool, pointed at an artifact instead of asked to build one --
+      # the invocation publish.yml makes, run on every push rather than on the
+      # first real publish. Until this step existed, a `--dist` mode that refused
+      # everything and a `--dist` mode that worked were identical in every test
+      # in this repository, and the only thing that could tell them apart was a
+      # publish to a public index.
+      #
+      # `--no-isolation` so the backend is the hatchling this job pinned two steps
+      # up rather than whatever is newest on PyPI -- build installs nothing in
+      # that mode and checks the dependency is already present instead, which is
+      # the trade the pins above were written for. It changes where the backend
+      # comes from, not what gets built: with no --sdist/--wheel flag this still
+      # writes the sdist *and* the wheel, so the gate is pointed at the same
+      # two-artifact directory it will meet in publish.yml. The gate reads the
+      # wheel out of it and the sdist beside it, which is the limit publish.yml's
+      # own comment states out loud.
+      - name: build into the directory the publish gate reads
+        run: python3 -m build --no-isolation --outdir dist/
+
+      - name: the artifact in dist/ installs and its API runs
+        run: python3 tools/verify_wheel.py --dist dist/
 
   # The fourth job. It exists because a single run per push cannot see
   # nondeterminism, which is a real class and invisible by construction -- but the
