@@ -276,6 +276,58 @@ def test_a_wheel_that_is_a_real_zip_is_not_refused_by_the_readability_check():
 # The flag reaches the decision
 # --------------------------------------------------------------------------
 
+def test_dist_accepts_a_relative_path_the_way_publish_yml_passes_it():
+    # `publish.yml` calls `verify_wheel.py --dist dist/`: a path relative to the
+    # checkout, not an absolute one. Every other test in this file passed
+    # `FIXTURES`, which is absolute, so the whole file stayed green while that
+    # one invocation could never work.
+    #
+    # Why it could not work: `main` hands the selected wheel to a subprocess
+    # whose `cwd` is a scratch directory outside the checkout, so a relative
+    # path is resolved against *that* directory. pip was asked to install
+    # `/tmp/elohim-wheel-XXXX/dist/elohim-0.3.0-py3-none-any.whl`, which does
+    # not exist, and the gate failed at the install -- after printing a
+    # selection and passing every content check, so nothing above the install
+    # had said anything was wrong. A `--dist` mode that worked and one that
+    # could never work were identical in every test in this repository.
+    #
+    # The assertion is on the *shape* of the returned path rather than on a
+    # full build, because a full build here would make this file minutes
+    # instead of seconds. `_one_wheel` must return something absolute: that is
+    # the whole contract, and it is what the subprocess depends on.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-relative-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        (dist / "elohim-0.3.0-py3-none-any.whl").write_bytes(b"")
+
+        relative = Path(os.path.relpath(dist, REPO))
+        assert not relative.is_absolute(), relative
+        got = vw._one_wheel(relative)
+        assert got.is_absolute(), (
+            "a relative --dist returned a relative wheel path; the install "
+            "subprocess runs with cwd outside the checkout and would resolve "
+            "it there: %s" % got)
+        assert got == (REPO / relative / "elohim-0.3.0-py3-none-any.whl")
+        # The name it was selected under is what the messages use, so
+        # absolutising must not rename it.
+        assert got.name == "elohim-0.3.0-py3-none-any.whl"
+
+
+def test_no_workflow_passes_a_dist_path_this_file_does_not_test():
+    # `publish.yml` runs `verify_wheel.py --dist dist/`. `ci.yml` runs the tool
+    # with no `--dist` at all, so it builds its own wheel and is not covered by
+    # the test above. If a workflow ever grows a `--dist` step it has to use the
+    # relative form that test drives -- an absolute path in a workflow would go
+    # untested, which is how this gate stayed broken in the first place.
+    for path in sorted((REPO / ".github" / "workflows").glob("*.yml")):
+        for line in path.read_text(encoding="utf-8").splitlines():
+            if "verify_wheel.py" not in line or "--dist" not in line:
+                continue
+            assert "--dist dist/" in line, (
+                "%s invokes the tool as %r, a form this file does not test"
+                % (path.name, line.strip()))
+
+
 def test_the_flag_is_offered_and_documented():
     out = _run_tool("--help")
     assert out.returncode == 0, out.stderr

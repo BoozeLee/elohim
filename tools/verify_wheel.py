@@ -282,6 +282,22 @@ def _one_wheel(dist: Path) -> Path:
     thing at that path can be checked, and a caller that prints the selection
     has to be entitled to make it.
 
+    And absolute, which is the half of that claim nobody had written down. The
+    workflow calls this with `--dist dist/`, so the returned path arrives
+    relative, and `main` then hands it to a subprocess whose `cwd` is a scratch
+    directory outside the checkout. A relative path is resolved against *that*
+    directory, so the install looked for
+    `/tmp/elohim-wheel-XXXX/dist/elohim-0.3.0-py3-none-any.whl`, found nothing,
+    and the gate failed on the one invocation the workflow actually uses. Every
+    test in `tests/test_wheel_dist.py` passed `FIXTURES`, which is absolute, so
+    the whole file stayed green while the workflow was broken -- a `--dist` mode
+    that worked and one that could never work were identical in every test in
+    this repository.
+
+    `absolute()` rather than `resolve()` so a wheel reached through a symlink
+    keeps the name it was selected under, which is the name the refusal
+    messages and the printed selection both use.
+
     Side-effect free: it reads a directory and either returns a path or raises,
     which is what lets `tests/test_wheel_dist.py` exercise both directions
     offline. The build is not here because the build is not what is under test.
@@ -295,7 +311,7 @@ def _one_wheel(dist: Path) -> Path:
                       % (dist, len(wheels),
                          ", ".join(w.name for w in wheels) or "no *.whl"))
     _readable(wheels[0])
-    return wheels[0]
+    return wheels[0].absolute()
 
 
 def _entries(wheel: Path) -> list:
