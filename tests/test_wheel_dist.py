@@ -17,12 +17,21 @@ as a subprocess to show `--dist` reaches the decision rather than being dropped
 on the floor, and ends with a control that breaks `--dist` on purpose and shows
 the assertion noticing.
 
-The red input, in one sentence: point `--dist` at a directory holding no
+One and *openable* is a second condition, and it is the one a count cannot
+express. A name ending in `.whl` is satisfiable by a directory, by a mode-`000`
+file, and by a symlink whose target was cleaned up, so those are driven here
+too -- each refusing at the selection rather than being announced by the caller
+and then raising an `OSError` out of `main`.
+
+The red inputs, in one sentence each: point `--dist` at a directory holding no
 `*.whl` and the tool exits 1 with "expected exactly one wheel in <that
-directory>, found 0".
+directory>, found 0"; point it at a directory holding a *directory* called
+`elohim-0.3.0-py3-none-any.whl` and the tool exits 1 with "cannot be read as a
+wheel" instead of printing a selection it never validated.
 """
 
 import importlib.util
+import os
 import subprocess
 import sys
 import tempfile
@@ -148,6 +157,84 @@ def test_entries_returns_the_names_of_a_zip_that_is_one():
             "elohim_gate/__init__.py",
             "elohim_gate/_skills/elohim/SKILL.md",
         ]
+
+
+# --------------------------------------------------------------------------
+# A name ending in .whl, and not a wheel
+# --------------------------------------------------------------------------
+
+def test_a_directory_named_like_a_wheel_is_refused_rather_than_announced():
+    # The red input for `_readable`, in one sentence: put a *directory* called
+    # elohim-0.3.0-py3-none-any.whl in dist/ and the selection refuses instead
+    # of being printed and then crashing.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-dir-") as scratch:
+        dist = Path(scratch) / "dist"
+        (dist / "elohim-0.3.0-py3-none-any.whl").mkdir(parents=True)
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_wheel(dist)
+        message = str(caught.value)
+        assert "cannot be read as a wheel" in message, message
+        assert "elohim-0.3.0-py3-none-any.whl" in message
+        # A distinct sentence from the two-count refusal, because a typo that
+        # produced a directory should not read as "two wheels were found".
+        assert "found 2" not in message, message
+
+
+def test_a_symlink_to_a_wheel_that_is_gone_is_refused():
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-dangling-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        gone = dist / "elohim-0.3.0-py3-none-any.whl"
+        # The name has to survive and the target must not: a symlink removed
+        # from both sides is a directory with no `*.whl` in it, which the count
+        # check already refuses for a different reason.
+        gone.symlink_to(dist / "a-build-that-was-cleaned-up.whl")
+        assert gone.is_symlink() and not gone.exists()
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_wheel(dist)
+        message = str(caught.value)
+        assert "cannot be read as a wheel" in message, message
+        assert "elohim-0.3.0-py3-none-any.whl" in message
+        # The count saw one and accepted it; this is the check that caught it,
+        # so the message must not claim zero wheels were found.
+        assert "found 0" not in message, message
+
+
+@pytest.mark.skipif(
+    hasattr(os, "geteuid") and os.geteuid() == 0,
+    reason="root opens a mode-000 file, so this input cannot turn the gate red")
+def test_a_wheel_nobody_can_read_is_refused():
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-mode000-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        locked = dist / "elohim-0.3.0-py3-none-any.whl"
+        locked.write_bytes(b"PK\x03\x04")
+        locked.chmod(0o000)
+        try:
+            with pytest.raises(vw.Refusal) as caught:
+                vw._one_wheel(dist)
+            message = str(caught.value)
+            assert "cannot be read as a wheel" in message, message
+            assert "elohim-0.3.0-py3-none-any.whl" in message
+        finally:
+            locked.chmod(0o600)  # so the temporary directory can be removed
+
+
+def test_a_wheel_that_is_a_real_zip_is_not_refused_by_the_readability_check():
+    # The other direction, and the one that stops the check above from being a
+    # gate that refuses everything: a readable file is passed straight through,
+    # including one that is not yet a zip, which is `_entries`' problem to name.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-readable-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        empty = dist / "elohim-0.3.0-py3-none-any.whl"
+        empty.write_bytes(b"")
+        assert vw._one_wheel(dist) == empty
+        with pytest.raises(vw.Refusal) as caught:
+            vw._entries(vw._one_wheel(dist))
+        assert "is not a readable wheel" in str(caught.value)
 
 
 # --------------------------------------------------------------------------
