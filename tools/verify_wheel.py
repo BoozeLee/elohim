@@ -265,7 +265,8 @@ def _readable(wheel: Path) -> None:
         with open(wheel, "rb"):
             pass
     except OSError as exc:
-        raise Refusal("%s cannot be read as a wheel: %s" % (wheel.name, exc))
+        raise Refusal("%s cannot be read as a wheel: %s"
+                      % (wheel.name, exc)) from exc
 
 
 def _one_wheel(dist: Path) -> Path:
@@ -317,10 +318,11 @@ def _entries(wheel: Path) -> list:
         with zipfile.ZipFile(wheel) as zf:
             return zf.namelist()
     except zipfile.BadZipFile as exc:
-        raise Refusal("%s is not a readable wheel: %s" % (wheel.name, exc))
+        raise Refusal("%s is not a readable wheel: %s"
+                      % (wheel.name, exc)) from exc
     except OSError as exc:
         raise Refusal("%s became unreadable while it was being read: %s"
-                      % (wheel.name, exc))
+                      % (wheel.name, exc)) from exc
 
 
 def static_check() -> list[str]:
