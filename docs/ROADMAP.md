@@ -128,14 +128,15 @@ observed seal is a pinned one, and there is no third class.
 | 3.14.5 | `312plus` | identical to 3.12.13 |
 | **3.14.7** | `312plus` | **identical to 3.14.5** |
 
-That last row is why this note exists. The row above reads `3.10.13 → 3.14.7`,
-and the B1 narrative further down reads "Measured across 3.10.20, 3.11.9,
-3.12.13, 3.13.13 and **3.14.7**" — and **3.14.7 is real**. It is installed at
-`/usr/bin/python3.14`, it lands in class `312plus`, and it produces seals
-**byte-identical to 3.14.5** for all seven instrumented skills. So that B1
-sentence is a **true record**, and it is left exactly as written. Only the
-`3.10.13` lower endpoint — on no interpreter this machine has, and covered by no
-measurement in this repository — has been corrected, to `3.10.20`.
+That last row is why this note exists. The row above **used to** read
+`3.10.13 → 3.14.7`, and the B1 narrative further down reads "Measured across
+3.10.20, 3.11.9, 3.12.13, 3.13.13 and **3.14.7**" — and **3.14.7 is real**. It
+is installed at `/usr/bin/python3.14`, it lands in class `312plus`, and it
+produces seals **byte-identical to 3.14.5** for all seven instrumented skills.
+So that B1 sentence is a **true record**, and it is left exactly as written. The
+`3.10.13` lower endpoint was the one genuinely unsupported claim — on no
+interpreter this machine has, and covered by no measurement in this repository —
+and it is the only thing above that has been changed, to `3.10.20`.
 
 `traps.md` still names five interpreters and is still right about what the *pins*
 were measured across: 3.10.20, 3.11.9, 3.12.13, 3.13.13 and 3.14.5. The table's
