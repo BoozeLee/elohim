@@ -141,31 +141,51 @@ def test_a_directory_that_is_not_there_is_refused_differently():
     assert "found 0" not in message, message
 
 
-def test_the_selection_does_not_depend_on_the_order_the_directory_lists():
-    # The version of this test that filtered the fixtures down to the
-    # directories holding exactly one wheel could not fail: after the filter the
-    # candidate set was the single element "one_wheel", and no ordering of a
-    # one-element set was ever going to be observed. It asserted the name of a
-    # wheel and was named for a property it never touched.
+def test_the_selection_does_not_depend_on_the_order_the_directory_lists(monkeypatch):
+    # The first version of this test filtered the fixtures to the directories
+    # holding exactly one wheel, so the candidate set was the single element
+    # "one_wheel" and no ordering of a one-element set was ever observable. It
+    # asserted a name and was named for a property it never touched.
     #
-    # So the order is manufactured instead of inherited. The two wheels are
-    # created in an order that is not the sorted order, and the refusal has to
-    # name them sorted -- which is the only way the claim can be true for a
-    # directory that holds more than one wheel. A selection that took "the
-    # first entry the directory happened to list" would pass the count check
-    # and then report a different wheel than it picked.
+    # The second version created two wheels in a non-sorted order and hoped
+    # `glob` would hand them back that way. It does not: on tmpfs the listing
+    # comes back sorted whatever the creation order, so that test was green
+    # whether or not `_one_wheel` sorted at all -- dropping `sorted()` from the
+    # production code left the whole file passing. Green because the filesystem
+    # cooperated is the same defect the test was written to remove.
+    #
+    # So the listing order is injected rather than hoped for. `glob` is the only
+    # channel a directory's order enters through, so pinning it pins the input
+    # the property is actually about, and the assertion below is a statement
+    # about the code instead of about the filesystem. Reverse-sorted, because
+    # sorted() of a reverse-sorted list is the one arrangement where "did the
+    # code sort" and "did it not" cannot both hold.
     with tempfile.TemporaryDirectory(prefix="wheel-dist-order-") as scratch:
         dist = Path(scratch) / "dist"
         dist.mkdir()
         (dist / "zzz-0.3.0-py3-none-any.whl").write_bytes(b"")
         (dist / "aaa-0.3.0-py3-none-any.whl").write_bytes(b"")
 
+        real_glob = Path.glob
+
+        def reverse_sorted_glob(self, pattern):
+            return iter(sorted(real_glob(self, pattern), reverse=True))
+
+        monkeypatch.setattr(Path, "glob", reverse_sorted_glob)
+        # The precondition this test needs, asserted rather than assumed: the
+        # listing the code will actually see is the reverse of the sorted order,
+        # so a refusal that reads sorted cannot be an accident of the
+        # filesystem. (For the record the real listing here is *not* reversed --
+        # that is the whole problem, and it is why the order is injected.)
+        assert [p.name for p in Path.glob(dist, "*.whl")] == [
+            "zzz-0.3.0-py3-none-any.whl", "aaa-0.3.0-py3-none-any.whl"]
+
         with pytest.raises(vw.Refusal) as caught:
             vw._one_wheel(dist)
         message = str(caught.value)
         assert "found 2" in message
-        # Sorted, not listing order: whichever of the two the filesystem hands
-        # back first, "aaa" is reported first because that is the rule.
+        # Sorted, not listing order: the listing is the reverse of this, so
+        # "aaa" can only be reported first because the code sorted it.
         assert message.index("aaa-") < message.index("zzz-"), message
 
 
