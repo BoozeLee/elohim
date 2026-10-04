@@ -14,11 +14,40 @@ the sibling, so it cannot rot in prose.
 
 | instrument | pre 3.12 | 3.12 and later |
 |---|---|---|
+| claim-ledger | `bac7bcd15a64` | `bac7bcd15a64` |
 | elohim | `5f12cc7825b5` | `5f12cc7825b5` |
 | estimator-bias | `06631f4cb544` | `8163ec2d879a` |
 | invariant-hunter | `4bdfb8f34c78` | `4bdfb8f34c78` |
+| pay-signal | `1d0f042d68b6` | `1d0f042d68b6` |
 | precision-budget | `23d801ec5ecc` | `23d801ec5ecc` |
 | tolerance-prover | `79ea4f7f114c` | `79ea4f7f114c` |
+
+Seven rows, because there are seven instrumented siblings. This table listed five
+until 2026-10-04: `claim-ledger` and `pay-signal` were missing from the prose while
+`cross_version.py` carried both, so the document claimed to record "each sibling's
+recorded seal" and did not. Both values above were re-derived independently by
+`tools/matrix.py` on 2026-10-04 and agree with the instrument exactly. Nothing
+gated the omission — no test reads this table, which is why a two-row gap could sit
+here through a ledger-strengthening, a seal re-pin and a census re-run without
+anything noticing.
+
+**CPython 3.14.7 was measured on 2026-10-04 and is deliberately *not* in the range
+named above.** It is installed at `/usr/bin/python3.14`, it lands in the `312plus`
+class, and it produces seals **byte-identical to 3.14.5** for all seven instruments —
+so it is the same class, not a third one, and the pins hold on it unchanged. The
+documented range still names five interpreters because widening it is not a prose
+edit. Six surfaces carry a copy of this range — this line, the `range` comment in
+`cross_version.py`, the `origin` field in `ledger.json`, the module docstring's
+bounds, and two subsets — and `tests/test_interpreter_claim.py` exists precisely to
+fail loudly when they drift apart. Moving them is a deliberate act that has to
+happen on all of them at once, not something a sentence should do on its own. The
+measurement is recorded here so the decision has its evidence when it is made.
+
+One operational consequence, recorded because it will otherwise be rediscovered as
+a bug: on a machine carrying two patch releases of one minor, `tools/matrix.py` in
+discovery mode **exits 3 with empty stdout** rather than guessing which one "the
+range" means. Naming the interpreters with `--interpreter PATH` bypasses it
+entirely. That is the tool refusing, not the tool failing.
 
 The boundary is CPython 3.12 because `sum()` changed there to Neumaier compensated
 summation. The consequence is visible without any of this machinery:
