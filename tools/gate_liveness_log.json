@@ -8,7 +8,8 @@
     "A test's record carries `via` naming the job that ran the suite. The",
     "suite passing is evidence for each test it collected; the field says so",
     "rather than implying the test was invoked on its own.",
-    "Records whose run is `local` were verified on a machine, not a runner, and say so. They are replaced by a real run id the first time CI collects the suite, which is the mechanism keeping this log honest -- and a record that claimed a runner it did not have would be the defect this tool exists to catch."
+    "Records whose run is `local` were verified on a machine, not a runner, and say so. They are replaced by a real run id the first time CI collects the suite, which is the mechanism keeping this log honest -- and a record that claimed a runner it did not have would be the defect this tool exists to catch.",
+    "This file is a SNAPSHOT. The recorder writes it inside a runner's checkout, which is discarded when the job ends, so nothing commits it and no run refreshes it for you. Each CI run appends the delta it produced to the job's step summary instead, and a person commits those records when they want the snapshot to move. A gate with no record here is reported NEVER_PASSED, which is the honest answer: nothing has been observed."
   ],
   "gates": {
     "ci.yml:core:claim sentences are bound to pinned values": {
@@ -734,6 +735,30 @@
     "tests/test_gate_liveness.py::test_the_gate_fails_on_a_classification_with_no_written_reason": {
       "at": "2026-10-04T22:00:00Z",
       "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_recorder_appends_its_delta_to_the_step_summary": {
+      "at": "2026-10-04T23:30:00Z",
+      "note": "verified on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_recorder_writes_no_summary_file_when_the_variable_is_unset": {
+      "at": "2026-10-04T23:30:00Z",
+      "note": "verified on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_summary_write_does_not_replace_the_committed_log": {
+      "at": "2026-10-04T23:30:00Z",
+      "note": "verified on this machine; the first CI run of this branch replaces this record",
       "run": "local",
       "status": "success",
       "via": "python3 -m pytest tests/test_gate_liveness.py",

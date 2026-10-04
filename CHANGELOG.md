@@ -28,6 +28,18 @@ changed, not one per commit, for the reason `[0.3.0]` gives.
 
 ### Added
 
+- **The gate-liveness recorder now writes its observations somewhere they
+  survive.** `tools/gate_liveness_record.py` appends the records a job just
+  produced to `$GITHUB_STEP_SUMMARY`, so each run carries its own delta on the
+  run page. It did not before, and that was a real hole: the recorder wrote
+  `tools/gate_liveness_log.json` inside a runner's working tree, which is
+  discarded when the job ends, so every observation it gathered went with the
+  checkout and the committed log went quietly stale — the exact rot the tool
+  exists to catch, inside the tool. The committed log stays a **snapshot** and
+  refreshing it is a person's job; the step summary is the recoverable copy, so
+  nobody has to re-run anything to commit the records. The delta is bounded on
+  purpose: the file is per-step, capped at 1 MiB, and at most 20 step summaries
+  are shown per job, so the whole log never goes there.
 - **`tools/verify_repo_state.py`** — a fifth gate, and the only one that asks a
   remote question. It re-measures the repository's own state: that the
   hardening files are present, that `main` has not diverged from `origin/main`,
