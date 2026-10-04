@@ -789,15 +789,45 @@ which in a wheel *is* `site-packages`, so installing the package and then import
 the library raised `FileNotFoundError` on a path the caller had never heard of. One
 resolver, `skills_root()`, now serves every call site, and
 `tools/verify_wheel.py` builds the real artifact, installs it into a clean venv, and
-calls the library from outside the checkout. The clause moved because that gate
-passes, not because this file says so. It has two modes, and both are asked on
+calls the library from outside the checkout. **The wheel clause — the second of
+`E1`'s three, not the third, which is still open — moved because that gate
+passes, not because this file says so.** It has two modes, and both are asked on
 every push: run with no argument it builds the wheel itself, which is what asks
 whether the checkout builds an installable artifact, and run with `--dist DIR` it
 installs the artifact it was handed and builds nothing, which is the question
 `publish.yml` asks about the wheel on its way to the index. The second mode is
-the one that reads a directory rather than making one, and until `ci.yml` ran it
-too, a `--dist` mode that refused everything was indistinguishable from a
-working one in every test here.
+the one that reads a directory rather than making one, and `ci.yml` did run it:
+the run **failed**, and recording that is the point. A relative `--dist dist/`
+reached a subprocess whose working directory is a scratch tree outside the
+checkout, so pip was asked to install a path under that scratch directory, and
+the gate refused at the install — after printing a selection and passing every
+content check, so nothing above the install had said anything was wrong. Every
+test in this repository passed, because every one of them handed the tool an
+absolute path. `tests/test_wheel_dist.py` now pins the shape that defect needed,
+`_one_wheel` returning an absolute path, and that assertion fails when the
+absolutising is removed.
+
+**What that run was not, for a while.** Between 13:25:44Z and 18:05Z on
+2026-10-04 this repository received no run that executed a step, and this
+paragraph said so: the `--dist` mode had never been green on a GitHub runner,
+its fix (`70f59e4`) had landed after the last green run, and the only evidence
+it had was a local one. That was true when written, and it is kept here because
+a correction that erases its own history is not a correction.
+
+**It is green now, and the reason is worth more than the fact.** Run
+`37223438858` reports the `wheel` job with ten executed steps, all `success`,
+and the seventh of them — *the artifact in `dist/` installs and its API runs* —
+is this mode. So the clause below rests on a runner after all. What changed was
+not this repository: Actions had stopped starting jobs because the repository
+was **private**, and GitHub's documented behaviour for a private repository on a
+free plan is that usage is *blocked* once the included quota is spent, with
+standard runners free only in public repositories. The repository was made
+public, and the next dispatched run executed. The correction, then, is not
+"this gate passes" but "this gate passes, and here is the run, and here is why
+it could not run for five hours while this file claimed it had".
+
+A reader is owed both halves in that order: what was verified, and what was not
+when the claim was made.
 
 ### E2. Bootstrap the ledger
 **Why:** a judgment consult was asked what stands between this tool and a caller
