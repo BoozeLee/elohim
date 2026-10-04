@@ -62,13 +62,21 @@ jobs:
       # rather than a shrug. Locally the same command without the flag reports
       # it as UNVERIFIED and still refuses to call that a pass.
       #
+      # `--require visibility`, and only that one. On a `pull_request` checkout
+      # there is no `refs/remotes/origin/main` to compare `main` against, so
+      # demanding the divergence claim here would fail every pull request over
+      # a fact that cannot exist in that context -- the same defect as a check
+      # that can never fail. The divergence check earns its keep locally, where
+      # a real clone can actually diverge, which is the state
+      # `docs/DISTRIBUTION.md` described.
+      #
       # This step exists because `docs/DISTRIBUTION.md` once carried a blocking
       # claim that main and origin/main had diverged, and nothing re-measured
       # it. The claim was true when written and false for months; a gate that
       # had existed would have said so on the first push after it stopped
       # being true.
       - name: the repository's own state is re-measured
-        run: python3 tools/verify_repo_state.py --require-visibility
+        run: python3 tools/verify_repo_state.py --require visibility
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
