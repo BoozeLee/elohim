@@ -63,7 +63,7 @@ workflow red instead.
 | traps re-derived independently | 53 |
 | claims a real agent made, read by hand from one real session | hand-adjudicated from one real session \| claims adjudicated 14, of which contradicted 0, and asserted-but-never-measured 2; the gate flags both of those with no false alarm |
 | instrument checksums pinned | 8, all PASS |
-| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** † *(not re-measured since the population moved; still describes a five-instrument tree)* |
+| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.20 → 3.14.7** † *(not re-measured since the population moved; still describes a five-instrument tree; lower endpoint corrected 3.10.13 → 3.10.20 on 2026-10-04, see below)* |
 | instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** † *(same)* |
 | recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** † *(same)* |
 | instrument mutation sites enumerated exhaustively, seal forged | **1,937** † |
@@ -113,6 +113,117 @@ self-check holds and all 25 gate runs pass, because the ledger's tolerances
 absorb a shift that size. The pinned values are therefore measuring the
 mathematics through a small measured interpreter-induced offset, and the size
 of that offset is now the thing B1 pins.
+
+### The interpreter range, re-measured 2026-10-04
+
+`tools/matrix.py` was run over **six** interpreters and exited **0**: every
+observed seal is a pinned one, and there is no third class.
+
+| interpreter | class | seals |
+|---|---|---|
+| 3.10.20 | `pre312` | one identical set; `estimator_bias` `06631f4cb544` |
+| 3.11.9 | `pre312` | identical to 3.10.20 |
+| 3.12.13 | `312plus` | `estimator_bias` `8163ec2d879a`; rest identical |
+| 3.13.13 | `312plus` | identical to 3.12.13 |
+| 3.14.5 | `312plus` | identical to 3.12.13 |
+| **3.14.7** | `312plus` | **identical to 3.14.5** |
+
+That last row is why this note exists. The row above **used to** read
+`3.10.13 → 3.14.7`, and the B1 narrative further down reads "Measured across
+3.10.20, 3.11.9, 3.12.13, 3.13.13 and **3.14.7**" — and **3.14.7 is real**. It
+is installed at `/usr/bin/python3.14`, it lands in class `312plus`, and it
+produces seals **byte-identical to 3.14.5** for all seven instrumented skills.
+So that B1 sentence is a **true record**, and it is left exactly as written. The
+`3.10.13` lower endpoint was the one genuinely unsupported claim — on no
+interpreter this machine has, and covered by no measurement in this repository —
+and it is the only thing above that has been changed, to `3.10.20`.
+
+`traps.md` still names five interpreters and is still right about what the *pins*
+were measured across: 3.10.20, 3.11.9, 3.12.13, 3.13.13 and 3.14.5. The table's
+"17 binaries, 8 versions" stays as the † one-off measurement it is labelled as.
+What this note adds is what is true *now*, on this machine: **16 candidate
+interpreter paths resolving to 6 distinct versions** (3.10.20, 3.11.9, 3.12.13,
+3.13.13, 3.14.5, 3.14.7) — 10 paths under `uv`, 5 symlinked into `~/.local/bin`,
+and the sixth at `/usr/bin/python3.14`.
+
+**A gotcha worth naming: the documented command cannot run unattended here.**
+
+```sh
+python3 tools/matrix.py --json --expect-interpreters 5
+# matrix: REFUSED: 3.14 is claimed by two interpreters with different patch
+# versions: kept 3.14.5 at ~/.local/share/uv/python/cpython-3.14-.../bin/python3,
+# found 3.14.7 at /usr/bin/python3.14
+# exit 3, empty stdout
+```
+
+Two interpreters claim minor 3.14 at different patch versions, and which one
+"the range" means is not something the tool will guess — so it refuses and
+reports nothing. That is the **correct** behaviour and not a defect: the refusal
+is a *discovery* failure, not a *measurement* one. Naming the interpreters with
+`--interpreter PATH`, as the six-row run above did, bypasses the ambiguity
+entirely, and the class table was never in doubt — the answer is the same either
+way.
+
+### A CI outage, 2026-10-04 — resolved, cause never identified
+
+Every push workflow on every branch failed for a window of about **1 h 39 m**,
+from **16:26:06Z** until runs began succeeding again at **18:05Z**. It is
+recorded here because it happened, not because it is open. **This section was
+first written while the outage was still live, carrying a falsifier; the
+falsifier fired, and that is what the first STATE below now records.**
+
+```
+CLAIM:     the outage was not a defect in this tree
+STATE:     verified
+EVIDENCE:  4 branches x 3 workflows (Core CI, CodeQL, Interpreter Matrix); every
+           job lived 1-3 s with runner_name "" and steps []; core (3.10) started
+           16:59:42Z and completed 16:59:43Z; last green before the outage was
+           11:46:48Z on af3fd88; ci.yml parses
+FALSIFIER: a run on any branch with a populated steps[]  -- FIRED at 18:05Z
+
+CLAIM:     the cause is an exhausted Actions allowance
+STATE:     never confirmed, and REFUTED for this repository: 363 runner-minutes
+           summed since 2026-10-01 across 100 runs, against the 2,000-minute
+           free private-repo allowance
+FALSIFIER: an account-level or platform-level cause would have been refuted by a
+           human reporting the billing page shows a healthy balance -- never run
+```
+
+**What ended it.** The first run to pick up a runner after the push of
+`measure-interpreter-range` at 18:05:22Z. `Interpreter Matrix` finished
+successful in 40 s and `CodeQL` in 51 s, and `Core CI` completed successful with
+every job carrying populated step arrays — `core (3.10)` 2m31s, `core (3.12)`
+2m11s, `core (3.14)` 2m38s, `unit-stress` **10m17s**, `published-shard` 7 s,
+`wheel` 19 s. Nine of nine checks passed. A job that never received a runner
+cannot take ten minutes, so this is not a marginal difference in behaviour.
+
+**The cause is not recorded, because it was never identified.** During the
+outage the logs could not be read at all: no runner was ever assigned —
+`runner_name` and `runner_group_name` both empty — and no log was ever created, so
+`GET /actions/jobs/{id}/logs` returned `BlobNotFound` and the check-runs API 404'd
+with the scopes available here. A defect in one branch cannot fail four branches
+at once, which is what placed the cause outside this repository; a transient
+platform-side cause is consistent with everything observed, but consistency is not
+evidence and is not recorded as though it were. The outage ended without anyone
+learning why, and that is the honest state of it.
+
+One thing was worth checking and is worth keeping: the jobs reported `failure`,
+not `skipped`. A gate that cannot run says so rather than going green, which is
+the fail-closed direction and is **not** itself a defect. A workflow that had gone
+quiet instead would have been the far more dangerous outcome, and the fix would
+have been to make the tree true rather than the nightly quiet.
+
+The billing check below was never performed and is now **moot** — the outage
+resolved itself and no account-level or platform-level limit was ever
+demonstrated. It is retained only as the procedure that was prepared and not run,
+with its boxes still empty, because an empty sheet that says why it is empty is a
+record and a filled-in one nobody took would be a fabrication:
+
+1. ~~Open `github.com/settings/billing` at the account level~~ — not needed; the
+   repository's own allowance was already measured as not exhausted.
+2. ~~Record the Actions minutes used and included~~ ☐ recorded: ______ *(never run)*
+3. ~~Open `githubstatus.com`~~ ☐ recorded: ______ *(never run)*
+4. If this happens again, run 1–3 before assuming anything about the cause.
 
 ## The three findings that shaped this roadmap
 
@@ -319,7 +430,16 @@ existing traps weakened, but because the two new skills are leaf-heavy and
 nearly trap-free: `pay-signal` contributes 217 leaves watched by **one**
 independent trap and `reproducibility` 34 leaves watched by **none**, which is
 251 of the 789 leaves and 1 of the 110 independent catches. `reproducibility` is
-1 seal check and **6 traps that fire on nothing at all**.
+1 seal check and 6 traps that **this harness cannot reach** — which is not the
+same as traps that are broken, unnecessary, or firing on nothing. Its six read
+sibling `ledger.json` files, the `PINNED_CLASSES` table, and the shard's
+**types**; `tools/seal_independence.py` perturbs leaf **values** and re-seals, so
+none of them observes a change. `references/traps.md` documents a different
+probe — the class-table probe, with its stale-bytecode hazard — that does
+exercise all six. They are unexercised *by this sweep*. So read the 13.9 % and
+86.1 % above as figures about the leaves **this harness tampers with**, not as a
+measurement of the trap suite, and do not "fix" the † row below by deleting traps
+that a different probe does reach.
 
 **The number this item was opened for reproduced, at 13.5× the sample.** The
 recorded 11-of-15 for `tolerance-prover` (73%) measures as **177 of 203 shard
