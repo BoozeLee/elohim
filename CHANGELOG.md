@@ -90,8 +90,17 @@ changed, not one per commit, for the reason `[0.3.0]` gives.
 
 ### Not claimed
 
-- That `E1`'s third clause is closed. It is not, and this release does not
-  close it.
+- ~~That `E1`'s third clause is closed. It is not, and this release does not
+  close it.~~ **True when this section was written on 2026-10-04, and superseded
+  the same day.** `elohim 0.4.0` was installed from the index into a fresh
+  environment and `elohim --all` ran from outside the checkout to `verdict PASS`
+  at exit 0 — the criterion `E3` set for itself, executed. The owner has ruled
+  that a caller which installed from the index and ran outside the checkout
+  satisfies "something that did not write them", and has recorded that as a
+  **reading rather than a measurement**, because the run was made by this
+  project's author minutes after the upload. The struck line is kept because it
+  was true at release time and because a reader who inherits only the correction
+  loses the caveat that produced it. See `docs/ROADMAP.md` under `E1`.
 - That any number in this section was measured on a runner *before* 18:05Z on
   2026-10-04. It was not, because no runner was executing.
 
