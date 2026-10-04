@@ -4,8 +4,8 @@
   "note": "Every entry is re-measured on every run. A drifting residual is a finding, not a warning. The counts describe ONE committed claims file read by an exit-code contract -- they are not a score of how good an agent's work is, and nothing here survives the day a run supplies its own claims file. The corpus is fixed precisely so that a change here means the instrument moved, not that some run got more honest.",
   "instrument": {
     "path": "instrument/claim_ledger.py",
-    "sha256": "0bf66b12986df08fab2c823ecc697e69ff450e196c66c3a197a0b0156d16dcd6",
-    "bytes": 20573,
+    "sha256": "63c8ee7aa5f69ee78086e08e2a99e7fb899353418d2c570d385b965695e85582",
+    "bytes": 21439,
     "note": "Editing this file is itself a measurable event, and the pin is re-derived by scripts/check_traps.py rather than by the file being pinned -- an edited copy of the instrument would report that it is fine. The harness reports both hashes and never resolves to a passing verdict on a modified instrument."
   },
   "claims_pin": {
@@ -13,7 +13,7 @@
     "sha256": "a38e0649cb8512ad446564b4b2948f558f09875e67e58549245c3addae9f7bdb",
     "note": "The file under judgement is pinned as well as the instrument. Without this the ledger would keep re-proving the previous change's claims forever, and the gate would read PASS on a measurement about something else. Applied mode -- a run's own claims file -- therefore reports claims_are_the_pinned_ones false and its verdict FAIL by construction, which is the correct answer and not a defect."
   },
-  "seal_at_heading": "d340ce3a75ccfbdd07e4c4a7b78594f5e4fbfea7b03908c39de2c61041c15f41",
+  "seal_at_heading": "bac7bcd15a64bf9b338b2d5c5d2d3d8b2910d48d864a9c2060f7401aed2368db",
   "replay": {
     "path": "tests/fixtures/session-03-33-40-878.labels.json",
     "labels_sha256": "54defe7236f2aedbc4c8c558d0ca32c0a271b514b295cb2f87ff169d1069bab9",

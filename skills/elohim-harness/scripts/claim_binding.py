@@ -455,6 +455,16 @@ DOC_FIGURES: list[tuple[str, str, str, str]] = [
     ("docs/ROADMAP.md", "ledger-bearing skills |", "before", "ledger_bearing_skills"),
     ("docs/ROADMAP.md", "| traps re-derived independently |", "after", "total_traps"),
     ("docs/ROADMAP.md", "| instrument checksums pinned |", "after", "pins_passing"),
+    # The mutation census's population, in the one document that owns it. It was
+    # ungated here while being written into a CI script and a test as well, so
+    # three copies existed and nothing compared any of them to the tree -- and
+    # `tests/test_mutate.py` kept passing while asserting a population the
+    # census no longer ran. The document is its single home now; the derivation
+    # is `sites.enumerate_sites` over the instruments the ledgers name.
+    # `.github/workflows/mutation-census.yml` reads the same anchor, so there is
+    # one string in this repository that locates the figure, not two.
+    ("docs/MUTATION_SURVIVAL.md", "Every (operator, site) pair, all instrumented skills:",
+     "after", "census_population_sites"),
     # Prose restatements of the same figures. These are what a reader meets
     # first, and the 81/52 pair is exactly what drifted.
     #
@@ -579,6 +589,15 @@ def derivations(root: Path) -> dict[str, int | None]:
     # updated to match the other.
     replay = _replay_figures(root)
 
+    # The mutation census's population. It is the one figure in the repository
+    # that was, until now, written into a document and into a CI script and
+    # checked by nothing -- `tests/test_mutate.py` held a hardcoded six-skill
+    # list and asserted 1,679 while the census measured a population the test
+    # no longer described, and it passed. So it is derived here from the same
+    # source the census builds its jobs from: the ledgers on disk, and
+    # `sites.enumerate_sites` over each instrument it names.
+    population = _population_sites(root, ledgers)
+
     return {
         "total_facts": total_facts,
         "ledger_bearing_skills": len(ledgers),
@@ -586,8 +605,54 @@ def derivations(root: Path) -> dict[str, int | None]:
         "nonzero_tolerance_count": nonzero,
         "total_traps": traps,
         "pins_passing": pins,
+        "census_population_sites": population,
         **replay,
     }
+
+
+def _population_sites(root: Path, ledgers: list[Path]) -> int | None:
+    """Every (operator, site) pair in every instrumented skill, or None.
+
+    This is the census's population, derived the way the census derives it:
+    one ledger per instrumented skill, the instrument path read from that
+    ledger, and `sites.enumerate_sites` run over its source. It shares the
+    census's own enumerator on purpose -- a second implementation of "what is a
+    mutable site" would be free to drift from the first, and a document bound to
+    the drifted copy would be checked against a population the census never ran.
+
+    Returns None rather than a number when the enumerator is not importable or a
+    ledger names an instrument that is not there. A figure reported as
+    un-checkable is a different statement from a figure reported as wrong, and
+    the second one would be a lie about a tree this function did not read.
+    """
+    if (root / "elohim_gate" / "sites.py").is_file():
+        if str(root) not in sys.path:
+            sys.path.insert(0, str(root))
+    try:
+        from elohim_gate import sites as S
+    except Exception:
+        return None
+    base = root / "skills" if (root / "skills").is_dir() else root
+    total = 0
+    seen = 0
+    for ledger_path in ledgers:
+        try:
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        rel = (ledger.get("instrument") or {}).get("path")
+        if not rel:
+            continue
+        instrument = base / ledger_path.parent.name / rel
+        if not instrument.is_file():
+            return None
+        try:
+            source = instrument.read_text(encoding="utf-8")
+        except OSError:
+            return None
+        total += sum(len(rows) for rows in S.enumerate_sites(source).values())
+        seen += 1
+    return total if seen else None
 
 
 def _pins_passing(root: Path, ledgers: list[Path]) -> int | None:
@@ -720,12 +785,22 @@ def check_doc_figures(
             continue
         current = values.get(key)
         if current is None:
-            if key in POST_RUN_ONLY:
-                unchecked.append({"fact": name, "key": key,
-                                  "problem": f"{rel} states {stated} for {key}, which is "
-                                             f"only measurable after a gate run; this tree "
-                                             f"has not been gated, so the figure is "
-                                             f"UNCHECKED here and not agreed"})
+            # A declared figure whose derivation produced nothing used to be
+            # `continue`d in silence, which is the same false green this check
+            # exists to prevent: the summary counts checked figures, a document
+            # says a number, and nothing compared them. `POST_RUN_ONLY` is the
+            # one honest reason to not check -- the number needs a gate run --
+            # and it says so. A derivation that could not run at all is a
+            # different reason, and it is named too, because a figure nobody can
+            # check is not a figure that passed.
+            reason = ("which is only measurable after a gate run, so this tree has "
+                      "not been gated and the figure is UNCHECKED here and not agreed"
+                      if key in POST_RUN_ONLY else
+                      "whose derivation produced no value in this tree (the module "
+                      "could not be imported, or a ledger named an instrument that "
+                      "is not present), so the figure is UNCHECKED here and not agreed")
+            unchecked.append({"fact": name, "key": key,
+                              "problem": f"{rel} states {stated} for {key}, {reason}"})
             continue
         if stated != current:
             failures.append({

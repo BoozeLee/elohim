@@ -45,7 +45,6 @@ Usage
 from __future__ import annotations
 
 import argparse
-import datetime as dt
 import hashlib
 import json
 import re
@@ -477,9 +476,16 @@ def main(argv: list[str] | None = None) -> int:
         json.dumps(m, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
 
-    # Added AFTER the seal, and therefore outside it. Anything volatile belongs
-    # here, not above.
-    m["generated"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Anything volatile used to go here, outside the seal, on the reasoning that
+    # excluding it from the digest was enough. It is not: the census runs this
+    # instrument twice in two different temporary directories and compares the shard
+    # FILE as text, so a volatile field in the file is a nondeterministic instrument
+    # however carefully the digest is drawn around it. Measured: two runs two seconds
+    # apart differed in `generated` and nothing else, the seal identical in both, and
+    # the Action workflow red with "pay-signal: the two pristine runs disagreed".
+    #
+    # A timestamp belongs in the run payload, and harness_run.py already writes one
+    # into out/last-run.json.
     m["seal"] = seal
 
     if args.json:

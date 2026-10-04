@@ -50,7 +50,6 @@ from __future__ import annotations
 
 import argparse
 import ast
-import datetime as dt
 import hashlib
 import json
 import os
@@ -468,8 +467,21 @@ def main(argv: list[str] | None = None) -> int:
     seal = hashlib.sha256(
         json.dumps(m, sort_keys=True, separators=(",", ":"), default=str).encode()
     ).hexdigest()
-    # Volatile, and therefore added AFTER the seal.
-    m["generated"] = dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # No wall clock in the shard. Not even outside the seal, which is where this used
+    # to sit and where excluding it looked sufficient.
+    #
+    # The census runs this instrument twice in two different temporary directories and
+    # compares the shard FILE as text, so a volatile field in the file is a
+    # nondeterministic instrument however carefully the digest is drawn around it.
+    # Measured: two runs two seconds apart differed in `generated` and nothing else,
+    # the seal `d340ce3a75cc` identical in both, and the Action workflow red with
+    # "claim-ledger: the two pristine runs disagreed" -- a failure that reached main
+    # because this shard was the only one of eight carrying a timestamp, and nothing
+    # in the tree compared two runs of the same instrument.
+    #
+    # A timestamp belongs in the run payload, and harness_run.py already writes one
+    # into out/last-run.json. `elohim`'s shard has no such field either, so this is
+    # alignment with the other seven rather than a new idea.
     m["seal"] = seal
 
     if args.json:

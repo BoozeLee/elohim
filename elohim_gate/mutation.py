@@ -470,12 +470,41 @@ def population_report(skills: list[str]) -> dict:
     }
 
 
+def plannable_cells(skills: list[str]) -> list[tuple[dict, str]]:
+    """The (operator, skill) cells that have at least one site to mutate.
+
+    A cell with zero sites is not a cell: there is nothing in it to mutate, so a
+    job drawn there would carry `n_sites: 0`, decide nothing, and be counted as a
+    draw. `population_report` has always counted only the non-empty cells; this
+    makes `plan` draw from the same set rather than a wider one, so the sample
+    cannot visit a cell the report says does not exist.
+
+    It was reachable but unvisited until the population grew: `tol_widen` has no
+    site in `claim-ledger`, `pay-signal` or `reproducibility`, and with eight
+    skills a draw landed on one. `census.py` was never affected -- it enumerates
+    sites through `sites.enumerate_sites`, so an empty cell contributes nothing
+    to it rather than a row.
+    """
+    cells = []
+    for op in MUTATORS:
+        for skill in skills:
+            if count_sites(skill, op["name"]):
+                cells.append((op, skill))
+    return cells
+
+
 def plan(rng: random.Random, n: int, skills: list[str], stale_cap: int) -> list[dict]:
+    cells = plannable_cells(skills)
+    if not cells:
+        raise ValueError(
+            "no operator x skill cell in this tree has a site to mutate, so a "
+            "sample drawn from it decides nothing; census.py refuses this case "
+            "for the same reason"
+        )
     jobs = []
     for i in range(n):
         arm = "stale" if i < stale_cap else "forged"
-        op = MUTATORS[rng.randrange(len(MUTATORS))]
-        skill = skills[rng.randrange(len(skills))]
+        op, skill = cells[rng.randrange(len(cells))]
         jobs.append({"arm": arm, "operator": op["name"], "fn": op["fn"],
                      "skill": skill, "seed": rng.randrange(10**9),
                      "budget": DEFAULT_BUDGET,

@@ -13,7 +13,8 @@ a real interpreter boundary — so B1 pins two named classes and fails on a
 third instead of pretending there is one. A3 is shipped, and its measurement
 went the other way from the item's framing: 25 of 38 traps are provably
 independent of the checksum, and 77 % of all tampers are caught by nothing but
-the sha256 — both † rows, measured over six skills, see the table below. D1 is
+the sha256 † — both re-measured 2026-10-04 over all eight skills, where the
+counts are 33 of 53 and 86 %, see the table below. D1 is
 shipped: `--all` gates the whole tree under one payload, the clean case
 delegates to it, and a fourth exit code now separates "the tree is clean" from
 "the tree is too small".
@@ -25,13 +26,19 @@ delegates to it, and a fourth exit code now separates "the tree is clean" from
 Measured, not asserted:
 
 A row marked † is **not** a count of the tree as it stands. It is a snapshot of a
-deliberate manual run, taken over the **6 ledger-bearing skills that existed
-before `c06d0b2` added `pay-signal`**, and it is scoped here rather than left to
-drift silently. The tree has held 8 ledger-bearing skills since `e27d9bc` added
-`claim-ledger`, so a † row is under-scoped by exactly those two skills.
+deliberate manual run, and each one names the tree it was measured over rather
+than being left to drift silently.
+
+**The census and sweep rows were re-measured on 2026-10-04, over all 8
+ledger-bearing skills.** The three interpreter rows have **not**, and say so:
+they come from `matrix.py` across installed interpreters, and that run has not
+been repeated since `claim-ledger` and `pay-signal` landed, so they still
+describe a five-instrument tree and are under-scoped by three. This is the
+second time this table has needed that sentence, which is the reason the census
+and sweep rows are now read from their own tools' output rather than typed.
 
 Three tools produce them and **CI runs none of them** —
-`tools/seal_independence.py` (rows marked with the census and sweep figures),
+`tools/seal_independence.py` (the sweep rows),
 `tools/mutation_survival.py` and `tools/matrix.py`. `matrix.yml` installs the
 interpreters and runs four verifiers, but never invokes `matrix.py`; the census
 row comes from `elohim_gate.census`, which `mutation-census.yml` does run, so
@@ -42,8 +49,13 @@ counted and printed on every `claim_binding.py` run rather than living only in
 this sentence.
 
 To refresh them, re-run the three tools against the current tree and update the
-† rows together — not one at a time, since rows 39–42 are four views of a single
-sweep and are only meaningful as a set.
+† rows together — not one at a time, since the sweep rows are five views of a
+single run and are only meaningful as a set. **The census rows are the one
+exception and no longer need this discipline**: since `0a68ff8` they are read by
+`.github/workflows/mutation-census.yml` out of the recorded-figures table in
+`docs/MUTATION_SURVIVAL.md`, and `claim_binding` re-derives the population from
+the tree, so those three rows can no longer go quietly stale — they turn a
+workflow red instead.
 
 | claim | measurement |
 |---|---|
@@ -51,19 +63,21 @@ sweep and are only meaningful as a set.
 | traps re-derived independently | 53 |
 | claims a real agent made, read by hand from one real session | hand-adjudicated from one real session \| claims adjudicated 14, of which contradicted 0, and asserted-but-never-measured 2; the gate flags both of those with no false alarm |
 | instrument checksums pinned | 8, all PASS |
-| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** † |
-| instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** † |
-| recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** † |
-| instrument mutation sites enumerated exhaustively, seal forged | **1,679** † |
-| mutations that passed the full gate | **63 of 1,679 (3.75 %)** † |
-| survivors that were fact-bound and outside declared tolerance | **0** † |
-| runs left undetermined by a harness artefact | 1 of 1,679 (reported, not counted) † |
+| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** † *(not re-measured since the population moved; still describes a five-instrument tree)* |
+| instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** † *(same)* |
+| recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** † *(same)* |
+| instrument mutation sites enumerated exhaustively, seal forged | **1,937** † |
+| mutations that passed the full gate | **13 of 1,848 (0.70 %)**, defect arm † |
+| mutants that moved only fields the gate does not decide on | 145 of 1,848 (7.85 %), reported and not counted † |
+| survivors that were fact-bound and outside declared tolerance | **0** † — and no longer for the reason it first read: none of the 13 touches a fact-pinned field at all † |
+| runs left undetermined by a harness artefact | 1 of 1,937 (reported, not counted) † |
 | shipped ledgers whose prose contradicted their pins | 1 (`precision-budget`, fixed) |
-| shard leaves swept twice, once with the seal forged and once left stale | **522, across 6 skills** † |
-| traps measured to fire without the checksum | **25 of 38** † |
+| shard leaves swept twice, once with the seal forged and once left stale | **789, across 8 skills** † |
+| traps measured to fire without the checksum | **33 of 53** † |
 | traps that are the checksum | 5, exactly the 5 seal checks † |
-| tampers caught by a seal-independent trap | **118 of 522 (22.6 %)** † |
-| tampers caught by nothing but the sha256 | **404 of 522 (77.4 %)** † |
+| traps that fired on no tamper in either arm | **15** † |
+| tampers caught by a seal-independent trap | **110 of 789 (13.9 %)** † |
+| tampers caught by nothing but the sha256 | **679 of 789 (86.1 %)** † |
 | CLI exit codes, each measured rather than assumed | 4 (0, 1, 2, 3) |
 | JSON payload contract version | `elohim.gate/1` |
 | tools importing a third-party package — stdlib, the pinned dev group, and the first-party siblings loaded off `skills/` excluded | 0 |
@@ -281,15 +295,31 @@ away. Every tamper therefore runs twice, forged and unforged.
 
 **Decided by, met:** every trap has a recorded seal-independence verdict, and no
 trap is described as independent until it is measured to be.
-`tools/seal_independence.py` sweeps all 38 traps across 522 shard leaves and
-prints the census; `skills/reproducibility/references/seal-independence.md` is
-the record.
+`tools/seal_independence.py` sweeps every trap in the tree across every shard
+leaf it can forge and prints the census;
+`skills/reproducibility/references/seal-independence.md` is the record. It last
+measured 38 traps over 522 leaves; **re-run 2026-10-04 over the current 8-skill
+tree it is 53 traps over 789 leaves, and the numbers moved against this item's
+own conclusion** — see the re-measurement below.
 
-**Result: 25 independent, 5 decoration, 8 not-reached.** The 5 decorations are
+**Result, as first measured: 25 independent, 5 decoration, 8 not-reached.** The 5 decorations are
 exactly the 5 checksum traps and nothing else — the census found no trap that
 behaves like a checksum without being one. `elohim` has no seal trap at all, so
 all 6 of its traps are independent and the seal it records is a claim with no
 gate behind it.
+
+****Re-measured 2026-10-04, over all 8 skills: 33 independent, 5 decoration, 15
+not-reached, across 789 leaves.** The tool's own controls were clean —
+`impossible-row: 0`, no cap hit, no exclusions, every skill's baseline OK — and
+33 + 5 + 15 = 53 matches the gated `total_traps`, so the sweep covered every
+trap rather than most of them. The direction of travel is the finding: the
+independent share **fell** from 22.6 % to **13.9 %** of leaves, and the share
+caught by nothing but the sha256 rose from 77.4 % to **86.1 %**. Not because the
+existing traps weakened, but because the two new skills are leaf-heavy and
+nearly trap-free: `pay-signal` contributes 217 leaves watched by **one**
+independent trap and `reproducibility` 34 leaves watched by **none**, which is
+251 of the 789 leaves and 1 of the 110 independent catches. `reproducibility` is
+1 seal check and **6 traps that fire on nothing at all**.
 
 **The number this item was opened for reproduced, at 13.5× the sample.** The
 recorded 11-of-15 for `tolerance-prover` (73%) measures as **177 of 203 shard
@@ -1264,10 +1294,10 @@ prevents the specific failure this project has already shipped once. `A1`
 second, and it is done: a gate with an unbounded runtime is a gate that can be
 made to lie by making it wait. `B1` third, and it is done: it turned a README
 sentence into a ledger fact, and the fact it found was the opposite of the one
-the sentence asserted. `A3` fourth, and it is done: 25 of the 38 traps are
-provably independent of the checksum † (a six-skill measurement; see the †
-preamble above), the 5 that are not are exactly the 5 checksums, and the
-motivating number — eleven of fifteen tampers in `tolerance-prover` caught by
+the sentence asserted. `A3` fourth, and it is done: **33 of the 53 traps are
+provably independent of the checksum** † (re-measured 2026-10-04 over all eight
+skills; it was 25 of 38 over six), **15 fire on no tamper at all** †, the 5 that
+are not independent are exactly the 5 checksums, and the motivating number — eleven of fifteen tampers in `tolerance-prover` caught by
 the seal alone — was not folklore, measuring at 177 of 203 once the sweep could
 forge the seal instead of deleting it. Three
 false claims in `elohim`'s oldest traps died on the way. Then `D1`, because a

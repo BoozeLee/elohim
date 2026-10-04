@@ -56,7 +56,9 @@ jobs:
     # Well above the expected time rather than at it, for the reason
     # .github/workflows/mutation-census.yml records: a timeout here produces no
     # verdict, and "no verdict" reads exactly like "nothing is wrong". The whole
-    # population is 1679 (operator x site) pairs; a GitHub runner has 4 cores,
+    # population is every (operator x site) pair in the tree -- derived, and
+    # recorded in docs/MUTATION_SURVIVAL.md rather than written here; a GitHub
+    # runner has 4 cores,
     # jobs defaults to 2, and the nightly measured 600s on 12.
     timeout-minutes: 90
 

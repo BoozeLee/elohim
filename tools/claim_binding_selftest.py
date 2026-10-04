@@ -326,11 +326,23 @@ def doc_figure_controls() -> int:
         ("anchors: the anchor is duplicated", lambda t: t.replace(
             traps_row, f"{traps_row}\n{traps_row}", 1)),
     ]
+    # The Tier B row is DERIVED from the document, for the same reason the three
+    # above are. It was written out as a literal, and when the row it names was
+    # re-measured from 522 leaves over 6 skills to 789 over 8, `t.replace` found
+    # nothing to mutate -- so the control mutated nothing and then reported the
+    # pass it got by not running. That is a checker holding its own copy of the
+    # expectation, the defect this file's own comment calls out by commit
+    # (8985ea3), and it hid in the one control whose whole job is to prove a
+    # row is NOT bound. Deriving it makes the control impossible to desync.
+    tier_b_row = _row(
+        r"\| shard leaves swept twice, once with the seal forged and once left stale \|[^|]*\|",
+        "the Tier B sweep row", pristine, doc)
+
     # These MUST NOT fire. The first is a declared Tier B row, the second is
     # Tier C narrative the repo ruled must never be edited to match the tree.
     must_pass = [
-        ("| shard leaves swept twice, once with the seal forged and once left stale | **522, across 6 skills** † |",
-         "| shard leaves swept twice, once with the seal forged and once left stale | **999, across 9 skills** † |",
+        (tier_b_row,
+         re.sub(r"\*\*[^*]*\*\*", "**999, across 9 skills**", tier_b_row, count=1),
          "a declared Tier B figure is not derived from the tree and is not checked"),
         ("66 pinned facts and 31 independently",
          "666 pinned facts and 311 independently",

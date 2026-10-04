@@ -35,9 +35,10 @@ is not tidiness: the resolver walks up from its own file looking for a checkout,
 and a probe run from inside the repo would find skills/ by a path that does not
 exist for anyone who pip-installed the package.
 
-Probes are chosen to be cheap. Nothing here runs a full census -- that is 1,679
-mutation sites -- because this gate runs on every push and a gate nobody waits
-for is a gate that gets deleted. The two copy sites that a full census would
+Probes are chosen to be cheap. Nothing here runs a full census -- that is one
+subprocess per (operator x site) pair in the whole tree, several minutes --
+because this gate runs on every push and a gate nobody waits for is a gate that
+gets deleted. The two copy sites that a full census would
 reach are covered directly instead: build_population for the ledger reads, and a
 job naming a nonexistent skill for the second copytree, which returns SKIPPED
 before it would run anything.

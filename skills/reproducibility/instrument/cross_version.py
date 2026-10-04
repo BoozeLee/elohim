@@ -94,7 +94,16 @@ PINNED_CLASSES = {
     # classes, and the matrix would say so. Recorded in BOTH columns for the
     # same reason as pay-signal above: an entry missing from one is what turns a
     # stable instrument into an UNLISTED tripwire.
-    "claim-ledger": {PRE312: "d340ce3a75cc", POST312: "d340ce3a75cc"},
+    #
+    # Re-measured 2026-10-04 after the wall clock was removed from the shard. The
+    # value moved from d340ce3a75cc to bac7bcd15a64 because the shard carried a
+    # timestamp the census compares and could not, and the tripwire fired with
+    # "produced a seal in no pinned class". Re-measured before re-pinning rather
+    # than assumed: 3.10.20, 3.11.9, 3.12.13, 3.13.13 and 3.14.5 all return
+    # bac7bcd15a64, so the split did not move -- one value still serves both
+    # classes, and the entry is updated to a measured prefix rather than to
+    # whatever the instrument happened to emit last.
+    "claim-ledger": {PRE312: "bac7bcd15a64", POST312: "bac7bcd15a64"},
 }
 
 # Skills that ship no instrument of their own.
