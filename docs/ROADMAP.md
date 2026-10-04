@@ -163,54 +163,66 @@ is a *discovery* failure, not a *measurement* one. Naming the interpreters with
 entirely, and the class table was never in doubt — the answer is the same either
 way.
 
-### An open CI outage, recorded 2026-10-04
+### A CI outage, 2026-10-04 — resolved, cause never identified
 
-Every push workflow on every branch has failed since **2026-10-04T16:26:06Z**.
+Every push workflow on every branch failed for a window of about **1 h 39 m**,
+from **16:26:06Z** until runs began succeeding again at **18:05Z**. It is
+recorded here because it happened, not because it is open. **This section was
+first written while the outage was still live, carrying a falsifier; the
+falsifier fired, and that is what the first STATE below now records.**
 
 ```
-CLAIM:     the CI outage since 2026-10-04T16:26:06Z is not a defect in this tree
+CLAIM:     the outage was not a defect in this tree
 STATE:     verified
 EVIDENCE:  4 branches x 3 workflows (Core CI, CodeQL, Interpreter Matrix); every
-           job lives 1-3 s with runner_name "" and steps []; core (3.10) started
-           16:59:42Z and completed 16:59:43Z; last green on main 11:46:48Z on
-           af3fd88; ci.yml parses
-FALSIFIER: a run on any branch with a populated steps[] that fails on a real
-           step -> the outage is over; delete this section
+           job lived 1-3 s with runner_name "" and steps []; core (3.10) started
+           16:59:42Z and completed 16:59:43Z; last green before the outage was
+           11:46:48Z on af3fd88; ci.yml parses
+FALSIFIER: a run on any branch with a populated steps[]  -- FIRED at 18:05Z
 
 CLAIM:     the cause is an exhausted Actions allowance
-STATE:     assumed, and REFUTED for this repository: 363 runner-minutes summed
-           since 2026-10-01 across 100 runs, against the 2,000-minute free
-           private-repo allowance
-FALSIFIER: an account-level or platform-level cause would be refuted by a human
-           reporting the billing page shows a healthy balance
+STATE:     never confirmed, and REFUTED for this repository: 363 runner-minutes
+           summed since 2026-10-01 across 100 runs, against the 2,000-minute
+           free private-repo allowance
+FALSIFIER: an account-level or platform-level cause would have been refuted by a
+           human reporting the billing page shows a healthy balance -- never run
 ```
 
-Two things about that signature. **No runner was ever assigned** — `runner_name`
-and `runner_group_name` are both empty — and **no log was ever created**, so
-`GET /actions/jobs/{id}/logs` returns `BlobNotFound` and the check-runs API 404s
+**What ended it.** The first run to pick up a runner after the push of
+`measure-interpreter-range` at 18:05:22Z. `Interpreter Matrix` finished
+successful in 40 s and `CodeQL` in 51 s, and `Core CI` completed successful with
+every job carrying populated step arrays — `core (3.10)` 2m31s, `core (3.12)`
+2m11s, `core (3.14)` 2m38s, `unit-stress` **10m17s**, `published-shard` 7 s,
+`wheel` 19 s. Nine of nine checks passed. A job that never received a runner
+cannot take ten minutes, so this is not a marginal difference in behaviour.
+
+**The cause is not recorded, because it was never identified.** During the
+outage the logs could not be read at all: no runner was ever assigned —
+`runner_name` and `runner_group_name` both empty — and no log was ever created, so
+`GET /actions/jobs/{id}/logs` returned `BlobNotFound` and the check-runs API 404'd
 with the scopes available here. A defect in one branch cannot fail four branches
-at once. Note the direction too: these jobs report `failure`, not `skipped`. A
-gate that cannot run says so rather than going green, which is the fail-closed
-direction and is not itself a defect.
+at once, which is what placed the cause outside this repository; a transient
+platform-side cause is consistent with everything observed, but consistency is not
+evidence and is not recorded as though it were. The outage ended without anyone
+learning why, and that is the honest state of it.
 
-**The cause is not the repository's to fix, and the check is a person's browser** —
-the same class of step as the `D2` sponsorship item further down. In that same
-spirit the recording sheet ships **empty**: filling it in is the human's job, and
-an agent that fills it in has manufactured the one piece of evidence this section
-lacks.
+One thing was worth checking and is worth keeping: the jobs reported `failure`,
+not `skipped`. A gate that cannot run says so rather than going green, which is
+the fail-closed direction and is **not** itself a defect. A workflow that had gone
+quiet instead would have been the far more dangerous outcome, and the fix would
+have been to make the tree true rather than the nightly quiet.
 
-1. Open `github.com/settings/billing` at the **account** level, not the repository
-   level — this repository's own allowance is measured as not exhausted, which is
-   precisely what makes the account level the part that matters.
-2. Record the Actions minutes used and included, and any spending-limit or
-   payment state. ☐ recorded: ______
-3. Open `githubstatus.com` and record whether Actions is degraded.
-   ☐ recorded: ______
-4. If billing is healthy and status is clear, the cause is neither; record that
-   and stop escalating. ☐ recorded: ______
+The billing check below was never performed and is now **moot** — the outage
+resolved itself and no account-level or platform-level limit was ever
+demonstrated. It is retained only as the procedure that was prepared and not run,
+with its boxes still empty, because an empty sheet that says why it is empty is a
+record and a filled-in one nobody took would be a fabrication:
 
-Until someone fills that in, the cause is unnamed. It is not recorded here as an
-exhausted allowance, because that specific guess is refuted above.
+1. ~~Open `github.com/settings/billing` at the account level~~ — not needed; the
+   repository's own allowance was already measured as not exhausted.
+2. ~~Record the Actions minutes used and included~~ ☐ recorded: ______ *(never run)*
+3. ~~Open `githubstatus.com`~~ ☐ recorded: ______ *(never run)*
+4. If this happens again, run 1–3 before assuming anything about the cause.
 
 ## The three findings that shaped this roadmap
 
