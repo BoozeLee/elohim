@@ -44,7 +44,37 @@ like it fired.
 Both guards were added because the first full run of this tool was wrong in two
 ways at once and looked clean while it was wrong.
 
-## The census
+## The census, re-measured 2026-10-04
+
+53 traps, 789 forged tampers, no skill excluded, no skill capped. The tool's own
+controls were clean on this run: `impossible-row: 0`, `incomplete: false`, no
+cap reached, no exclusions, and every skill's baseline OK. **33 + 5 + 15 = 53
+matches the gated `total_traps`**, which is the check that the sweep covered
+every trap rather than most of them.
+
+| skill | traps | leaves | scheme | independent | decoration | not-reached |
+|---|---|---|---|---|---|---|
+| `claim-ledger` | 10 | 42 | compact | 7 | 0 | 3 |
+| `elohim` | 6 | 48 | default | 6 | 0 | 0 |
+| `estimator-bias` | 7 | 113 | compact | 6 | 1 | 0 |
+| `invariant-hunter` | 5 | 31 | compact | 4 | 1 | 0 |
+| `pay-signal` | 5 | 217 | compact | 1 | 0 | 4 |
+| `precision-budget` | 6 | 101 | compact | 3 | 1 | 2 |
+| `reproducibility` | 7 | 34 | compact | 0 | 1 | 6 |
+| `tolerance-prover` | 7 | 203 | compact | 6 | 1 | 0 |
+| **total** | **53** | **789** | | **33** | **5** | **15** |
+
+Caught by a seal-independent trap: **110 of 789 (13.9 %)**. Caught by nothing
+but the sha256: **679 of 789 (86.1 %)**.
+
+The independent share **fell** against the six-skill run below, and not because
+any existing trap weakened. `pay-signal` and `reproducibility` arrived leaf-heavy
+and nearly trap-free: 251 of the 789 leaves, watched by one independent trap
+between them. `reproducibility` is one seal check and **six traps that fire on no
+tamper in either arm**, which is the same shape as the census's `REPORTED` class
+— a gate that reports fields nothing watches.
+
+## The census, as first measured (6 skills)
 
 38 traps, 522 forged tampers, no skill excluded, no skill capped.
 
@@ -136,7 +166,7 @@ They are not one finding. Splitting them matters:
 
 ## Why this census is not a ledger fact
 
-It runs 522 suites and takes longer than the harness's entire 600-second budget
+It runs 789 suites and takes longer than the harness's entire 600-second budget
 by an order of magnitude, and A1 already established that runtime on this
 machine is noise. A number the gate cannot re-derive inside its own budget is
 decoration by this repository's own standard — the same standard that produced
