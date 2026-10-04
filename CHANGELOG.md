@@ -231,11 +231,18 @@ one of the twelve commits sitting unpushed.
   empty for every caller, and the workflow step that consumed them echoed five
   blank lines and went green. The run below is the fix, and its verification
   step now refuses an empty value rather than printing one.
-- **Nothing has been published to PyPI.** The name is free (404 today), but
-  Trusted Publishing cannot be registered from a machine with no PyPI
-  credential, so the first upload needs a person in a browser. `publish.yml`
-  exists so that upload is a workflow dispatch rather than a local command with
-  a long-lived token.
+- **`0.3.0` is on PyPI, and this section used to say nothing was.** The entry
+  above recorded that Trusted Publishing needed a person in a browser before
+  the first upload; that person registered the publisher and the upload
+  happened. Measured 2026-10-04 against the index rather than from memory:
+  `https://pypi.org/pypi/elohim/json` returns HTTP 200 with `version: 0.3.0`
+  and one release, `elohim-0.3.0-py3-none-any.whl` and `elohim-0.3.0.tar.gz`
+  uploaded at 09:23:35Z and 09:23:37Z on 2026-10-03. A later dry run of
+  `publish.yml` on this version refused at the step named *the version being
+  offered is not already released* — `tools/verify_release_slot.py` reporting
+  `elohim 0.3.0 is already released on the index (2 file(s))`. That is the gate
+  working: a released version is never replaced, so the next upload needs a
+  version bump in `pyproject.toml` rather than a retry.
 - **`v0.1.0`'s tag is orphaned** into the history rewritten for commit signing
   and cannot be moved through the API. `v0.3.0` describes the range
   `v0.2.0..v0.3.0`, which is resolvable.
