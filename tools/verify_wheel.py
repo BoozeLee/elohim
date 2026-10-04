@@ -678,7 +678,7 @@ def _sdist_report(dist: Path, tmp: Path, repo: Path) -> list:
 
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
-        description="prove the wheel installs and its API runs")
+        description="prove the distribution installs and its API runs")
     ap.add_argument(
         "--dist",
         type=Path,
@@ -727,7 +727,7 @@ def main(argv=None) -> int:
         except Refusal as exc:
             return _fail(str(exc))
 
-    print("verify_wheel: the installed wheel runs the API")
+    print("verify_wheel: the installed distribution runs the API")
     return 0
 
 

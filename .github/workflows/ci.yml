@@ -190,7 +190,7 @@ jobs:
           python3 -m pip install --disable-pip-version-check
           "build==1.5.0" "hatchling==1.32.4"
 
-      - name: the installed wheel runs the API
+      - name: the installed distribution runs the API
         run: python3 tools/verify_wheel.py
 
       # The same tool, pointed at an artifact instead of asked to build one --
