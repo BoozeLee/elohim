@@ -912,10 +912,17 @@ resolver, `skills_root()`, now serves every call site, and
 calls the library from outside the checkout. **The wheel clause — the second of
 `E1`'s three, not the third, which is still open — moved because that gate
 passes, not because this file says so.** It has two modes, and both are asked on
-every push: run with no argument it builds the wheel itself, which is what asks
-whether the checkout builds an installable artifact, and run with `--dist DIR` it
-installs the artifact it was handed and builds nothing, which is the question
-`publish.yml` asks about the wheel on its way to the index. The second mode is
+every push: run with no argument it builds the distribution itself, which is what
+asks whether the checkout produces installable artifacts, and run with `--dist
+DIR` it installs the artifact it was handed and builds nothing, which is the
+question `publish.yml` asks about what it is about to upload. Both modes check
+both artifacts rather than the wheel alone, and that is the whole reason the
+no-argument mode builds a distribution instead of a wheel: `python3 -m build`
+with neither `--wheel` nor `--sdist` writes an sdist *and* a wheel, and the upload
+step sends both, so an sdist that cannot be installed is a defect a consumer
+meets that no amount of checking the wheel would have found. The sdist is
+therefore rebuilt into a wheel and put through the same verification the wheel
+beside it went through, so one run reports on both or refuses. The second mode is
 the one that reads a directory rather than making one, and `ci.yml` did run it:
 the run **failed**, and recording that is the point. A relative `--dist dist/`
 reached a subprocess whose working directory is a scratch tree outside the
