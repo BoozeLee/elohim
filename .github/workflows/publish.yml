@@ -163,7 +163,7 @@ jobs:
       # purpose. That job asks whether the checkout builds an installable
       # artifact; this one asks whether the artifact about to leave is
       # installable. Neither question is the other's.
-      - name: the wheel about to be uploaded installs and its API runs
+      - name: the artifacts about to be uploaded install and their API runs
         run: python3 tools/verify_wheel.py --dist dist/
 
       # v1.14.2. The sha is the commit the annotated tag v1.14.2 resolves to,
