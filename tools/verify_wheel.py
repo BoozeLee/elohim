@@ -20,14 +20,22 @@ real artifact and installing it into a real venv is what a user gets, and it
 also catches packaging metadata errors that no in-process test can see.
 
 Two modes, and the difference is the whole reason the second one exists. With no
-argument this builds a wheel and installs it, which is what CI wants: it proves
-the checkout produces an installable artifact. Given `--dist DIR` it installs the
-wheel already sitting in DIR and builds nothing, which is what a publish wants:
-the upload step sends the files in DIR, so a gate that built a wheel of its own
-verified a second build of the same checkout rather than the artifact on its way
-to the index. The publish workflow passes `--dist dist/`; the `wheel` job in
-ci.yml does not, because those two are answering different questions and neither
-question is the other's.
+argument this builds the distribution and installs the wheel in it, which is what
+CI wants: it proves the checkout produces installable artifacts. Given `--dist
+DIR` it installs the wheel already sitting in DIR and builds nothing, which is
+what a publish wants: the upload step sends the files in DIR, so a gate that
+built a wheel of its own verified a second build of the same checkout rather
+than the artifact on its way to the index. The publish workflow passes `--dist
+dist/`; the `wheel` job in ci.yml does not, because those two are answering
+different questions and neither question is the other's.
+
+Both modes check both artifacts, and that is not a detail. `python3 -m build`
+with neither --wheel nor --sdist writes an sdist *and* a wheel, and the upload
+step sends both, so an sdist that cannot be installed is a defect a consumer
+hits that no amount of checking the wheel would have found. The sdist is
+therefore rebuilt into a wheel and put through the same verification the wheel
+above it went through -- one implementation, two artifacts -- rather than being
+reported on by filename.
 
 
 Every probe runs with its working directory outside the source checkout. That
@@ -54,6 +62,7 @@ import re
 import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import venv
 import zipfile
@@ -241,7 +250,7 @@ class Refusal(Exception):
     """
 
 
-def _readable(wheel: Path) -> None:
+def _readable(wheel: Path, noun: str = "wheel", article: str = "a") -> None:
     """Raise a `Refusal` unless `wheel` is a regular file this process can open.
 
     A name ending in `.whl` is not a wheel. `dist/` can hold a *directory*
@@ -272,20 +281,27 @@ def _readable(wheel: Path) -> None:
     file is a different defect from a readable file that is not a zip, and the
     caller prints a line about the selected artifact that must not be printed
     for either.
+
+    `noun` and `article` are what the refusal calls the thing, and they are
+    parameters because the same check now runs over the sdist as well. "cannot
+    be read as a wheel" about a file that is not a wheel is a sentence that
+    argues with itself, and a reader who hits it on a `.tar.gz` has no way to
+    tell which artifact the run had actually stopped on.
     """
     try:
         mode = os.stat(wheel).st_mode
     except OSError as exc:
-        raise Refusal("%s cannot be read as a wheel: %s" % (wheel.name, exc))
+        raise Refusal("%s cannot be read as %s %s: %s"
+                      % (wheel.name, article, noun, exc))
     if not stat.S_ISREG(mode):
-        raise Refusal("%s is not a regular file, so it is not a wheel"
-                      % wheel.name)
+        raise Refusal("%s is not a regular file, so it is not %s %s"
+                      % (wheel.name, article, noun))
     try:
         with open(wheel, "rb"):
             pass
     except OSError as exc:
-        raise Refusal("%s cannot be read as a wheel: %s"
-                      % (wheel.name, exc)) from exc
+        raise Refusal("%s cannot be read as %s %s: %s"
+                      % (wheel.name, article, noun, exc)) from exc
 
 
 def _one_wheel(dist: Path) -> Path:
@@ -317,6 +333,36 @@ def _one_wheel(dist: Path) -> Path:
                          ", ".join(w.name for w in wheels) or "no *.whl"))
     _readable(wheels[0])
     return wheels[0].absolute()
+
+
+def _one_sdist(dist: Path) -> Path:
+    """The single sdist in `dist`, or a `Refusal` naming what was there instead.
+
+    A separate function from `_one_wheel` on purpose, and the reason is written
+    down in `tests/fixtures/wheel_dist/README.md`: a `dist/` holding only an sdist
+    is *the realistic version of the same refusal*, which is to say `--dist` is
+    documented as wheel-only and a directory with no wheel in it is supposed to
+    be refused by wheel selection. Widening `_one_wheel` to also accept sdists
+    would quietly overturn that contract to save a dozen lines, and the contract
+    is the part someone else reads.
+
+    So this asks its own question of the same directory. Exactly one `*.tar.gz`,
+    because two means the directory did not come from one build -- the same
+    argument `_one_wheel` makes, about the other artifact. And readable, by the
+    same type-and-openability guard, because a `.tar.gz` is as satisfiable by a
+    directory or a named pipe as a `.whl` is.
+
+    Absent is a refusal, not a shrug. `python3 -m build` with neither --wheel
+    nor --sdist writes both, so a `dist/` with a wheel and no sdist is a build
+    that quietly produced less than the upload step is about to send.
+    """
+    sdists = sorted(dist.glob("*.tar.gz"))
+    if len(sdists) != 1:
+        raise Refusal("expected exactly one sdist in %s, found %d: %s"
+                      % (dist, len(sdists),
+                         ", ".join(s.name for s in sdists) or "no *.tar.gz"))
+    _readable(sdists[0], "sdist", "an")
+    return sdists[0].absolute()
 
 
 def _entries(wheel: Path) -> list:
@@ -377,6 +423,259 @@ def _run(cmd, cwd, env=None):
         cmd, cwd=str(cwd), env=env, capture_output=True, text=True)
 
 
+def _verify_dist(dist: Path, source: str, tmp: Path, repo: Path) -> int:
+    """Check the one wheel in `dist` end to end, and return 0 or 1.
+
+    Split out of `main` so the sdist check can run the *same* verification
+    against an artifact rebuilt from the sdist, rather than writing a second and
+    weaker opinion about what a wheel has to contain. One implementation, two
+    artifacts: the wheel the build step produced, and the wheel a consumer gets
+    when they install the sdist instead.
+
+    `source` is how the artifact is described in the report -- "built",
+    "given", or whatever the caller wants to be called -- and it is a parameter
+    rather than a constant because the third caller is not talking about an
+    artifact it was handed.
+    """
+
+
+    try:
+        wheel = _one_wheel(dist)
+    except Refusal as exc:
+        return _fail(str(exc))
+    print("%s: %s (%d bytes)%s"
+          % (source, wheel.name, wheel.stat().st_size,
+             "" if source == "built" else ", not built by this run"))
+    try:
+        names = _entries(wheel)
+    except Refusal as exc:
+        return _fail(str(exc))
+
+    # The wheel must ship the instruments inside the package.
+    if not any(n.startswith(PKG + "/_skills/") for n in names):
+        return _fail("the wheel contains no %s/_skills/ entries" % PKG)
+    if any(n.startswith("skills/") for n in names):
+        return _fail(
+            "the wheel contains a top-level skills/, which would shadow "
+            "any other distribution shipping that name")
+    if not any(n.endswith("elohim-harness/scripts/harness_run.py")
+               for n in names):
+        return _fail("the wheel ships no instrument runner")
+    print("contents: %d entries, instruments under %s/_skills/"
+          % (len(names), PKG))
+
+    env_dir = tmp / "env"
+    venv.EnvBuilder(with_pip=True, clear=True).create(env_dir)
+    py = env_dir / "bin" / "python"
+    if not py.exists():
+        py = env_dir / "Scripts" / "python.exe"
+    install = _run([str(py), "-m", "pip", "install", "--quiet",
+                    "--disable-pip-version-check", "--no-deps",
+                    str(wheel)], tmp)
+    if install.returncode != 0:
+        return _fail("wheel install failed:\n" + install.stdout + install.stderr)
+
+    # Outside the checkout, so a parent walk cannot find the source tree.
+    cwd = tmp / "elsewhere"
+    cwd.mkdir()
+
+    probe_src = tmp / "probe.py"
+    probe_src.write_text(PROBE)
+    empty = tmp / "empty"
+    empty.mkdir()
+
+    run = _run([str(py), str(probe_src), str(empty), str(repo)], cwd)
+    if run.returncode != 0:
+        return _fail("probe crashed:\n" + run.stdout + run.stderr)
+
+    import json
+    try:
+        results = json.loads(run.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return _fail("probe printed no result line:\n" + run.stdout
+                     + run.stderr)
+
+    failed = []
+    for name in sorted(results):
+        r = results[name]
+        if r["ok"]:
+            print("  pass  %-32s %s" % (name, str(r["value"])[:60]))
+        else:
+            failed.append(name)
+            print("  FAIL  %-32s %s" % (name, r["error"]))
+    if failed:
+        return _fail("%d probe(s) failed: %s" % (len(failed),
+                                                 ", ".join(failed)))
+
+    # The code that ran must be the code in this checkout, or the probes
+    # above proved something about a stale artifact. Asking the venv for its
+    # own purelib matters: sysconfig in this process would answer for the
+    # host interpreter and the check would pass against the wrong tree.
+    import json
+    compare = _run([str(py), "-c",
+                    "import importlib, json, sysconfig, sys;"
+                    "m = importlib.import_module(%r);"
+                    "sys.stdout.write(json.dumps({'file': m.__file__,"
+                    " 'purelib': sysconfig.get_paths()['purelib']}))" % PKG],
+                   cwd)
+    if compare.returncode != 0:
+        return _fail("could not import the installed package:\n"
+                     + compare.stdout + compare.stderr)
+    info = json.loads(compare.stdout)
+    installed = Path(info["file"]).resolve()
+    purelib = Path(info["purelib"]).resolve()
+    if purelib not in installed.parents:
+        return _fail("the probe imported %s from outside the install: %s"
+                     % (PKG, installed))
+    if (repo / PKG / "__init__.py").read_bytes() != installed.read_bytes():
+        return _fail(
+            "the installed %s is not byte-identical to the one in this "
+            "checkout, so the probes above proved something about a stale "
+            "artifact" % PKG)
+    print("imported from: %s (byte-identical to this checkout)" % installed)
+
+    # What the artifact calls itself, from three directions, required to
+    # agree. `tests/test_version_agreement.py` checks the four *sources* in
+    # the checkout agree with each other, which is the wrong question here:
+    # the source of truth for a published wheel is what the build backend
+    # stamped on the artifact and what the installed distribution reports,
+    # and a packaging change can break that wiring while all four files in
+    # the tree still agree perfectly. The filename a user installs from and
+    # the `elohim --version` they run afterwards are the only two strings an
+    # outside caller ever sees, so those are the two checked against the
+    # tree.
+    #
+    # The console script is invoked rather than imported on purpose: the
+    # version is handed to the runner through `init_globals` instead of an
+    # import, so a caller that never imports the package still gets the
+    # right string, and that claim is only observable from outside.
+    script = env_dir / "bin" / "elohim"
+    if not script.exists():
+        script = env_dir / "Scripts" / "elohim.exe"
+    if not script.exists():
+        return _fail("the wheel installed no `elohim` console script; a "
+                     "distribution with no entry point cannot be invoked "
+                     "the way every instruction in this repository invokes "
+                     "it")
+
+    said = _run([str(script), "--version"], cwd)
+    if said.returncode != 0:
+        return _fail("`elohim --version` failed in the installed wheel:\n"
+                     + said.stdout + said.stderr)
+    stamped = _run([str(py), "-c",
+                    "import importlib.metadata as m;"
+                    "print(m.version('elohim'))"], cwd)
+    if stamped.returncode != 0:
+        return _fail("could not read the installed distribution's "
+                     "version:\n" + stamped.stdout + stamped.stderr)
+
+    reported = said.stdout.strip()
+    metadata = stamped.stdout.strip()
+    try:
+        declared = PYPROJECT_VERSION.search(
+            (repo / "pyproject.toml").read_text(encoding="utf-8")).group(1)
+    except (AttributeError, OSError) as exc:
+        return _fail("could not read this checkout's declared version from "
+                     "pyproject.toml: %s" % exc)
+
+    print("version: %s | metadata: %s | pyproject: %s"
+          % (reported, metadata, declared))
+    disagree = [("%s said %r" % (n, v)) for n, v in
+                (("the console script", reported.split()[-1]),
+                 ("the distribution metadata", metadata),
+                 ("this checkout", declared))
+                if v != declared]
+    if disagree:
+        return _fail(
+            "the artifact is not the thing this checkout describes: %s. A "
+            "wheel whose own version disagrees with its source is "
+            "installable, and every other gate in this repository stays "
+            "green while it is." % "; ".join(disagree))
+    return 0
+
+
+def _rebuild_from_sdist(sdist: Path, out: Path) -> Path:
+    """Unpack `sdist` under `out`, build a wheel from it, and return where it went.
+
+    This is the whole argument for the sdist check. An sdist is not a thing you
+    can read a checksum off and call verified: it is a compressed instruction to
+    a build backend, and the only question a consumer's `pip install` will ask of
+    it is whether a wheel comes out. So the sdist is put through the build it
+    asks for, and the wheel that comes out is handed to `_verify_dist` -- the
+    same function that just verified the wheel sitting beside it.
+
+    `--no-isolation` for the reason the build in `main` uses it: an isolated
+    build downloads its own backend, which would put a second pinned version in
+    this repository to keep in step with the one pyproject.toml already names.
+
+    A refusal rather than a traceback, for the same reason every other failure
+    here is one: the message has to name the artifact that was wrong.
+    """
+    out.mkdir(parents=True, exist_ok=True)
+    tree = out / "unpacked"
+    tree.mkdir()
+    with tarfile.open(sdist) as tf:
+        try:
+            tf.extractall(tree, filter="data")
+        except TypeError:
+            # `filter` arrived in 3.12 and was backported to late 3.10 patches.
+            # This repository's floor is 3.10, and on an earlier 3.10 patch the
+            # keyword does not exist and the pre-3.12 behaviour is all there is.
+            tf.extractall(tree)
+
+    roots = [p for p in sorted(tree.iterdir()) if p.is_dir()]
+    if len(roots) != 1:
+        raise Refusal("%s unpacks to %d top-level directories, so which one is "
+                      "the project is not a question this gate can answer"
+                      % (sdist.name, len(roots)))
+
+    dist = out / "dist"
+    build = _run([sys.executable, "-m", "build", "--wheel", "--no-isolation",
+                  "--outdir", str(dist)], roots[0])
+    if build.returncode != 0:
+        raise Refusal("the sdist %s does not build a wheel:\n%s%s"
+                      % (sdist.name, build.stdout, build.stderr))
+    return dist
+
+
+def _sdist_report(dist: Path, tmp: Path, repo: Path) -> list:
+    """Every line the run owes about the sdist travelling beside the wheel.
+
+    `python3 -m build` with neither --wheel nor --sdist writes both into
+    `dist/`, and the upload step in publish.yml sends both. So for as long as
+    the gate read `*.whl` and nothing else, a run reported that a wheel had been
+    verified and said nothing at all about the artifact travelling next to it --
+    and a reader of that report had no way to tell which of the two had been
+    checked. The first line here exists to close exactly that gap, which is why
+    it names the sdist rather than summarising it.
+
+    Selection, then rebuild, then the same `_verify_dist` the wheel above went
+    through. A refusal at any of the three stops the run: an sdist that cannot
+    be selected, unpacked, built from, or built into a working wheel is exactly
+    the defect this exists to find, and it is found before the upload rather
+    than after it.
+    """
+    sdist = _one_sdist(dist)
+    out = ["sdist: %s (%d bytes)" % (sdist.name, sdist.stat().st_size)]
+    # Printed here rather than collected and printed by the caller, because the
+    # rebuild below prints a whole verification block of its own. Collected, the
+    # artifact's name would land *after* that block and the block would name
+    # only "rebuilt from ...", leaving a reader to work out which artifact it
+    # had just been told about.
+    print(out[0])
+
+    scratch = tmp / "sdist"
+    rebuilt = _rebuild_from_sdist(sdist, scratch)
+    if _verify_dist(rebuilt, "rebuilt from %s" % sdist.name, scratch, repo) != 0:
+        raise Refusal("the sdist %s rebuilds into a wheel this gate refuses, so "
+                      "the sdist this run would have uploaded is not installable"
+                      % sdist.name)
+    out.append("sdist: %s rebuilds into a wheel that installs and runs the API"
+               % sdist.name)
+    print(out[-1])
+    return out
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(
         description="prove the wheel installs and its API runs")
@@ -406,166 +705,27 @@ def main(argv=None) -> int:
             # --no-isolation because an isolated build downloads its own backend,
             # which would put a second pinned version in this repository to keep in
             # step with the one pyproject.toml already names.
-            build = _run([sys.executable, "-m", "build", "--wheel",
+            #
+            # No --wheel either, so this writes the sdist *and* the wheel: the
+            # same two artifacts `python3 -m build` writes for publish.yml, and
+            # therefore the same two the sdist check below has something to say
+            # about. Building only the wheel would have left the no-argument
+            # mode with nothing to check and the sdist check refusing a run that
+            # had done exactly what it was asked.
+            build = _run([sys.executable, "-m", "build",
                           "--no-isolation", "--outdir", str(dist)], repo)
             if build.returncode != 0:
-                return _fail("wheel build failed:\n" + build.stdout + build.stderr)
+                return _fail("build failed:\n" + build.stdout + build.stderr)
             source = "built"
         else:
             dist = args.dist
             source = "given"
+        if _verify_dist(dist, source, tmp, repo) != 0:
+            return 1
         try:
-            wheel = _one_wheel(dist)
+            _sdist_report(dist, tmp, repo)
         except Refusal as exc:
             return _fail(str(exc))
-        print("%s: %s (%d bytes)%s"
-              % (source, wheel.name, wheel.stat().st_size,
-                 "" if source == "built" else ", not built by this run"))
-        try:
-            names = _entries(wheel)
-        except Refusal as exc:
-            return _fail(str(exc))
-
-        # The wheel must ship the instruments inside the package.
-        if not any(n.startswith(PKG + "/_skills/") for n in names):
-            return _fail("the wheel contains no %s/_skills/ entries" % PKG)
-        if any(n.startswith("skills/") for n in names):
-            return _fail(
-                "the wheel contains a top-level skills/, which would shadow "
-                "any other distribution shipping that name")
-        if not any(n.endswith("elohim-harness/scripts/harness_run.py")
-                   for n in names):
-            return _fail("the wheel ships no instrument runner")
-        print("contents: %d entries, instruments under %s/_skills/"
-              % (len(names), PKG))
-
-        env_dir = tmp / "env"
-        venv.EnvBuilder(with_pip=True, clear=True).create(env_dir)
-        py = env_dir / "bin" / "python"
-        if not py.exists():
-            py = env_dir / "Scripts" / "python.exe"
-        install = _run([str(py), "-m", "pip", "install", "--quiet",
-                        "--disable-pip-version-check", "--no-deps",
-                        str(wheel)], tmp)
-        if install.returncode != 0:
-            return _fail("wheel install failed:\n" + install.stdout + install.stderr)
-
-        # Outside the checkout, so a parent walk cannot find the source tree.
-        cwd = tmp / "elsewhere"
-        cwd.mkdir()
-
-        probe_src = tmp / "probe.py"
-        probe_src.write_text(PROBE)
-        empty = tmp / "empty"
-        empty.mkdir()
-
-        run = _run([str(py), str(probe_src), str(empty), str(repo)], cwd)
-        if run.returncode != 0:
-            return _fail("probe crashed:\n" + run.stdout + run.stderr)
-
-        import json
-        try:
-            results = json.loads(run.stdout.strip().splitlines()[-1])
-        except (ValueError, IndexError):
-            return _fail("probe printed no result line:\n" + run.stdout
-                         + run.stderr)
-
-        failed = []
-        for name in sorted(results):
-            r = results[name]
-            if r["ok"]:
-                print("  pass  %-32s %s" % (name, str(r["value"])[:60]))
-            else:
-                failed.append(name)
-                print("  FAIL  %-32s %s" % (name, r["error"]))
-        if failed:
-            return _fail("%d probe(s) failed: %s" % (len(failed),
-                                                     ", ".join(failed)))
-
-        # The code that ran must be the code in this checkout, or the probes
-        # above proved something about a stale artifact. Asking the venv for its
-        # own purelib matters: sysconfig in this process would answer for the
-        # host interpreter and the check would pass against the wrong tree.
-        import json
-        compare = _run([str(py), "-c",
-                        "import importlib, json, sysconfig, sys;"
-                        "m = importlib.import_module(%r);"
-                        "sys.stdout.write(json.dumps({'file': m.__file__,"
-                        " 'purelib': sysconfig.get_paths()['purelib']}))" % PKG],
-                       cwd)
-        if compare.returncode != 0:
-            return _fail("could not import the installed package:\n"
-                         + compare.stdout + compare.stderr)
-        info = json.loads(compare.stdout)
-        installed = Path(info["file"]).resolve()
-        purelib = Path(info["purelib"]).resolve()
-        if purelib not in installed.parents:
-            return _fail("the probe imported %s from outside the install: %s"
-                         % (PKG, installed))
-        if (repo / PKG / "__init__.py").read_bytes() != installed.read_bytes():
-            return _fail(
-                "the installed %s is not byte-identical to the one in this "
-                "checkout, so the probes above proved something about a stale "
-                "artifact" % PKG)
-        print("imported from: %s (byte-identical to this checkout)" % installed)
-
-        # What the artifact calls itself, from three directions, required to
-        # agree. `tests/test_version_agreement.py` checks the four *sources* in
-        # the checkout agree with each other, which is the wrong question here:
-        # the source of truth for a published wheel is what the build backend
-        # stamped on the artifact and what the installed distribution reports,
-        # and a packaging change can break that wiring while all four files in
-        # the tree still agree perfectly. The filename a user installs from and
-        # the `elohim --version` they run afterwards are the only two strings an
-        # outside caller ever sees, so those are the two checked against the
-        # tree.
-        #
-        # The console script is invoked rather than imported on purpose: the
-        # version is handed to the runner through `init_globals` instead of an
-        # import, so a caller that never imports the package still gets the
-        # right string, and that claim is only observable from outside.
-        script = env_dir / "bin" / "elohim"
-        if not script.exists():
-            script = env_dir / "Scripts" / "elohim.exe"
-        if not script.exists():
-            return _fail("the wheel installed no `elohim` console script; a "
-                         "distribution with no entry point cannot be invoked "
-                         "the way every instruction in this repository invokes "
-                         "it")
-
-        said = _run([str(script), "--version"], cwd)
-        if said.returncode != 0:
-            return _fail("`elohim --version` failed in the installed wheel:\n"
-                         + said.stdout + said.stderr)
-        stamped = _run([str(py), "-c",
-                        "import importlib.metadata as m;"
-                        "print(m.version('elohim'))"], cwd)
-        if stamped.returncode != 0:
-            return _fail("could not read the installed distribution's "
-                         "version:\n" + stamped.stdout + stamped.stderr)
-
-        reported = said.stdout.strip()
-        metadata = stamped.stdout.strip()
-        try:
-            declared = PYPROJECT_VERSION.search(
-                (repo / "pyproject.toml").read_text(encoding="utf-8")).group(1)
-        except (AttributeError, OSError) as exc:
-            return _fail("could not read this checkout's declared version from "
-                         "pyproject.toml: %s" % exc)
-
-        print("version: %s | metadata: %s | pyproject: %s"
-              % (reported, metadata, declared))
-        disagree = [("%s said %r" % (n, v)) for n, v in
-                    (("the console script", reported.split()[-1]),
-                     ("the distribution metadata", metadata),
-                     ("this checkout", declared))
-                    if v != declared]
-        if disagree:
-            return _fail(
-                "the artifact is not the thing this checkout describes: %s. A "
-                "wheel whose own version disagrees with its source is "
-                "installable, and every other gate in this repository stays "
-                "green while it is." % "; ".join(disagree))
 
     print("verify_wheel: the installed wheel runs the API")
     return 0

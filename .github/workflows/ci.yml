@@ -199,8 +199,8 @@ jobs:
       # comes from, not what gets built: with no --sdist/--wheel flag this still
       # writes the sdist *and* the wheel, so the gate is pointed at the same
       # two-artifact directory it will meet in publish.yml. The gate reads the
-      # wheel out of it and the sdist beside it, which is the limit publish.yml's
-      # own comment states out loud.
+      # wheel out of it and rebuilds a wheel from the sdist beside it, so both
+      # artifacts are checked on every push rather than only on a real publish.
       - name: build into the directory the publish gate reads
         run: python3 -m build --no-isolation --outdir dist/
 
