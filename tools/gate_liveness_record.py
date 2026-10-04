@@ -22,13 +22,23 @@ absence. That is why an entry carries the run that produced it.
 **The committed log is a snapshot, and this script does not make it a feed.** A
 runner's working tree is discarded when the job ends, so the write above is
 thrown away with the checkout and nothing commits it. Refreshing the file in the
-repository is a person's job. What this script does instead is append the
-*delta* -- the records this run added or refreshed -- to `$GITHUB_STEP_SUMMARY`
-when GitHub sets it, so each run carries its own observations on the run page
-and a person has the exact records to commit rather than re-running anything to
-recover them. The delta is bounded on purpose: the file is per-step, capped at
-1 MiB, and at most 20 step summaries are shown per job, so the whole log never
-goes there.
+repository is a person's job. What this script does instead is publish the
+*delta* -- the records this run added or refreshed -- to two surfaces, so a
+person has the exact records to commit rather than re-running anything to
+recover them.
+
+The first is stdout, which is the one that actually delivers that promise: the
+step log is retained and is readable with `gh run view --log <run>`. Every
+recorded gate is named there. The second is `$GITHUB_STEP_SUMMARY`, which GitHub
+renders as a table on the run page. That one is decoration -- no REST API
+exposes a job summary and the served run page does not carry the text -- so it
+is the surface a reader cannot reach from a terminal, and it is not what makes
+the delta recoverable. Both are written; only one is load-bearing. The summary
+is bounded on purpose: the file is per-step, capped at 1 MiB, and at most 20
+step summaries are shown per job, so the whole log never goes there.
+
+Before this, stdout carried the count and not the names, so run 37236817476 is
+unrecoverable: it says "8 gate(s) in ci.yml:core" and never says which eight.
 """
 
 from __future__ import annotations
@@ -140,6 +150,15 @@ def main(argv=None) -> int:
         "gate_liveness_record: %d gate(s) in %s recorded as passing in run %s"
         % (len(touched), args.job, args.run)
     )
+    # The names go to stdout as well as to the step summary, because the
+    # summary is not readable from a terminal and the docstring promises the
+    # delta is recoverable without re-running anything. `gh run view --log` is
+    # greppable and retained; the Summary tab is neither greppable nor exposed
+    # by any API. Printed in full even under --suite, where that is a few
+    # hundred lines: truncating would put the tail back behind the re-run this
+    # exists to avoid, and a CI log is not a UI.
+    for gate in touched:
+        print("  recorded: %s" % gate)
     return 0
 
 

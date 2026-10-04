@@ -740,9 +740,25 @@
       "via": "python3 -m pytest tests/test_gate_liveness.py",
       "workflow": "local verification"
     },
+    "tests/test_gate_liveness.py::test_the_printed_delta_is_the_delta_and_not_the_whole_log": {
+      "at": "2026-10-04T22:05:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
     "tests/test_gate_liveness.py::test_the_recorder_appends_its_delta_to_the_step_summary": {
       "at": "2026-10-04T23:30:00Z",
       "note": "verified on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_recorder_prints_its_delta_so_the_step_log_can_recover_it": {
+      "at": "2026-10-04T22:05:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
       "run": "local",
       "status": "success",
       "via": "python3 -m pytest tests/test_gate_liveness.py",
