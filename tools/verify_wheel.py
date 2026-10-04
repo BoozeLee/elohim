@@ -297,7 +297,7 @@ def _one_wheel(dist: Path) -> Path:
                       % (dist, len(wheels),
                          ", ".join(w.name for w in wheels) or "no *.whl"))
     _readable(wheels[0])
-    return wheels[0]
+    return wheels[0].absolute()
 
 
 def _entries(wheel: Path) -> list:

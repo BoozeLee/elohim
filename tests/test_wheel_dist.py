@@ -589,5 +589,42 @@ def test_these_ci_assertions_can_fail_by_running_the_gate_before_the_build():
         "about their order; got %r" % (problems,))
 
 
+def test_dist_accepts_a_relative_path_the_way_publish_yml_passes_it():
+    # `publish.yml` calls `verify_wheel.py --dist dist/`: a path relative to the
+    # checkout, not an absolute one. Every other test in this file passed
+    # `FIXTURES`, which is absolute, so the whole file stayed green while that
+    # one invocation could never work.
+    #
+    # Why it could not work: `main` hands the selected wheel to a subprocess
+    # whose `cwd` is a scratch directory outside the checkout, so a relative
+    # path is resolved against *that* directory. pip was asked to install
+    # `/tmp/elohim-wheel-XXXX/dist/elohim-0.3.0-py3-none-any.whl`, which does
+    # not exist, and the gate failed at the install -- after printing a
+    # selection and passing every content check, so nothing above the install
+    # had said anything was wrong. A `--dist` mode that worked and one that
+    # could never work were identical in every test in this repository.
+    #
+    # The assertion is on the *shape* of the returned path rather than on a
+    # full build, because a full build here would make this file minutes
+    # instead of seconds. `_one_wheel` must return something absolute: that is
+    # the whole contract, and it is what the subprocess depends on.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-relative-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        (dist / "elohim-0.3.0-py3-none-any.whl").write_bytes(b"")
+
+        relative = Path(os.path.relpath(dist, REPO))
+        assert not relative.is_absolute(), relative
+        got = vw._one_wheel(relative)
+        assert got.is_absolute(), (
+            "a relative --dist returned a relative wheel path; the install "
+            "subprocess runs with cwd outside the checkout and would resolve "
+            "it there: %s" % got)
+        assert got == (REPO / relative / "elohim-0.3.0-py3-none-any.whl")
+        # The name it was selected under is what the messages use, so
+        # absolutising must not rename it.
+        assert got.name == "elohim-0.3.0-py3-none-any.whl"
+
+
 if __name__ == "__main__":
     raise SystemExit(pytest.main([__file__]))
