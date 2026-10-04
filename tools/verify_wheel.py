@@ -14,11 +14,21 @@ never heard of, one level below the package data that was sitting there the
 whole time. pip install elohim is the distribution form E3 depends on and an
 external caller is the only thing that closes E1's third clause, so the one
 thing nobody had done was install the thing and call it.
-
 The check is deliberately not a fabricated directory layout. Building an
-in-process fake that mimics site-packages would be testing the fake; building
-the real artifact and installing it into a real venv is what a user gets, and
-it also catches packaging metadata errors that no in-process test can see.
+in-process fake that mimics site-packages would be testing the fake; building the
+real artifact and installing it into a real venv is what a user gets, and it
+also catches packaging metadata errors that no in-process test can see.
+
+Two modes, and the difference is the whole reason the second one exists. With no
+argument this builds a wheel and installs it, which is what CI wants: it proves
+the checkout produces an installable artifact. Given `--dist DIR` it installs the
+wheel already sitting in DIR and builds nothing, which is what a publish wants:
+the upload step sends the files in DIR, so a gate that built a wheel of its own
+verified a second build of the same checkout rather than the artifact on its way
+to the index. The publish workflow passes `--dist dist/`; the `wheel` job in
+ci.yml does not, because those two are answering different questions and neither
+question is the other's.
+
 
 Every probe runs with its working directory outside the source checkout. That
 is not tidiness: the resolver walks up from its own file looking for a checkout,
@@ -36,12 +46,14 @@ Stdlib only, like every tool in this repository. Invoked from CI as a separate
 job so it runs in parallel with the unit gates instead of extending them.
 """
 
+import argparse
 import ast
 import re
 import subprocess
 import sys
 import tempfile
 import venv
+import zipfile
 from pathlib import Path
 
 PKG = "elohim_gate"
@@ -217,6 +229,53 @@ def _fail(msg):
     return 1
 
 
+class Refusal(Exception):
+    """A condition this gate declines to pass over, carrying its own reason.
+
+    An exception rather than a returned int so the refusals can live in a
+    function the unit tests can drive with a committed fixture, instead of being
+    reachable only by running a build.
+    """
+
+
+def _one_wheel(dist: Path) -> Path:
+    """The single wheel in `dist`, or a `Refusal` naming what was there instead.
+
+    Exactly one, and the refusal is the interesting half. A `dist/` holding two
+    wheels is a directory whose contents did not come from one build, and
+    picking either of them is how a gate ends up checking an artifact nobody
+    chose -- so the count is checked rather than assumed, and a directory that
+    is not there at all is a refusal rather than an empty result.
+
+    Side-effect free: it reads a directory and either returns a path or raises,
+    which is what lets `tests/test_wheel_dist.py` exercise both directions
+    offline. The build is not here because the build is not what is under test.
+    """
+    if not dist.is_dir():
+        raise Refusal("%s is not a directory; --dist names a directory of "
+                      "already-built artifacts" % dist)
+    wheels = sorted(dist.glob("*.whl"))
+    if len(wheels) != 1:
+        raise Refusal("expected exactly one wheel in %s, found %d: %s"
+                      % (dist, len(wheels),
+                         ", ".join(w.name for w in wheels) or "no *.whl"))
+    return wheels[0]
+
+
+def _entries(wheel: Path) -> list:
+    """The wheel's zip entry names, or a `Refusal` if it is not a readable zip.
+
+    Without this the next line raises `zipfile.BadZipFile` out of `main`, and a
+    traceback is not a gate: it names a Python exception rather than the
+    artifact that was wrong.
+    """
+    try:
+        with zipfile.ZipFile(wheel) as zf:
+            return zf.namelist()
+    except zipfile.BadZipFile as exc:
+        raise Refusal("%s is not a readable wheel: %s" % (wheel.name, exc))
+
+
 def static_check() -> list[str]:
     """No code path may reach the skills tree by dividing REPO by a literal.
 
@@ -250,7 +309,18 @@ def _run(cmd, cwd, env=None):
         cmd, cwd=str(cwd), env=env, capture_output=True, text=True)
 
 
-def main() -> int:
+def main(argv=None) -> int:
+    ap = argparse.ArgumentParser(
+        description="prove the wheel installs and its API runs")
+    ap.add_argument(
+        "--dist",
+        type=Path,
+        metavar="DIR",
+        help=("verify the wheel already in DIR instead of building one, so a "
+              "publish checks the artifact it is about to send rather than a "
+              "second build of the same checkout"))
+    args = ap.parse_args(argv)
+
     repo = Path(__file__).resolve().parent.parent
     if not (repo / PKG).is_dir():
         return _fail("not run from a checkout: %s has no %s/" % (repo, PKG))
@@ -263,34 +333,43 @@ def main() -> int:
 
     with tempfile.TemporaryDirectory(prefix="elohim-wheel-") as scratch:
         tmp = Path(scratch)
-        dist = tmp / "dist"
-        # --no-isolation because an isolated build downloads its own backend,
-        # which would put a second pinned version in this repository to keep in
-        # step with the one pyproject.toml already names.
-        build = _run([sys.executable, "-m", "build", "--wheel",
-                      "--no-isolation", "--outdir", str(dist)], repo)
-        if build.returncode != 0:
-            return _fail("wheel build failed:\n" + build.stdout + build.stderr)
-        wheels = sorted(dist.glob("*.whl"))
-        if len(wheels) != 1:
-            return _fail("expected exactly one wheel, got %r"
-                         % [w.name for w in wheels])
-        print("built: %s (%d bytes)" % (wheels[0].name, wheels[0].stat().st_size))
+        if args.dist is None:
+            dist = tmp / "dist"
+            # --no-isolation because an isolated build downloads its own backend,
+            # which would put a second pinned version in this repository to keep in
+            # step with the one pyproject.toml already names.
+            build = _run([sys.executable, "-m", "build", "--wheel",
+                          "--no-isolation", "--outdir", str(dist)], repo)
+            if build.returncode != 0:
+                return _fail("wheel build failed:\n" + build.stdout + build.stderr)
+            source = "built"
+        else:
+            dist = args.dist
+            source = "given"
+        try:
+            wheel = _one_wheel(dist)
+        except Refusal as exc:
+            return _fail(str(exc))
+        print("%s: %s (%d bytes)%s"
+              % (source, wheel.name, wheel.stat().st_size,
+                 "" if source == "built" else ", not built by this run"))
+        try:
+            names = _entries(wheel)
+        except Refusal as exc:
+            return _fail(str(exc))
 
         # The wheel must ship the instruments inside the package.
-        with __import__("zipfile").ZipFile(wheels[0]) as zf:
-            names = zf.namelist()
-            if not any(n.startswith(PKG + "/_skills/") for n in names):
-                return _fail("the wheel contains no %s/_skills/ entries" % PKG)
-            if any(n.startswith("skills/") for n in names):
-                return _fail(
-                    "the wheel contains a top-level skills/, which would shadow "
-                    "any other distribution shipping that name")
-            if not any(n.endswith("elohim-harness/scripts/harness_run.py")
-                       for n in names):
-                return _fail("the wheel ships no instrument runner")
-            print("contents: %d entries, instruments under %s/_skills/"
-                  % (len(names), PKG))
+        if not any(n.startswith(PKG + "/_skills/") for n in names):
+            return _fail("the wheel contains no %s/_skills/ entries" % PKG)
+        if any(n.startswith("skills/") for n in names):
+            return _fail(
+                "the wheel contains a top-level skills/, which would shadow "
+                "any other distribution shipping that name")
+        if not any(n.endswith("elohim-harness/scripts/harness_run.py")
+                   for n in names):
+            return _fail("the wheel ships no instrument runner")
+        print("contents: %d entries, instruments under %s/_skills/"
+              % (len(names), PKG))
 
         env_dir = tmp / "env"
         venv.EnvBuilder(with_pip=True, clear=True).create(env_dir)
@@ -299,7 +378,7 @@ def main() -> int:
             py = env_dir / "Scripts" / "python.exe"
         install = _run([str(py), "-m", "pip", "install", "--quiet",
                         "--disable-pip-version-check", "--no-deps",
-                        str(wheels[0])], tmp)
+                        str(wheel)], tmp)
         if install.returncode != 0:
             return _fail("wheel install failed:\n" + install.stdout + install.stderr)
 

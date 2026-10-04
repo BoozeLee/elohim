@@ -300,9 +300,49 @@ STEP_START = re.compile(r"^[ \t]*(?:-[ \t]+)?(?:name|uses|run):", re.MULTILINE)
 GUARD = re.compile(r"^[ \t]*if:[ \t]*\$\{\{[^\n]*!inputs\.dry_run[^\n]*$",
                    re.MULTILINE)
 
+# The wheel gate, and the upload it is ordered against. Both anchored to their
+# own key rather than to a substring, because a line of prose mentioning either
+# is not the step: this file's own comment once said this step ran "against what
+# was actually published", which was false -- the tool rebuilds -- so a matcher
+# loose enough to count that comment could not tell the two orders apart either.
+WHEEL_RUN = re.compile(
+    r"^[ \t]*run:[ \t]+python3[ \t]+tools/verify_wheel\.py(?P<args>[^\n]*)$",
+    re.MULTILINE)
+PUBLISH_NAME = re.compile(
+    r"^[ \t]*(?:-[ \t]+)?name:[ \t]*publish to PyPI[ \t]*$", re.MULTILINE)
+
+# The directory the upload is told to send, anchored to its own key. Scoped to
+# the publish step by the caller rather than matched against the file, because a
+# `packages-dir:` anywhere else in publish.yml would satisfy a file-wide match
+# while saying nothing at all about what the upload sends.
+PACKAGES_DIR = re.compile(
+    r"^[ \t]+packages-dir:[ \t]*(?P<dir>[^\n#]*?)[ \t]*$", re.MULTILINE)
+
+
+def _line_of(pattern, text, what):
+    """The line number of the only match, or a failure naming what was absent.
+
+    Counting the matches as well as locating them, because an assertion about
+    the order of two things also passes when one of them is missing -- and a
+    workflow with no upload step is not one that got safer.
+    """
+    hits = list(pattern.finditer(text))
+    assert len(hits) == 1, (
+        "expected exactly one %s in publish.yml, found %d" % (what, len(hits)))
+    return text.count("\n", 0, hits[0].start())
+
 
 def _workflow() -> str:
     return PUBLISH.read_text(encoding="utf-8")
+
+
+def _wheel_gate_args(text: str) -> str:
+    """The argument the wheel gate is invoked with, or a failure naming what is absent."""
+    hits = list(WHEEL_RUN.finditer(text))
+    assert len(hits) == 1, (
+        "expected exactly one `run: python3 tools/verify_wheel.py` line in "
+        "publish.yml, found %d" % len(hits))
+    return hits[0].group("args").strip()
 
 
 def _publish_step(text: str) -> str:
@@ -374,6 +414,93 @@ def test_the_dry_run_still_builds_and_verifies():
     )
 
 
+def test_the_artifact_is_verified_before_it_is_uploaded():
+    """The one gate that cannot be undone, above the one thing that cannot be.
+
+    The upload is the only irreversible step here, and a wheel that does not
+    install is only found out by installing it. Checking afterwards is not a
+    late check, it is no check: by then the index is serving the artifact to
+    anyone who asks, and a fixed version published next to a broken one leaves
+    both of them on the index.
+    """
+    text = _workflow()
+    wheel = _line_of(WHEEL_RUN, text, "`run: python3 tools/verify_wheel.py` step")
+    upload = _line_of(PUBLISH_NAME, text, "`name: publish to PyPI` step")
+    assert wheel < upload, (
+        "publish.yml runs the wheel gate at line %d and the upload at line %d, so "
+        "a packaging defect is found only after the public index has it"
+        % (wheel, upload))
+
+
+def test_the_wheel_gate_reads_the_directory_the_upload_sends():
+    """Above the upload is necessary; reading *its* directory is what makes it so.
+
+    The ordering on its own is satisfied by a gate that rebuilds a wheel of its
+    own: run first, then build a proxy, then upload the original, and the
+    ordering assertion still passes while the artifact that leaves is still
+    unverified. So this asserts the flag, not just the position.
+    """
+    text = _workflow()
+    hits = list(WHEEL_RUN.finditer(text))
+    assert len(hits) == 1, (
+        "expected exactly one `run: python3 tools/verify_wheel.py` line in "
+        "publish.yml, found %d" % len(hits))
+    args = hits[0].group("args").strip()
+    assert args == "--dist dist/", (
+        "publish.yml invokes the wheel gate as `python3 tools/verify_wheel.py%s`, "
+        "so it builds a second wheel of this checkout instead of installing the "
+        "one the build step above produced and the upload below sends"
+        % ((" " + args) if args else ""))
+
+
+def test_the_upload_is_told_the_directory_the_gate_reads():
+    """The other half of the coupling, and the half that was unasserted.
+
+    The test above pins the gate to `dist/`. Pinning one end of a coupling is
+    not pinning it: the upload step declared no `packages-dir` at all, so the
+    directory it actually sent was whatever the action's own default was. At the
+    pinned sha that default is `dist` -- but only because the canonical
+    kebab-case input carries no default of its own and the value arrives through
+    the *deprecated* `packages_dir` alias, via the action's internal
+    `inputs.packages-dir || inputs.packages_dir` fallback, and beside that
+    commented-out default the action carries its own "TODO: uncomment once alias
+    removed".
+
+    So the gate read a directory pinned in this repository while the upload read
+    a directory pinned inside a third-party action, through a spelling its
+    maintainers have marked for removal, and nothing here said the two were the
+    same place. Every assertion that existed ran the other way: they held the
+    gate to `dist/` and asked nothing of the upload. Change that default, or add
+    a `packages-dir:` here pointing somewhere else, and both existing assertions
+    stay green while the gate goes back to verifying a proxy for whatever leaves
+    -- the exact defect moving it above the upload was meant to remove.
+
+    Read from the upload step and required to equal the gate's own argument,
+    rather than repeated as a second literal `dist/`: two literals would agree
+    with each other after someone changed only one of them.
+    """
+    text = _workflow()
+    step = _publish_step(text)
+    assert step.strip(), (
+        "publish.yml has no `publish to PyPI` step to read a directory from")
+    hits = list(PACKAGES_DIR.finditer(step))
+    assert len(hits) == 1, (
+        "expected exactly one `packages-dir:` in the `publish to PyPI` step, "
+        "found %d; with none, the upload sends whatever the action's default "
+        "is, which nothing in this repository states" % len(hits))
+    declared = hits[0].group("dir").strip()
+    assert declared, (
+        "the upload step declares `packages-dir:` with no value, so the upload "
+        "is back to sending the action's default")
+    given = _wheel_gate_args(text)
+    assert given == "--dist " + declared, (
+        "the gate is invoked as `python3 tools/verify_wheel.py %s` while the "
+        "upload is told `packages-dir: %s`, so the gate verifies a directory "
+        "that is not the one that leaves: the artifact reaching the index is "
+        "unverified and every other assertion in this file still passes"
+        % (given, declared))
+
+
 def test_these_assertions_can_fail():
     """The control. Every assertion above is a regular expression over a file,
     and a regular expression that cannot fail proves nothing. Deleting the
@@ -416,6 +543,62 @@ def test_these_assertions_can_fail():
         "DRY_RUN_TYPE still matches with the `type: boolean` line removed, so it "
         "is matching something other than the type it claims to require"
     )
+
+    # Control 4: the two steps the last assertion orders, transposed. Only the
+    # order changes: both lines are still present exactly once, so this fails
+    # for the reason it claims rather than because a step went missing.
+    wheel_at = _line_of(WHEEL_RUN, text, "the wheel gate step")
+    upload_at = _line_of(PUBLISH_NAME, text, "the upload step")
+    lines = text.splitlines()
+    lines[wheel_at], lines[upload_at] = lines[upload_at], lines[wheel_at]
+    transposed = "\n".join(lines) + "\n"
+    assert _line_of(WHEEL_RUN, transposed, "the wheel gate step") > _line_of(
+        PUBLISH_NAME, transposed, "the upload step"), (
+        "swapping the wheel gate and the upload left them in the order the "
+        "ordering assertion accepts, so that assertion cannot fail")
+
+    # Control 5: the flag dropped, which leaves the gate above the upload and
+    # still building its own proxy. Position is unchanged, so the ordering
+    # assertion cannot see this -- only the argument assertion can.
+    def _args(in_text):
+        found = list(WHEEL_RUN.finditer(in_text))
+        assert len(found) == 1, "the mutation below is not unique"
+        return found[0].group("args").strip()
+
+    stripped = re.sub(r"(^[ \t]*run:[ \t]+python3[ \t]+tools/verify_wheel\.py)"
+                      r"[^\n]*\n", r"\1\n", text, count=1, flags=re.MULTILINE)
+    assert stripped != text, "the control removed no argument"
+    assert _args(stripped) == "", "the control left an argument behind"
+    assert _args(stripped) != "--dist dist/"
+    # And the ordering assertion still passes on it, which is the point.
+    assert _line_of(WHEEL_RUN, stripped, "the wheel gate step") < _line_of(
+        PUBLISH_NAME, stripped, "the upload step"), (
+        "this control no longer isolates the argument: dropping --dist changed "
+        "the step order too, so it would not prove the ordering assertion is "
+        "blind to the rebuild")
+
+    # Control 6: the upload's own directory deleted, which is the state the
+    # workflow was actually in when the gate was moved above it -- the gate
+    # pinned to dist/, the upload pinned to nothing, the two agreeing only
+    # because the action's default happened to match. Neither the position of
+    # the gate nor the gate's own argument changes, so the two assertions above
+    # cannot see this; only the coupling assertion can, which is what makes it
+    # load-bearing rather than a second copy of the same claim.
+    undeclared = re.sub(r"^[ \t]+packages-dir:[^\n]*\n", "", text, count=1,
+                        flags=re.MULTILINE)
+    assert undeclared != text, "the control removed no packages-dir line"
+    assert not PACKAGES_DIR.findall(_publish_step(undeclared)), (
+        "PACKAGES_DIR still matches with the line removed, so it is matching "
+        "something other than the upload's declared directory")
+    # And the assertions that must stay blind to it. If either of these fails
+    # below, the control has stopped isolating the upload side and the proof it
+    # offers is void.
+    assert _line_of(WHEEL_RUN, undeclared, "the wheel gate step") < _line_of(
+        PUBLISH_NAME, undeclared, "the upload step")
+    assert _wheel_gate_args(undeclared) == "--dist dist/", (
+        "this control no longer isolates the upload side: removing "
+        "packages-dir: also changed the gate's argument, so it would not prove "
+        "the coupling assertion is the only one that can see it")
 
 
 if __name__ == "__main__":

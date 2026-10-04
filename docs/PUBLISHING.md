@@ -66,6 +66,14 @@ things: `skipped` is a dry run, `success` is an upload. Read it by name rather
 than by position — a step added anywhere above it renumbers everything below,
 and this file has been wrong about that number before.
 
+Two steps sit above the upload and can stop a run before anything leaves this
+repository: `the version being offered is not already released`, and `the wheel
+about to be uploaded installs and its API runs`. Red on either means **nothing was
+uploaded**, which is the outcome you wanted rather than a failure to retry. Fix
+the cause — usually a version bump, or a packaging defect — and dispatch again.
+There is no in-between state to clean up: the upload is one step, and it is the
+first one after both gates.
+
 ## When it refuses
 
 This is the part worth keeping.
