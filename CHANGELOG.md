@@ -10,8 +10,15 @@ version, and no version is covered by a stability guarantee.
 
 `elohim 0.3.0` is on PyPI, so this release is the first one that can be
 published at all: a released version is never replaced, and the previous tree
-could not have shipped without a bump. Nothing here has been uploaded — the
-release is prepared, and `publish.yml` is the only thing that uploads.
+could not have shipped without a bump. ~~Nothing here has been uploaded — the
+release is prepared, and `publish.yml` is the only thing that uploads.~~
+**True when this section was written and false by the time it was read.**
+`elohim 0.4.0` was uploaded to PyPI at **19:15:15Z on 2026-10-04** by trusted
+publishing, and installed back from the index into a clean environment to
+`verdict PASS` from outside the checkout the same day; the figures are recorded
+under `E3` in `docs/ROADMAP.md`. The struck sentence is kept because it was true
+of the tree at the moment it was written, and a reader who inherits only the
+correction loses the fact that the release was prepared before it was uploaded.
 
 The range is measured, not asserted, and it needs a different command from the
 one below it. `0.3.0` was published at **09:23:35Z on 2026-10-03** and was
@@ -34,8 +41,11 @@ changed, not one per commit, for the reason `[0.3.0]` gives.
   and that the repository is public. The third is a remote property, so it
   needs `GITHUB_TOKEN`; without one it *raises* rather than returning an empty
   list, because an empty list is indistinguishable from "all good" to every
-  caller. On a runner it runs `--require visibility` and an unobservable claim
-  is a failure.
+  caller. ~~On a runner it runs `--require visibility` and an unobservable claim
+  is a failure.~~ **True of the 0.4.0 release, and superseded after it.** The
+  runner now runs `--require visibility index`: the index's JSON endpoint answers
+  unauthenticated, so that claim needs no credential, and an unobservable claim
+  is still a failure. The current invocation is `.github/workflows/ci.yml`.
 - **`pay-signal` and `claim-ledger`** — two more gate-ledger-backed skills,
   plus a design note for five more at the front of the pipeline. None of those
   five are built.
