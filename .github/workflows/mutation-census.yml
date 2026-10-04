@@ -72,6 +72,7 @@ jobs:
           python-version: "3.13"
 
       - name: the census, against the whole population
+        id: census
         run: |
           args=""
           if [ -n "${{ inputs.fail_over }}" ]; then
@@ -276,3 +277,22 @@ jobs:
           for r in rows:
               print(f"  {r['operator']} {r['skill']} site {r['site_index']} (line {r['lineno']})")
           PY
+
+      # Guarded, and the guard is the whole point. The two steps above carry
+      # `if: always()` on purpose -- the report is published and named even when
+      # the census fails -- so in this job "reached the last step" no longer
+      # means "the job passed". An unguarded recorder here would write a passing
+      # record for a census that had just gone red, which is the one thing this
+      # log must never hold.
+      #
+      # So the recorder runs only when the census itself succeeded. `id: census`
+      # above exists for this condition and nothing else.
+      #
+      # This step is also why the two census gates could never go LIVE: nothing
+      # in this job called the recorder, so the declared `workflow_dispatch-only`
+      # reason was half of it. The other half is that no dispatch could have
+      # moved them, however many times one was sent.
+      - name: record what this job proved
+        if: steps.census.outcome == 'success'
+        run: >-
+          python3 tools/gate_liveness_record.py --job mutation-census.yml:census
