@@ -349,11 +349,22 @@ def test_that_the_wiring_assertions_can_fail():
 
 
 def test_that_moving_the_gate_after_the_upload_is_caught():
+    """Move the guard step below the upload, and the ordering must invert.
+
+    The two blocks are swapped by position rather than as one contiguous
+    substring. They were adjacent when this control was written and no longer
+    are, and a control that quietly stops altering the file when an unrelated
+    step lands between the two things it is swapping has stopped being a
+    control. The `reordered != text` assertion is what says so, and it is the
+    reason that assertion is here rather than assumed.
+    """
     text = _publish_text()
     blocks = _steps(text)
     guard = blocks[_index_of(blocks, TOOL.name)]
     upload = blocks[_index_of(blocks, "publish to PyPI")]
-    reordered = text.replace(guard + upload, upload + guard)
+
+    reordered = text.replace(guard, "\0guard\0").replace(upload, guard)
+    reordered = reordered.replace("\0guard\0", upload)
     assert reordered != text, "the control did not change the file"
 
     moved = _steps(reordered)

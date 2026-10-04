@@ -109,6 +109,23 @@ jobs:
       - name: the version being offered is not already released
         run: python3 tools/verify_release_slot.py
 
+      # The upload succeeding is not the same as the artifact being installable,
+      # and only the second is what anyone consumes. This step is the second, and
+      # it sits above the upload rather than below it: a packaging defect found
+      # after the upload is a defect the public index is already serving, and a
+      # published version is not withdrawn by publishing a fixed one next to it.
+      # The earlier this gate turns red, the cheaper the lesson.
+      #
+      # What it proves, stated exactly rather than generously. `verify_wheel.py`
+      # builds a wheel from this same checkout with the same pinned backend and
+      # installs that into a clean venv, so what it checks is the distribution
+      # the upload below is about to send. It does not check the bytes as the
+      # index received them -- nothing in this workflow does -- and the step is
+      # named for what it does rather than for what it hoped to check, because
+      # the version of this comment that said "published" was false.
+      - name: the wheel about to be uploaded installs and its API runs
+        run: python3 tools/verify_wheel.py
+
       # v1.14.2. The sha is the commit the annotated tag v1.14.2 resolves to,
       # dereferenced rather than copied from the tag object, so it names code
       # rather than a name that can be moved.
@@ -127,9 +144,3 @@ jobs:
       - name: publish to PyPI
         if: ${{ !inputs.dry_run }}
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
-
-      # The upload succeeding is not the same as the artifact being installable,
-      # and only the second is what anyone consumes. This is the same proof
-      # `tools/verify_wheel.py` gives, run against what was actually published.
-      - name: the published artifact installs and its API runs
-        run: python3 tools/verify_wheel.py

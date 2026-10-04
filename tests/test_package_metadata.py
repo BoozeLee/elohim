@@ -300,6 +300,29 @@ STEP_START = re.compile(r"^[ \t]*(?:-[ \t]+)?(?:name|uses|run):", re.MULTILINE)
 GUARD = re.compile(r"^[ \t]*if:[ \t]*\$\{\{[^\n]*!inputs\.dry_run[^\n]*$",
                    re.MULTILINE)
 
+# The wheel gate, and the upload it is ordered against. Both anchored to their
+# own key rather than to a substring, because a line of prose mentioning either
+# is not the step: this file's own comment once said this step ran "against what
+# was actually published", which was false -- the tool rebuilds -- so a matcher
+# loose enough to count that comment could not tell the two orders apart either.
+WHEEL_RUN = re.compile(
+    r"^[ \t]*run:[ \t]+python3[ \t]+tools/verify_wheel\.py[ \t]*$", re.MULTILINE)
+PUBLISH_NAME = re.compile(
+    r"^[ \t]*(?:-[ \t]+)?name:[ \t]*publish to PyPI[ \t]*$", re.MULTILINE)
+
+
+def _line_of(pattern, text, what):
+    """The line number of the only match, or a failure naming what was absent.
+
+    Counting the matches as well as locating them, because an assertion about
+    the order of two things also passes when one of them is missing -- and a
+    workflow with no upload step is not one that got safer.
+    """
+    hits = list(pattern.finditer(text))
+    assert len(hits) == 1, (
+        "expected exactly one %s in publish.yml, found %d" % (what, len(hits)))
+    return text.count("\n", 0, hits[0].start())
+
 
 def _workflow() -> str:
     return PUBLISH.read_text(encoding="utf-8")
@@ -374,6 +397,24 @@ def test_the_dry_run_still_builds_and_verifies():
     )
 
 
+def test_the_artifact_is_verified_before_it_is_uploaded():
+    """The one gate that cannot be undone, above the one thing that cannot be.
+
+    The upload is the only irreversible step here, and a wheel that does not
+    install is only found out by installing it. Checking afterwards is not a
+    late check, it is no check: by then the index is serving the artifact to
+    anyone who asks, and a fixed version published next to a broken one leaves
+    both of them on the index.
+    """
+    text = _workflow()
+    wheel = _line_of(WHEEL_RUN, text, "`run: python3 tools/verify_wheel.py` step")
+    upload = _line_of(PUBLISH_NAME, text, "`name: publish to PyPI` step")
+    assert wheel < upload, (
+        "publish.yml runs the wheel gate at line %d and the upload at line %d, so "
+        "a packaging defect is found only after the public index has it"
+        % (wheel, upload))
+
+
 def test_these_assertions_can_fail():
     """The control. Every assertion above is a regular expression over a file,
     and a regular expression that cannot fail proves nothing. Deleting the
@@ -416,6 +457,19 @@ def test_these_assertions_can_fail():
         "DRY_RUN_TYPE still matches with the `type: boolean` line removed, so it "
         "is matching something other than the type it claims to require"
     )
+
+    # Control 4: the two steps the last assertion orders, transposed. Only the
+    # order changes: both lines are still present exactly once, so this fails
+    # for the reason it claims rather than because a step went missing.
+    wheel_at = _line_of(WHEEL_RUN, text, "the wheel gate step")
+    upload_at = _line_of(PUBLISH_NAME, text, "the upload step")
+    lines = text.splitlines()
+    lines[wheel_at], lines[upload_at] = lines[upload_at], lines[wheel_at]
+    transposed = "\n".join(lines) + "\n"
+    assert _line_of(WHEEL_RUN, transposed, "the wheel gate step") > _line_of(
+        PUBLISH_NAME, transposed, "the upload step"), (
+        "swapping the wheel gate and the upload left them in the order the "
+        "ordering assertion accepts, so that assertion cannot fail")
 
 
 if __name__ == "__main__":
