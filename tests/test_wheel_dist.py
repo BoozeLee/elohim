@@ -124,31 +124,51 @@ def test_a_directory_that_is_not_there_is_refused_differently():
     assert "found 0" not in message, message
 
 
-def test_the_selection_does_not_depend_on_the_order_the_directory_lists():
-    # The version of this test that filtered the fixtures down to the
-    # directories holding exactly one wheel could not fail: after the filter the
-    # candidate set was the single element "one_wheel", and no ordering of a
-    # one-element set was ever going to be observed. It asserted the name of a
-    # wheel and was named for a property it never touched.
+def test_the_selection_does_not_depend_on_the_order_the_directory_lists(monkeypatch):
+    # The first version of this test filtered the fixtures to the directories
+    # holding exactly one wheel, so the candidate set was the single element
+    # "one_wheel" and no ordering of a one-element set was ever observable. It
+    # asserted a name and was named for a property it never touched.
     #
-    # So the order is manufactured instead of inherited. The two wheels are
-    # created in an order that is not the sorted order, and the refusal has to
-    # name them sorted -- which is the only way the claim can be true for a
-    # directory that holds more than one wheel. A selection that took "the
-    # first entry the directory happened to list" would pass the count check
-    # and then report a different wheel than it picked.
+    # The second version created two wheels in a non-sorted order and hoped
+    # `glob` would hand them back that way. It does not: on tmpfs the listing
+    # comes back sorted whatever the creation order, so that test was green
+    # whether or not `_one_wheel` sorted at all -- dropping `sorted()` from the
+    # production code left the whole file passing. Green because the filesystem
+    # cooperated is the same defect the test was written to remove.
+    #
+    # So the listing order is injected rather than hoped for. `glob` is the only
+    # channel a directory's order enters through, so pinning it pins the input
+    # the property is actually about, and the assertion below is a statement
+    # about the code instead of about the filesystem. Reverse-sorted, because
+    # sorted() of a reverse-sorted list is the one arrangement where "did the
+    # code sort" and "did it not" cannot both hold.
     with tempfile.TemporaryDirectory(prefix="wheel-dist-order-") as scratch:
         dist = Path(scratch) / "dist"
         dist.mkdir()
         (dist / "zzz-0.3.0-py3-none-any.whl").write_bytes(b"")
         (dist / "aaa-0.3.0-py3-none-any.whl").write_bytes(b"")
 
+        real_glob = Path.glob
+
+        def reverse_sorted_glob(self, pattern):
+            return iter(sorted(real_glob(self, pattern), reverse=True))
+
+        monkeypatch.setattr(Path, "glob", reverse_sorted_glob)
+        # The precondition this test needs, asserted rather than assumed: the
+        # listing the code will actually see is the reverse of the sorted order,
+        # so a refusal that reads sorted cannot be an accident of the
+        # filesystem. (For the record the real listing here is *not* reversed --
+        # that is the whole problem, and it is why the order is injected.)
+        assert [p.name for p in Path.glob(dist, "*.whl")] == [
+            "zzz-0.3.0-py3-none-any.whl", "aaa-0.3.0-py3-none-any.whl"]
+
         with pytest.raises(vw.Refusal) as caught:
             vw._one_wheel(dist)
         message = str(caught.value)
         assert "found 2" in message
-        # Sorted, not listing order: whichever of the two the filesystem hands
-        # back first, "aaa" is reported first because that is the rule.
+        # Sorted, not listing order: the listing is the reverse of this, so
+        # "aaa" can only be reported first because the code sorted it.
         assert message.index("aaa-") < message.index("zzz-"), message
 
 
@@ -209,11 +229,135 @@ def test_a_directory_named_like_a_wheel_is_refused_rather_than_announced():
         with pytest.raises(vw.Refusal) as caught:
             vw._one_wheel(dist)
         message = str(caught.value)
-        assert "cannot be read as a wheel" in message, message
+        # A directory is caught by the type check rather than by the open, so
+        # it gets the sharper of the two sentences: it is not a regular file,
+        # which is the actual reason, rather than the generic unreadability.
+        assert "is not a regular file" in message, message
         assert "elohim-0.3.0-py3-none-any.whl" in message
-        # A distinct sentence from the two-count refusal, because a typo that
+        # Distinct sentences from the two-count refusal, because a typo that
         # produced a directory should not read as "two wheels were found".
         assert "found 2" not in message, message
+
+
+@pytest.mark.skipif(
+    not hasattr(os, "mkfifo"), reason="no mkfifo on this platform")
+def test_a_wheel_that_is_a_named_pipe_is_refused_rather_than_waited_on():
+    # A named pipe is the shape that makes a gate hang instead of fail. `open()`
+    # on a FIFO for reading blocks until a writer appears, so a
+    # `elohim-0.3.0-py3-none-any.whl` that happened to be a pipe did not raise:
+    # it waited, with no output, until something killed it.
+    #
+    # The refusal has to arrive *promptly*, so the second half runs the tool in
+    # a subprocess it is allowed to kill. A test that only called `_one_wheel`
+    # would hang the suite rather than fail it, which is the defect reproducing
+    # itself inside its own test.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-fifo-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        os.mkfifo(dist / "elohim-0.3.0-py3-none-any.whl")
+
+        # The subprocess runs FIRST, and deliberately. If the type check is ever
+        # removed, the in-process call below would block on the pipe and hang
+        # the suite -- the defect reproducing itself inside its own test. The
+        # subprocess is allowed to be killed, so a regression arrives as a
+        # failure with a message instead of a hung run.
+        try:
+            result = subprocess.run(
+                [sys.executable, str(TOOL), "--dist", str(dist)],
+                capture_output=True, text=True, cwd=str(REPO), timeout=30)
+        except subprocess.TimeoutExpired:
+            raise AssertionError(
+                "the tool blocked on a named pipe instead of refusing it")
+        assert result.returncode == 1, (result.returncode, result.stdout,
+                                       result.stderr)
+        assert "is not a regular file" in result.stderr, result.stderr
+        # The selection must not be announced for something that is not a wheel.
+        assert "not built by this run" not in result.stdout, result.stdout
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_wheel(dist)
+        message = str(caught.value)
+        assert "is not a regular file" in message, message
+        assert "elohim-0.3.0-py3-none-any.whl" in message
+
+
+def test_a_regular_file_still_passes_the_type_check():
+    # The other direction, and the one that stops the checks above from being
+    # a gate that refuses everything: a plain file of the right name is
+    # selected, and a readable file that is not yet a zip is left for
+    # `_entries` to name.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-regular-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        plain = dist / "elohim-0.3.0-py3-none-any.whl"
+        plain.write_bytes(b"")
+        assert vw._one_wheel(dist) == plain
+        with pytest.raises(vw.Refusal) as caught:
+            vw._entries(vw._one_wheel(dist))
+        assert "is not a readable wheel" in str(caught.value)
+
+
+def test_a_symlink_loop_named_like_a_wheel_is_refused():
+    # `os.stat` follows symlinks, so a loop arrives as ELOOP rather than as a
+    # type this function can inspect. It has to be an `OSError` here, or the
+    # loop would surface as a traceback, which is the whole reason this
+    # function exists.
+    #
+    # One `*.whl` only, because two would be refused by the count check first
+    # and the loop would never be reached -- which is what a first attempt at
+    # this test did, and it passed for the wrong reason.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-loop-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        wheel = dist / "elohim-0.3.0-py3-none-any.whl"
+        target = dist / "not-a-wheel"  # no suffix, so the count stays at one
+        wheel.symlink_to(target)
+        target.symlink_to(wheel)
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_wheel(dist)
+        message = str(caught.value)
+        assert "cannot be read as a wheel" in message, message
+        assert "Too many levels" in message or "ELOOP" in message, message
+
+
+def test_the_entries_oserror_arm_has_a_control():
+    # `_entries` keeps an `OSError` arm for a wheel that becomes unreadable
+    # between the selection and the read. `_readable` opens the file first, so
+    # without this test the arm is new code with no fixture in either direction,
+    # which per AGENTS.md is a decorator rather than a gate.
+    #
+    # The race is produced for real rather than simulated: select the wheel,
+    # then take its permissions away, then read it. Dropping the arm turns this
+    # red, because the `PermissionError` would then escape as a traceback out of
+    # `main` instead of a refusal naming the artifact.
+    import zipfile
+
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        pytest.skip("root opens a mode-000 file, so this input cannot go red")
+
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-race-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        built = dist / "elohim-0.3.0-py3-none-any.whl"
+        with zipfile.ZipFile(built, "w") as zf:
+            zf.writestr("elohim_gate/__init__.py", "")
+
+        # Selected while it is still readable -- this is the "before".
+        assert vw._entries(vw._one_wheel(dist)) == ["elohim_gate/__init__.py"]
+
+        # And unreadable after, which is the "after" the arm exists for.
+        built.chmod(0o000)
+        try:
+            with pytest.raises(vw.Refusal) as caught:
+                vw._entries(built)
+            message = str(caught.value)
+            assert "elohim-0.3.0-py3-none-any.whl" in message
+            # Its own sentence, distinct from the "this is not a zip" one: the
+            # bytes were never wrong, the path stopped being readable.
+            assert "not a readable wheel" not in message, message
+        finally:
+            built.chmod(0o600)
 
 
 def test_a_symlink_to_a_wheel_that_is_gone_is_refused():
@@ -257,10 +401,13 @@ def test_a_wheel_nobody_can_read_is_refused():
             locked.chmod(0o600)  # so the temporary directory can be removed
 
 
-def test_a_wheel_that_is_a_real_zip_is_not_refused_by_the_readability_check():
-    # The other direction, and the one that stops the check above from being a
-    # gate that refuses everything: a readable file is passed straight through,
-    # including one that is not yet a zip, which is `_entries`' problem to name.
+def test_a_readable_file_is_not_refused_by_the_readability_check():
+    # The other direction, and the one that stops the checks above from being
+    # a gate that refuses everything: a readable regular file is passed
+    # straight through, including one that is not yet a zip, which is
+    # `_entries`' problem to name. (An earlier name for this said "a real zip"
+    # while the fixture wrote a 0-byte file -- the same name/content mismatch
+    # this PR exists to remove.)
     with tempfile.TemporaryDirectory(prefix="wheel-dist-readable-") as scratch:
         dist = Path(scratch) / "dist"
         dist.mkdir()
@@ -276,8 +423,8 @@ def test_a_wheel_that_is_a_real_zip_is_not_refused_by_the_readability_check():
 # The flag reaches the decision
 # --------------------------------------------------------------------------
 
-def test_dist_accepts_a_relative_path_the_way_publish_yml_passes_it():
-    # `publish.yml` calls `verify_wheel.py --dist dist/`: a path relative to the
+def test_dist_accepts_a_relative_path_the_way_both_workflows_pass_it():
+    # Both workflows call `verify_wheel.py --dist dist/`: a path relative to the
     # checkout, not an absolute one. Every other test in this file passed
     # `FIXTURES`, which is absolute, so the whole file stayed green while that
     # one invocation could never work.
@@ -288,13 +435,12 @@ def test_dist_accepts_a_relative_path_the_way_publish_yml_passes_it():
     # `/tmp/elohim-wheel-XXXX/dist/elohim-0.3.0-py3-none-any.whl`, which does
     # not exist, and the gate failed at the install -- after printing a
     # selection and passing every content check, so nothing above the install
-    # had said anything was wrong. A `--dist` mode that worked and one that
-    # could never work were identical in every test in this repository.
+    # said anything was wrong.
     #
-    # The assertion is on the *shape* of the returned path rather than on a
-    # full build, because a full build here would make this file minutes
-    # instead of seconds. `_one_wheel` must return something absolute: that is
-    # the whole contract, and it is what the subprocess depends on.
+    # The assertion is on the *shape* of the path rather than on a full build,
+    # because a full build here would make this file minutes instead of
+    # seconds. `_one_wheel` must return something absolute: that is the whole
+    # contract, and it is what the subprocess depends on.
     with tempfile.TemporaryDirectory(prefix="wheel-dist-relative-") as scratch:
         dist = Path(scratch) / "dist"
         dist.mkdir()
@@ -316,11 +462,14 @@ def test_dist_accepts_a_relative_path_the_way_publish_yml_passes_it():
 def test_no_workflow_passes_a_dist_path_this_file_does_not_test():
     # `publish.yml` runs `verify_wheel.py --dist dist/`. `ci.yml` runs the tool
     # with no `--dist` at all, so it builds its own wheel and is not covered by
-    # the test above. If a workflow ever grows a `--dist` step it has to use the
-    # relative form that test drives -- an absolute path in a workflow would go
-    # untested, which is how this gate stayed broken in the first place.
-    for path in sorted((REPO / ".github" / "workflows").glob("*.yml")):
-        for line in path.read_text(encoding="utf-8").splitlines():
+    # this file's relative-path test. If a workflow ever grows a `--dist` step,
+    # it has to use the relative form the test above drives -- an absolute path
+    # in a workflow would be untested, which is how the last version of this
+    # gate stayed broken.
+    workflows = (REPO / ".github" / "workflows")
+    for path in sorted(workflows.glob("*.yml")):
+        text = path.read_text(encoding="utf-8")
+        for line in text.splitlines():
             if "verify_wheel.py" not in line or "--dist" not in line:
                 continue
             assert "--dist dist/" in line, (
