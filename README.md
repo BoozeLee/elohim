@@ -70,6 +70,19 @@ does not establish a rate for agents in general — `docs/ROADMAP.md` and
 the part that matters most: with the replay gate neutered to echo its own labels, the
 figure comes out identical, so the number does not prove the gate works.
 
+**The claims file is agent-authored, and that is the honest limit of the whole skill.**
+`claim-ledger` reads a claims file; it does not parse a conversation. Who writes that
+file, and whether the run being judged wrote it, decides how much the gate is worth,
+and for the shipped corpus the answer is: the author. Two automatic ways around that
+were built against real transcripts and both were rejected on measurement. A
+failure-keyword classifier called 15 of 19 real failures undisclosed at roughly a 79%
+false-positive rate — the agent had diagnosed the failure without ever using the word.
+A metric-noun binding reported 120 contradicted claims whose sampled rows were all
+spurious, matching "Push 25" to a `git log` line that merely contained the word
+*commit*. So the gate is strict about assertions and blind to the prose around them,
+and the recall figure above is a hand-adjudicated measurement rather than something
+any tool derived.
+
 `skills/elohim-harness/` is the shared gate all eight run through. It has no
 instrument and no ledger of its own, so it is not one of the eight.
 
