@@ -147,6 +147,24 @@ jobs:
       # review. This is the first workflow here whose first *successful* run
       # writes to a public index, which is the most expensive place to learn that
       # lesson.
+      #
+      # `packages-dir` is written out rather than left to the action's default,
+      # because the default is not a thing this repository can point at. At the
+      # pinned sha the canonical kebab-case input carries no default at all --
+      # its `default: dist` line is commented out with the action's own "TODO:
+      # uncomment once alias removed" beside it -- and the value reaches the
+      # upload only through the *deprecated* `packages_dir` alias, which does
+      # default to `dist`, via the action's internal
+      # `inputs.packages-dir || inputs.packages_dir` fallback. So the gate above
+      # was reading a directory pinned here, while the upload was reading a
+      # directory pinned inside a third-party action, through a spelling its
+      # maintainers have marked for removal, and nothing in this repository said
+      # the two were the same place. Every assertion about that was in the other
+      # direction: they held the gate to `dist/` and asked nothing of the upload.
+      # Writing the value here is what makes the two halves of the coupling
+      # checkable by one test instead of trusted separately.
       - name: publish to PyPI
         if: ${{ !inputs.dry_run }}
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: dist/
