@@ -3,8 +3,8 @@
   "note": "Facts bind to version-independent counts only, so this ledger passes on every interpreter class it pins. No floating point enters the shard: a float measured here would vary with the interpreter and would make this skill's own seal vary with it, which is the one property worth having. The magnitude of each sibling's ledger residual is reported on stdout and measured across the whole matrix by tools/matrix.py, and pinned nowhere.",
   "instrument": {
     "path": "instrument/cross_version.py",
-    "sha256": "5c562adc5dbd62f5510bf8b55b33a2a20a651aa427650dcdd00415c660b3eb60",
-    "bytes": 13642
+    "sha256": "c5ceb5b88c142a219cf21d54021252dcc1b0194164069421c83e2cb53932158e",
+    "bytes": 14252
   },
   "facts": [
     {

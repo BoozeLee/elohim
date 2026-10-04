@@ -49,9 +49,9 @@ each one is now a check that runs on every invocation, forever.
 | `precision-budget` | the working-digit budget, its crossover, and its starved maximum | 9 | 6 | 23807 B, `2baf65bb…` |
 | `estimator-bias` | fitting a Pisot decay rate, and the bias that survives | 15 | 7 | 28213 B, `dddfdebd…` |
 | `tolerance-prover` | how tight Pisot's bound of 2 really is, and route dependence | 23 | 7 | 33152 B, `2182c01c…` |
-| `reproducibility` | which interpreter classes reproduce each sibling's shard, and the one that splits | 6 | 7 | 13642 B, `5c562adc…` |
-| `pay-signal` | stated preference against revealed preference, and which needs have no verified demand | 9 | 5 | 23291 B, `c36dd1bc…` |
-| `claim-ledger` | what an agent asserted, bound to a check that can be run and can fail | 13 | 10 | 20573 B, `0bf66b12…` |
+| `reproducibility` | which interpreter classes reproduce each sibling's shard, and the one that splits | 6 | 7 | 14252 B, `c5ceb5b8…` |
+| `pay-signal` | stated preference against revealed preference, and which needs have no verified demand | 9 | 5 | 23785 B, `22b464ff…` |
+| `claim-ledger` | what an agent asserted, bound to a check that can be run and can fail | 13 | 10 | 21439 B, `63c8ee7a…` |
 
 103 pinned facts, 53 independent trap re-derivations, 8 instrument pins. Every one of
 those three totals is checked against the tree on every run and the table is bound to
