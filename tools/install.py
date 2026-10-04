@@ -23,8 +23,8 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 SKILLS_DIR = REPO_ROOT / "skills"
-OPENCODE_TOOL_SRC = REPO_ROOT / ".opencode" / "tools" / "elohim-gate.ts"
-OPENCODE_TOOL_DEST = Path(".config") / "opencode" / "tools"
+OPENCODE_TOOL_SRC = REPO_ROOT / ".opencode" / "plugins" / "elohim-gate.ts"
+OPENCODE_TOOL_DEST = Path(".config") / "opencode" / "plugins"
 
 SKIP_DIR_NAMES = frozenset({"out", "__pycache__", ".git", "node_modules", ".venv"})
 SKIP_SUFFIXES = (".pyc", ".pyo")
@@ -147,11 +147,19 @@ def run_gate(skill_name: str, dest: Path, skip: bool) -> int:
 
 
 def install_opencode_tool(base: Path, force: bool, dry_run: bool) -> int:
-    """Copy the opencode custom tool next to the skills.
+    """Copy the opencode gate plugin next to the skills.
 
     The tool is what lets an agent ask for a typed verdict instead of parsing
     console output.  It is optional.  A consumer that does not use opencode
     loses nothing by skipping it.
+
+    It lands in `plugins/`, and it is a plugin rather than a tool file.  Measured
+    on opencode v1.18.32: there is no `tools/` directory convention and no
+    filename-becomes-tool-name rule -- custom tools arrive through a plugin's
+    `Hooks.tool` map, and `opencode debug config` showed zero trace of the file
+    when it sat in `~/.config/opencode/tools/`.  The earlier destination here was
+    a path the binary does not read, so the flag it belonged to could not have
+    worked on the version it was written for.
     """
     if not OPENCODE_TOOL_SRC.is_file():
         print(f"install: no opencode tool at {OPENCODE_TOOL_SRC}, skipping")
@@ -188,7 +196,8 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true", help="report what would happen, write nothing")
     parser.add_argument("--skip-gate", action="store_true", help="do not execute the installed copy's gate")
     parser.add_argument("--opencode-tool", action="store_true",
-                        help="also install the opencode custom tool into .config/opencode/tools")
+                        help="also install the opencode gate plugin into "
+                             ".config/opencode/plugins (v1.18.32 reads plugins/, not tools/)")
     args = parser.parse_args()
 
     skills = discover_skills()
