@@ -329,7 +329,12 @@ def test_dist_pointed_at_a_directory_with_no_wheel_refuses_and_never_builds():
     assert "expected exactly one wheel in %s" % (FIXTURES / "no_wheel") in result.stderr
     # If --dist were ignored the tool would have gone on to build a real wheel,
     # and every line of the failure would be about that build instead.
-    assert "wheel build failed" not in result.stderr
+    # The sentinel tracks the tool's own wording: the no-argument build was
+    # "wheel build failed" until it started building the distribution rather
+    # than the wheel alone, and leaving the old string here would have made
+    # this assertion unfalsifiable -- it would have passed against a run that
+    # did go and build, because that run no longer says those words.
+    assert "build failed" not in result.stderr
     assert "built:" not in result.stdout
 
 
@@ -349,7 +354,12 @@ def test_a_directory_that_is_not_there_is_refused_at_the_command_line():
     result = _run_tool("--dist", str(absent))
     assert result.returncode == 1
     assert "is not a directory" in result.stderr
-    assert "wheel build failed" not in result.stderr
+    # The sentinel tracks the tool's own wording: the no-argument build was
+    # "wheel build failed" until it started building the distribution rather
+    # than the wheel alone, and leaving the old string here would have made
+    # this assertion unfalsifiable -- it would have passed against a run that
+    # did go and build, because that run no longer says those words.
+    assert "build failed" not in result.stderr
 
 
 def test_dist_on_two_wheels_refuses_from_the_command_line_too():
@@ -792,6 +802,202 @@ def test_no_workflow_passes_a_dist_path_this_file_does_not_test():
             assert "--dist dist/" in line, (
                 "%s invokes the tool as %r, a form this file does not test"
                 % (path.name, line.strip()))
+
+
+# --------------------------------------------------------------------------
+# The sdist travelling beside the wheel
+# --------------------------------------------------------------------------
+#
+# `python3 -m build` with neither --wheel nor --sdist writes *both* into dist/,
+# and publish.yml uploads both. So the wheel was checked and the sdist rode
+# along beside it on the strength of having come out of the same build, which
+# is an argument and not a check. These are the controls for the check that
+# stopped it riding along.
+#
+# The red inputs, one sentence each. A dist/ holding a wheel and no sdist is
+# refused rather than passed over in silence; a report that never names the
+# sdist cannot be read as having covered the artifact beside the wheel; and a
+# sdist that is selected but never rebuilt is a file nobody looked inside.
+
+
+def _write_sdist(path: Path, members: dict) -> Path:
+    """A real gzip tarball at `path`, holding `members` (name -> bytes)."""
+    import io
+    import tarfile
+
+    with tarfile.open(path, "w:gz") as tf:
+        for name, payload in members.items():
+            if isinstance(payload, str):
+                payload = payload.encode("utf-8")
+            info = tarfile.TarInfo("elohim-0.3.0/" + name)
+            info.size = len(payload)
+            tf.addfile(info, io.BytesIO(payload))
+    return path
+
+
+def _minimal_project_members() -> dict:
+    """An sdist body that hatchling can really build a wheel from.
+
+    A synthetic sdist that is not buildable would make the rebuild dispatch
+    untestable for the wrong reason: every assertion would be satisfied by a
+    refusal, and a dispatch that rebuilt nothing would pass. So the fixture is
+    a genuine minimal project rather than a tarball of noise.
+    """
+    return {
+        "pyproject.toml": (
+            "[build-system]\n"
+            'requires = ["hatchling"]\n'
+            'build-backend = "hatchling.build"\n'
+            "\n"
+            "[project]\n"
+            'name = "elohim"\n'
+            'version = "0.3.0"\n'
+            "\n"
+            "[tool.hatch.build.targets.wheel]\n"
+            'packages = ["elohim_gate"]\n'
+        ),
+        "elohim_gate/__init__.py": "",
+    }
+
+
+def test_the_report_names_the_sdist_beside_the_wheel_so_it_cannot_read_as_covering_both(
+        monkeypatch):
+    # Without this, a run that reports a verified wheel and says nothing about
+    # the artifact beside it reads exactly like a run that checked both.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-report-") as scratch:
+        tmp = Path(scratch)
+        dist = tmp / "dist"
+        dist.mkdir()
+        (dist / "elohim-0.3.0-py3-none-any.whl").write_bytes(b"")
+        _write_sdist(dist / "elohim-0.3.0.tar.gz", {"PKG-INFO": ""})
+
+        # The install and the rebuild are the slow half, and they are not what
+        # this assertion is about; what is under test is that the sdist is
+        # named at all. Mocked rather than run so the naming cannot be satisfied
+        # by the rebuild happening to print something.
+        monkeypatch.setattr(vw, "_rebuild_from_sdist",
+                            lambda sdist, out: out / "dist")
+        (tmp / "scratch").mkdir()
+        (tmp / "scratch" / "dist").mkdir()
+        (tmp / "scratch" / "dist" / "elohim-0.3.0-py3-none-any.whl").write_bytes(b"")
+        monkeypatch.setattr(vw, "_verify_dist", lambda *a, **k: 0)
+
+        lines = vw._sdist_report(dist, tmp / "scratch", REPO)
+        # The *first* line, and that is the whole assertion. Asserting the name
+        # appears anywhere in the report is not enough, and the mutation below
+        # is what proved it: rewriting the first line to a name-free "sdist
+        # checked" left the suite green, because the closing line still named
+        # the file. The property worth having is that the artifact is named
+        # *before* the rebuild prints a block about it -- a name that arrives
+        # after the fact leaves the block orphaned.
+        assert lines[0].startswith("sdist: elohim-0.3.0.tar.gz"), lines
+        # And named as the sdist rather than as another wheel, so the line
+        # cannot be mistaken for the wheel's own selection line.
+        assert "sdist" in lines[0], lines
+
+
+def test_a_dist_holding_no_sdist_is_refused_rather_than_passed_over_in_silence():
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-nosdist-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        (dist / "elohim-0.3.0-py3-none-any.whl").write_bytes(b"")
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_sdist(dist)
+        message = str(caught.value)
+        assert "expected exactly one sdist" in message
+        assert "found 0" in message
+        # The wheel's presence is not the sdist's presence: a refusal phrased
+        # as a wheel problem would read as a packaging defect rather than a
+        # missing artifact, which is a different bug with a different fix.
+        assert "expected exactly one wheel" not in message, message
+        assert "sdist" in message, message
+
+
+def test_a_dist_holding_two_sdists_is_refused_and_names_both():
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-twosdists-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        _write_sdist(dist / "elohim-0.3.0.tar.gz", {"PKG-INFO": ""})
+        _write_sdist(dist / "elohim-0.3.1.tar.gz", {"PKG-INFO": ""})
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_sdist(dist)
+        message = str(caught.value)
+        assert "found 2" in message
+        assert "elohim-0.3.0.tar.gz" in message
+        assert "elohim-0.3.1.tar.gz" in message
+
+
+def test_a_sdist_that_is_not_a_readable_file_is_refused_before_it_is_extracted():
+    # The same type guard the wheel selection gets, for the same reason: a
+    # `.tar.gz` can be a directory or a named pipe, and opening one to read it
+    # would block rather than fail.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-sdistfifo-") as scratch:
+        dist = Path(scratch) / "dist"
+        dist.mkdir()
+        os.mkfifo(dist / "elohim-0.3.0.tar.gz")
+        with pytest.raises(vw.Refusal) as caught:
+            vw._one_sdist(dist)
+        assert "is not a regular file" in str(caught.value), str(caught.value)
+
+
+@pytest.mark.skipif(
+    not __import__("importlib.util", fromlist=["util"]).find_spec("hatchling"),
+    reason="the rebuild dispatch needs the build backend this repository pins")
+def test_the_sdist_is_rebuilt_and_the_rebuilt_wheel_is_what_the_gate_verifies(
+        monkeypatch):
+    # Selection alone would be a filename check. What the sdist needs is to be
+    # opened, and the only way to know an sdist is usable is to build from it,
+    # so this asserts the rebuild really happens and that what gets verified
+    # afterwards is the artifact the rebuild produced rather than the wheel
+    # that was already sitting in dist/.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-rebuild-") as scratch:
+        tmp = Path(scratch)
+        dist = tmp / "dist"
+        dist.mkdir()
+        # A decoy: if the dispatch ever verified this instead of the rebuild,
+        # the call recorded below would name it.
+        original = dist / "elohim-0.3.0-py3-none-any.whl"
+        original.write_bytes(b"")
+        _write_sdist(dist / "elohim-0.3.0.tar.gz", _minimal_project_members())
+
+        seen = {}
+
+        def spy(dist_arg, source, tmp_arg, repo_arg):
+            seen["dist"] = Path(dist_arg)
+            seen["source"] = source
+            return 0
+
+        monkeypatch.setattr(vw, "_verify_dist", spy)
+        vw._sdist_report(dist, tmp / "scratch", REPO)
+
+        assert seen, "the rebuilt wheel was never handed to the gate"
+        assert seen["dist"] != dist, "the gate verified the original dist/ again"
+        built = sorted(seen["dist"].glob("*.whl"))
+        assert len(built) == 1, built
+        # Genuinely rebuilt: the decoy was zero bytes, so a real wheel cannot
+        # be it.
+        assert built[0].stat().st_size > 0, built[0]
+        assert built[0] != original
+
+
+def test_a_sdist_whose_rebuild_yields_no_wheel_is_refused():
+    # The rebuild is not assumed to have worked because it returned zero. It is
+    # read back through the same selection the wheel above it went through, so
+    # a rebuild that produced nothing is a refusal rather than a silent pass.
+    with tempfile.TemporaryDirectory(prefix="wheel-dist-norebuild-") as scratch:
+        tmp = Path(scratch)
+        dist = tmp / "dist"
+        dist.mkdir()
+        (dist / "elohim-0.3.0-py3-none-any.whl").write_bytes(b"")
+        # A tarball that is not a project at all, so the rebuild produces
+        # nothing whatever.
+        _write_sdist(dist / "elohim-0.3.0.tar.gz", {"notes.txt": "not a project"})
+
+        with pytest.raises(vw.Refusal) as caught:
+            vw._sdist_report(dist, tmp / "scratch", REPO)
+        assert "sdist" in str(caught.value).lower(), str(caught.value)
 
 
 if __name__ == "__main__":
