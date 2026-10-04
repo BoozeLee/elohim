@@ -1,0 +1,18 @@
+{
+  "_fixture": "SYNTHETIC. Never fetched from a real index. An index that already holds the version the fixture pyproject declares, in the shape PyPI's JSON API actually returns.",
+  "info": {
+    "name": "elohim-release-slot-fixture",
+    "version": "9.9.9",
+    "summary": "A project that does not exist, used to test one index question."
+  },
+  "releases": {
+    "9.8.8": [
+      "elohim_release_slot.fixture-9.8.8-py3-none-any.whl",
+      "elohim_release_slot.fixture-9.8.8.tar.gz"
+    ],
+    "9.9.9": [
+      "elohim_release_slot.fixture-9.9.9-py3-none-any.whl",
+      "elohim_release_slot.fixture-9.9.9.tar.gz"
+    ]
+  }
+}

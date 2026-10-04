@@ -48,12 +48,23 @@ The control that makes the JSON API trustworthy: `requests` and `pytest` must
 return real `info` from the same endpoint, or it is not answering and its
 `Not Found` means nothing.
 
+**The workflow now repeats this check itself, and refuses before it builds.**
+`tools/verify_release_slot.py` reads the version out of `pyproject.toml` and asks
+the same JSON API whether the index already holds it. If it does, the run stops
+with exit 1 and names the number to bump; if the index cannot be read at all it
+stops with exit 2 rather than guessing, because "the index did not answer" is not
+"the slot is free". So the manual check below is for deciding *whether* to
+dispatch. The one in the workflow is for stopping a dispatch that should not have
+happened.
+
 **3. Dispatch.** No `-f dry_run=true` — that flag is what makes it *not*
 upload. With the flag absent the upload step runs.
 
-**4. Read the run back.** Check that step 6 is `success` and not `skipped`.
-Those two look identical in a green badge and mean opposite things: `skipped` is
-a dry run, `success` is an upload.
+**4. Read the run back.** Check that the `publish to PyPI` step is `success` and
+not `skipped`. Those two look identical in a green badge and mean opposite
+things: `skipped` is a dry run, `success` is an upload. Read it by name rather
+than by position — a step added anywhere above it renumbers everything below,
+and this file has been wrong about that number before.
 
 ## When it refuses
 

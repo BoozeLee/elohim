@@ -2,6 +2,11 @@
   "$comment": "Index grouping for the skills.sh ecosystem.  Auto-indexers crawl skills/*/SKILL.md in a public repository.  Each entry below groups one skill on a single page.",
   "skills": [
     {
+      "name": "claim-ledger",
+      "path": "skills/claim-ledger",
+      "description": "13 pinned facts, 8 independent trap re-derivations. Binds every outcome an AI coding agent asserts to a check that can be run and can fail, and reports the ones that are unverified, refuted by their own check, or evidenced by a command that looked at nothing. Exit codes are the only assertion vocabulary: no LLM judge exceeded AUROC 0.65, so a judgement step would make the gate worse than the thing it gates. Does not judge whether the work is any good, and does not check prose."
+    },
+    {
       "name": "elohim",
       "path": "skills/elohim",
       "description": "Checksum-pinned numerical-instrument gate: 16 pinned facts, 6 independent trap re-derivations, a source hygiene lint, and a proven tamper test."

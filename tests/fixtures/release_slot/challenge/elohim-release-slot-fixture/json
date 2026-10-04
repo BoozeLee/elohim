@@ -1,0 +1,18 @@
+<!doctype html>
+<!-- SYNTHETIC FIXTURE. Never served by anything real. Stands for the body an
+     index returns with HTTP 200 at a project URL that does not exist: a page,
+     not a project. docs/PUBLISHING.md records that this is what PyPI does, and
+     that is why this check reads the JSON API instead of the web page. A tool
+     that looked for a version here and found none would release over a name
+     that is already taken. -->
+<html lang="en">
+  <head>
+    <title>Client Challenge</title>
+    <meta name="robots" content="noindex, nofollow">
+  </head>
+  <body>
+    <h1>Client Challenge</h1>
+    <p>Your browser is being challenged. This is not a project page and it is
+       not an answer.</p>
+  </body>
+</html>

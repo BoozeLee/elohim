@@ -1,0 +1,11 @@
+# SYNTHETIC FIXTURE. Never shipped, never installed, never the real package.
+# Read only by tests/test_release_slot.py via --pyproject. The name is spelled
+# with underscores and a dot so the PEP 503 normalisation in the tool is load
+# bearing: on disk it is stored as elohim-release-slot-fixture.
+#
+# The version is 9.9.9, not the repository's. See README.md in this directory.
+
+[project]
+name = "elohim_release_slot.fixture"
+version = "9.9.9"
+description = "A project that does not exist, used to test one index question."

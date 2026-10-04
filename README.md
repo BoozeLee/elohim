@@ -2,11 +2,11 @@
 
 > A number is a finding only after its residual was measured.
 
-ELOHIM is a gate for numerical claims. Six instruments measure hard mathematics,
-pin every result they claim, and refuse to pass if anything moved — including the
-instrument itself. The sixth, `reproducibility`, holds the other five to that: it
-runs each of them, reads back the seal each recorded, and turns the gate red when a
-shard arrives from an interpreter class nobody pinned.
+ELOHIM is a gate for numerical claims. Eight instruments measure hard mathematics and
+what an agent claimed about it, pin every result they claim, and refuse to pass if
+anything moved — including the instrument itself. One of them, `reproducibility`, holds
+the other seven to that: it runs each of them, reads back the seal each recorded, and
+turns the gate red when a shard arrives from an interpreter class nobody pinned.
 
 It exists because of six specific failures. Each of the six produced a result
 that was internally consistent, readable, and wrong, and none of them announced
@@ -40,23 +40,51 @@ each one is now a check that runs on every invocation, forever.
    precision 38 breaks, 39 holds, 40 breaks, and 41 holds again.
    `tolerance-prover`
 
-## The six gated skills
+## The eight gated skills
 
 | skill | measures | facts | traps | instrument |
 |---|---|---|---|---|
-| `elohim` | Pisot decay, superellipse perimeters, Parry numbers, log saturation, and the recorded non-invariants | 16 | 6 | 30497 B, `a920cdd5…` |
+| `elohim` | Pisot decay, superellipse perimeters, Parry numbers, log saturation, and the recorded non-invariants | 25 | 6 | 30497 B, `a920cdd5…` |
 | `invariant-hunter` | Collatz traces and seed valuations, as refutations | 3 | 5 | 11853 B, `10a206f3…` |
 | `precision-budget` | the working-digit budget, its crossover, and its starved maximum | 9 | 6 | 23807 B, `2baf65bb…` |
 | `estimator-bias` | fitting a Pisot decay rate, and the bias that survives | 15 | 7 | 28213 B, `dddfdebd…` |
 | `tolerance-prover` | how tight Pisot's bound of 2 really is, and route dependence | 23 | 7 | 33152 B, `2182c01c…` |
-| `reproducibility` | which interpreter classes reproduce each sibling's shard, and the one that splits | 6 | 7 | 12380 B, `ca222ba4…` |
+| `reproducibility` | which interpreter classes reproduce each sibling's shard, and the one that splits | 6 | 7 | 13642 B, `5c562adc…` |
+| `pay-signal` | stated preference against revealed preference, and which needs have no verified demand | 9 | 5 | 23291 B, `c36dd1bc…` |
+| `claim-ledger` | what an agent asserted, bound to a check that can be run and can fail | 13 | 10 | 20573 B, `0bf66b12…` |
 
-81 pinned facts, 38 independent trap re-derivations, 6 instrument pins. Every
-number in that table is measured by running that skill's gate, not typed in by
-hand. Full derivations with residuals live in each skill's `references/`.
+103 pinned facts, 53 independent trap re-derivations, 8 instrument pins. Every one of
+those three totals is checked against the tree on every run and the table is bound to
+them by `claim_binding.py`, which fails the build if any cell stops matching what the
+tree actually holds. The *cell* figures come from each skill's own committed ledger, so
+they are pinned values rather than a second copy typed in here. Full derivations with
+residuals live in each skill's `references/`.
 
-`skills/elohim-harness/` is the shared gate all six run through. It has no
-instrument and no ledger of its own, so it is not one of the six.
+One figure in this file is not a gate result and is labelled as such rather than
+counted with the rest: `claim-ledger`'s recall measurement, read by hand out of one
+real agent session — claims adjudicated 14,
+of which contradicted 0,
+and asserted-but-never-measured 2. It is a bound on one agent's one afternoon and it
+does not establish a rate for agents in general — `docs/ROADMAP.md` and
+`skills/claim-ledger/references/limits.md` carry it with the caveats attached, including
+the part that matters most: with the replay gate neutered to echo its own labels, the
+figure comes out identical, so the number does not prove the gate works.
+
+**The claims file is agent-authored, and that is the honest limit of the whole skill.**
+`claim-ledger` reads a claims file; it does not parse a conversation. Who writes that
+file, and whether the run being judged wrote it, decides how much the gate is worth,
+and for the shipped corpus the answer is: the author. Two automatic ways around that
+were built against real transcripts and both were rejected on measurement. A
+failure-keyword classifier called 15 of 19 real failures undisclosed at roughly a 79%
+false-positive rate — the agent had diagnosed the failure without ever using the word.
+A metric-noun binding reported 120 contradicted claims whose sampled rows were all
+spurious, matching "Push 25" to a `git log` line that merely contained the word
+*commit*. So the gate is strict about assertions and blind to the prose around them,
+and the recall figure above is a hand-adjudicated measurement rather than something
+any tool derived.
+
+`skills/elohim-harness/` is the shared gate all eight run through. It has no
+instrument and no ledger of its own, so it is not one of the eight.
 
 ## What it refuses to do
 
@@ -139,6 +167,13 @@ against. The index is where a stranger starts, and it is now measured rather
 than assumed — which it was not for most of this project's life, and the
 sentence that used to stand here said so.
 
+Read that block as a measurement of **the published 0.3.0 wheel**, taken on the
+date beside it. It is a true record of what that artifact reported, and it is not
+the current tree: the tree has since grown to eight gated skills holding 103 facts
+and 53 traps, which is the table above. A release figure and a tree figure drift
+apart by design, and conflating them is how a README ends up describing a version of
+this project that never existed.
+
 ## Verify
 
 One entry point for every skill:
@@ -164,7 +199,7 @@ python3 tools/check_text.py           # shipped-text lint
 python3 tools/sync_adapters.py        # regenerate the derived plugin copies
 python3 tools/sync_adapters.py --check
 python3 tools/submit.py --check       # 10 distribution checks
-python3 -m pytest -q                  # the 43-test unit suite
+python3 -m pytest -q                  # the 183-test unit suite
 ```
 
 The first four need nothing installed. The fifth is the only command here
@@ -253,7 +288,7 @@ tests/                     test_all.py
 plugin installer silently drops symlinks and `../` escapes. Run
 `python3 tools/sync_adapters.py` after editing anything canonical, or `--check`
 to verify without writing. `sync_adapters.py --check` is the only sanctioned
-count of the mirrored files: it reports 62 files byte-identical across 7 skill
+count of the mirrored files: it reports 85 files byte-identical across 9 skill
 directories today, four of them the published artifacts.
 
 ## Use it

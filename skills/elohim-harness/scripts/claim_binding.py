@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import functools
+import hashlib
 import json
 import re
 import sys
@@ -405,6 +406,335 @@ def check_fact(
 EXEMPTIONS = Path(__file__).resolve().parent / "claim_binding_exemptions.json"
 
 
+# --- documentation figures -------------------------------------------------
+#
+# A drifted doc figure is not a claim citing the wrong pinned value. It is a
+# figure that no longer matches the tree it describes, and the ledger
+# `universe` cannot express that at all: `103` is not any fact's `expect`, so
+# there is nothing to bind it to. These therefore need DERIVATIONS -- functions
+# that count the tree -- rather than bindings against a pinned value.
+#
+# Why this exists: docs/ROADMAP.md opens with a table headed "Where the project
+# actually stands -- Measured, not asserted" and read 81 facts across 6 skills
+# where the tree held 103 across 8. It had been wrong since pay-signal, and
+# every gate stayed green, because this check read `skills/*/ledger.json` and
+# never looked at docs/ at all.
+#
+# Each entry is (relpath, anchor, side, derivation). Three rules make it safe:
+#
+#   anchor   must occur EXACTLY ONCE in the file. Asserted at check time. A
+#            silent second match would bind the wrong number, and a gate that
+#            binds the wrong number is worse than no gate -- it manufactures
+#            false confidence about a figure it never read.
+#   side     which way from the anchor to look for the integer, so a figure
+#            written BEFORE its own name ("**74 are exact comparisons") is as
+#            reachable as one written after it.
+#   derived  the figure must be CHECKABLE against the tree. A row that is a
+#            snapshot of a manual run has no derivation, and is declared in the
+#            exemptions file instead, where the existing per-run UNVERIFIED
+#            count makes the debt visible.
+#
+# Deliberately NOT bound: every dated historical figure. ROADMAP:534 already
+# ruled that a dated measurement is not edited to match the current tree, and a
+# scanner over those rows would either fail on correct documents or push
+# someone into making one true. Control `test_tier_c_is_never_bound` holds that.
+
+DOC_FIGURES: list[tuple[str, str, str, str]] = [
+    # The table. `| facts promoted | 103 across 8 ledger-bearing skills` holds
+    # two figures on one line, so the second is reached from the RIGHT.
+    #
+    # That second anchor used to be "| facts promoted | 103 across", which
+    # embedded the very figure it exists to locate. Harmless until the tree
+    # grows: the document would then read 104, the anchor would no longer be
+    # found, and the failure would be "anchor missing" rather than the clean
+    # mismatch a reader needs. `proof-before-claim` names the shape exactly --
+    # a checker holding its own copy of the expectation drifts one level
+    # further out, leaving two stale numbers instead of one. Anchoring from the
+    # right removes the copy, and `test_no_anchor_embeds_the_figure` holds it.
+    ("docs/ROADMAP.md", "| facts promoted |", "after", "total_facts"),
+    ("docs/ROADMAP.md", "ledger-bearing skills |", "before", "ledger_bearing_skills"),
+    ("docs/ROADMAP.md", "| traps re-derived independently |", "after", "total_traps"),
+    ("docs/ROADMAP.md", "| instrument checksums pinned |", "after", "pins_passing"),
+    # Prose restatements of the same figures. These are what a reader meets
+    # first, and the 81/52 pair is exactly what drifted.
+    #
+    # Both anchors were wrong on the first run and the check said so: "are
+    # exact" occurs twice in the file (the other is "are exactly"), and
+    # "**29 that carry a tolerance" looked forward to 25 rather than back to
+    # the 29 it names. A gate that binds the wrong number is worse than no
+    # gate, which is what the uniqueness assertion above is for.
+    ("docs/ROADMAP.md", "line of it. Of the", "after", "total_facts"),
+    ("docs/ROADMAP.md", "facts, **", "after", "exact_fact_count"),
+    ("docs/ROADMAP.md", "record a constant. Of the", "after", "nonzero_tolerance_count"),
+    # The recall row. Each anchor is a phrase that carries no digit of its own, for the
+    # same reason the table's are: an anchor holding the figure it locates is a second
+    # copy to drift. The three are separate anchors rather than one because three
+    # figures share the row, and a reader who changes one must not silently change the
+    # other two.
+    ("docs/ROADMAP.md", "claims adjudicated ", "after",
+     "replay_claims_adjudicated"),
+    ("docs/ROADMAP.md", "of which contradicted ", "after", "replay_claims_contradicted"),
+    ("docs/ROADMAP.md", "asserted-but-never-measured ", "after",
+     "replay_claims_unverified"),
+    # The public front door. This file was the worst offender in the repository and had
+    # no gate at all: it omitted two of the eight skills, under-counted `elohim` by
+    # nine facts, carried an instrument pin a later edit had invalidated, reported the
+    # pre-`claim-ledger` 81/38/6, and asserted in prose that its own numbers were "not
+    # typed in by hand" while being exactly that. Nothing would have caught any of it.
+    #
+    # Six figures, not the whole table. The three totals and the three recall counts
+    # are derivable from the tree and from the label fixture. The per-skill cells are
+    # NOT bound, because a derivation for them does not exist and inventing one to
+    # close the gap would be a gate that looks load-bearing and is not. Those cells
+    # come from each skill's committed ledger; a future figure that can derive them
+    # should.
+    ("README.md", "pinned facts, ", "before", "total_facts"),
+    ("README.md", "independent trap re-derivations, ", "before", "total_traps"),
+    ("README.md", " instrument pins. Every", "before", "pins_passing"),
+    ("README.md", "claims adjudicated ", "after", "replay_claims_adjudicated"),
+    ("README.md", "of which contradicted ", "after", "replay_claims_contradicted"),
+    ("README.md", "asserted-but-never-measured ", "after", "replay_claims_unverified"),
+]
+
+_INT = re.compile(r"\d[\d,]*")
+
+
+def _int_near(text: str, anchor: str, side: str) -> int | None:
+    """The integer nearest `anchor`, on the given side of it.
+
+    None when the anchor is missing, is not unique, or has no integer beside
+    it. All three are reported rather than guessed at, because each of them
+    means the figure is no longer being read.
+    """
+    hits = [m for m in re.finditer(re.escape(anchor), text)]
+    if len(hits) != 1:
+        return None
+    start = hits[0].end() if side == "after" else hits[0].start()
+    if side == "after":
+        found = _INT.search(text, start)
+    else:
+        found = None
+        for m in _INT.finditer(text, 0, start):
+            found = m
+    if found is None:
+        return None
+    return int(found.group(0).replace(",", ""))
+
+
+def _ledgers(root: Path) -> list[Path]:
+    base = root / "skills" if (root / "skills").is_dir() else root
+    return sorted(p for p in base.glob("*/ledger.json") if p.is_file())
+
+
+def derivations(root: Path) -> dict[str, int | None]:
+    """Count the tree. Pure: reads ledgers and the last gate's payloads.
+
+    `total_traps` and `pins_passing` read `out/last-run.json`, which is a
+    build artifact. When it is absent these return None rather than a number,
+    and the figure is reported as not-checkable instead of failing -- a fresh
+    clone that has not run the gate yet has not made the claim wrong, and a
+    check that fails for want of a prior step is a check people learn to skip.
+    `ci.yml` runs `tests/test_all.py` (which gates the tree) before this, so in
+    CI the artifacts are always present.
+    """
+    ledgers = _ledgers(root)
+    total_facts = 0
+    exact = nonzero = 0
+    for path in ledgers:
+        for fact in json.loads(path.read_text(encoding="utf-8")).get("facts", []):
+            total_facts += 1
+            tolerance = fact.get("tolerance")
+            if tolerance is None or tolerance == 0:
+                exact += 1
+            else:
+                nonzero += 1
+
+    base = root / "skills" if (root / "skills").is_dir() else root
+    payloads = sorted(p for p in base.glob("*/out/last-run.json") if p.is_file())
+    traps = None
+    if len(payloads) == len(ledgers) and payloads:
+        total = 0
+        for path in payloads:
+            payload = json.loads(path.read_text(encoding="utf-8"))
+            total += len(payload.get("traps", []))
+        traps = total
+
+    # `pins_passing` used to be read from those same shards, which made it inert
+    # everywhere a gate has not run -- including every CI job, because `out/` is
+    # gitignored and CI gates in temporary copies. A declared doc figure with no
+    # derivation to compare against used to pass silently, so a document could say
+    # anything at all about instrument pins and the check would agree. The count is
+    # derivable from committed bytes, so it is derived from them: each ledger pins its
+    # instrument by sha256 and byte count, and the instrument is committed beside it.
+    # That is the same question the shard answered, asked of files that exist in a
+    # fresh clone.
+    pins = _pins_passing(root, ledgers)
+
+    # The recall figure is not in any ledger's shard -- it is read from a hand-
+    # adjudicated label fixture, which is a different kind of evidence and would be
+    # invisible to a derivation that only reads out/last-run.json. Deriving it here
+    # closes the chain in one direction: the published sentence names numbers that come
+    # from the fixture, the fixture is checksummed by the claim-ledger trap, so editing
+    # the sentence or the ground truth both go red instead of one being quietly
+    # updated to match the other.
+    replay = _replay_figures(root)
+
+    return {
+        "total_facts": total_facts,
+        "ledger_bearing_skills": len(ledgers),
+        "exact_fact_count": exact,
+        "nonzero_tolerance_count": nonzero,
+        "total_traps": traps,
+        "pins_passing": pins,
+        **replay,
+    }
+
+
+def _pins_passing(root: Path, ledgers: list[Path]) -> int | None:
+    """Instrument pins that hold, counted from committed bytes only.
+
+    A ledger records the sha256 and byte count its instrument must have. The
+    instrument is committed beside it, so the question "does this pin still hold?"
+    is answerable in a fresh clone with no gate run and no generated file. Returns
+    None when a ledger carries no instrument pin at all, rather than reporting a
+    count over a population that was never defined.
+    """
+    base = root / "skills" if (root / "skills").is_dir() else root
+    held = 0
+    pinned = 0
+    for ledger_path in ledgers:
+        try:
+            ledger = json.loads(ledger_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return None
+        pin = ledger.get("instrument") or {}
+        rel = pin.get("path")
+        if not rel:
+            continue
+        pinned += 1
+        instrument = base / ledger_path.parent.name / rel
+        if not instrument.is_file():
+            return None
+        blob = instrument.read_bytes()
+        if hashlib.sha256(blob).hexdigest() == pin.get("sha256") and len(blob) == pin.get("bytes"):
+            held += 1
+    return held if pinned else None
+
+
+def _replay_figures(root: Path) -> dict[str, int]:
+    """Counts re-read from the adjudicated label fixture, or absent if it is not here.
+
+    Declared counts only. They are what the fixture says about itself, and the trap
+    `the_labels_counts_agree` is what proves those declared counts still match the
+    claims array -- so reading them here is reading a figure that is itself gated,
+    rather than a number typed into a document twice.
+    """
+    path = root / "skills" / "claim-ledger" / "tests" / "fixtures" / "session-03-33-40-878.labels.json"
+    if not path.is_file():
+        return {}
+    try:
+        doc = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    measured = doc.get("measured") or {}
+    out: dict[str, int] = {}
+    for key, name in (
+        ("adjudicated", "replay_claims_adjudicated"),
+        ("contradicted", "replay_claims_contradicted"),
+        ("unverified", "replay_claims_unverified"),
+    ):
+        value = measured.get(key)
+        if isinstance(value, int):
+            out[name] = value
+    recall = str(measured.get("recall", ""))
+    if "/" in recall:
+        caught, _, expected = recall.partition("/")
+        if caught.isdigit() and expected.isdigit():
+            out["replay_recall_caught"] = int(caught)
+            out["replay_recall_expected"] = int(expected)
+    return out
+
+
+def _applicable_figures(root: Path) -> list[tuple[str, str, str, str]]:
+    """The doc figures this root can actually check.
+
+    A summary that counts a figure it did not read is the same defect as the
+    one this check exists for, so the reported count is the checked count.
+    """
+    return DOC_FIGURES if (root / "docs").is_dir() else []
+
+
+# Figures whose only source is a gate's generated output, and which therefore
+# cannot be checked in a tree that has not been gated.
+#
+# `out/last-run.json` is gitignored on purpose -- it is a run's output, not a
+# source of truth -- so in a fresh clone, and in every CI job, these read as
+# absent. They used to be skipped in silence, which made a document free to say
+# anything at all about them and the check would agree: a false green wearing
+# the costume of a gate. `total_traps` is in this set because no committed
+# artifact records how many traps a skill has; only running the trap checker
+# produces that number, and there is no honest way to derive it without doing
+# the thing it is supposed to be checking.
+#
+# So they are not failed -- failing them would redden every ungated tree over a
+# figure nobody claimed to measure -- and they are not silently passed either.
+# They are named, and the summary says how many of the declared figures went
+# unchecked, so the count a reader takes away is the count that was checked.
+POST_RUN_ONLY = frozenset({"total_traps"})
+
+
+def check_doc_figures(
+    root: Path, exemptions: dict[str, str]
+) -> tuple[list[dict[str, str]], list[dict[str, str]]]:
+    """Declared doc figures that disagree with the tree, and those that cannot be checked.
+
+    Returns `(failures, unchecked)`. The second list is not a softer kind of
+    first list: a failure is a figure that was checked and is wrong, and an
+    unchecked figure is one that was never compared to anything. Collapsing
+    them is how an inert binding gets reported as a working gate.
+    """
+    figures = _applicable_figures(root)
+    if not figures:
+        return [], []
+    values = derivations(root)
+    failures: list[dict[str, str]] = []
+    unchecked: list[dict[str, str]] = []
+    for rel, anchor, side, key in figures:
+        path = root / rel
+        name = "doc:rel=%s" % rel
+        if not path.is_file():
+            failures.append({"fact": name, "problem": f"{rel} is absent, so its "
+                                                          f"figures are no longer checked"})
+            continue
+        if "doc:rel=%s#%s" % (rel, anchor) in exemptions:
+            continue
+        text = path.read_text(encoding="utf-8")
+        stated = _int_near(text, anchor, side)
+        if stated is None:
+            hits = text.count(anchor)
+            problem = (f"the anchor {anchor!r} is missing from {rel}, so this figure "
+                       f"stopped being read" if hits == 0 else
+                       f"the anchor {anchor!r} occurs {hits} times in {rel}, so no "
+                       f"single figure can be bound to it")
+            failures.append({"fact": name, "problem": problem})
+            continue
+        current = values.get(key)
+        if current is None:
+            if key in POST_RUN_ONLY:
+                unchecked.append({"fact": name, "key": key,
+                                  "problem": f"{rel} states {stated} for {key}, which is "
+                                             f"only measurable after a gate run; this tree "
+                                             f"has not been gated, so the figure is "
+                                             f"UNCHECKED here and not agreed"})
+            continue
+        if stated != current:
+            failures.append({
+                "fact": name,
+                "problem": f"{rel} states {stated} for {key}, the tree measures {current}",
+            })
+    return failures, unchecked
+
+
 def collect(root: Path) -> tuple[list[Path], list[dict[str, Any]], list[float]]:
     """Every ledger visible from ``root``, whichever layout it is.
 
@@ -455,6 +785,11 @@ def main(argv: list[str] | None = None) -> int:
         for f in check_fact(fact, universe, exemptions):
             failures.append({"file": "ledger.json", **f})
 
+    doc_failures, doc_unchecked = check_doc_figures(root, exemptions)
+    doc_declared = sum(
+        1 for k in exemptions if k.startswith("doc:rel=")
+    )
+
     report = {
         "check": "claim_binding",
         "ledgers": len(ledgers),
@@ -464,9 +799,13 @@ def main(argv: list[str] | None = None) -> int:
         "unverified_exemptions": sum(
             1 for r in exemptions.values() if r.startswith(UNVERIFIED)
         ),
+        "doc_figures": len(_applicable_figures(root)),
+        "doc_figures_declared": doc_declared,
+        "doc_figures_unchecked": doc_unchecked,
         "id_failures": id_failures,
         "failures": failures,
-        "ok": not failures and not id_failures,
+        "doc_failures": doc_failures,
+        "ok": not failures and not id_failures and not doc_failures,
     }
     if args.json:
         print(json.dumps(report, indent=2))
@@ -480,19 +819,28 @@ def main(argv: list[str] | None = None) -> int:
                 f"claim_binding: {len(failures)} unclassified number(s) in {len(facts)} facts",
                 file=sys.stderr,
             )
-        if not failures and not id_failures:
+        for f in doc_failures:
+            print(f"claim_binding: FAIL {f['fact']}: {f['problem']}", file=sys.stderr)
+        for f in doc_unchecked:
+            print(f"claim_binding: UNCHECKED {f['fact']}: {f['problem']}", file=sys.stderr)
+        if not failures and not id_failures and not doc_failures:
             unverified = report["unverified_exemptions"]
+            declared = len(_applicable_figures(root))
+            checked = declared - len(doc_unchecked)
+            suffix = (f", {len(doc_unchecked)} of them post-run only and UNCHECKED "
+                      f"here" if doc_unchecked else "")
             print(
                 f"claim_binding: OK  {len(facts)} facts, {len(universe)} pinned values, "
-                f"{len(exemptions)} declared exemptions, 0 unclassified"
+                f"{len(exemptions)} declared exemptions, {declared} doc figures "
+                f"({checked} checked){suffix}, 0 unclassified"
             )
             if unverified:
                 print(
                     f"claim_binding: {unverified} declared exemption(s) are UNVERIFIED "
-                    f"figures -- claims asserting measurements no gate pins. See "
-                    f"{EXEMPTIONS.name}."
+                    f"figures -- claims and documents asserting measurements no gate "
+                    f"pins. See {EXEMPTIONS.name}."
                 )
-    return 1 if (failures or id_failures) else 0
+    return 1 if (failures or id_failures or doc_failures) else 0
 
 
 if __name__ == "__main__":

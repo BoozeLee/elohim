@@ -1,0 +1,34 @@
+{
+  "schema": "elohim.claim_ledger.claims/1",
+  "author": "fixture:healthy",
+  "note": "Every claim here is checked, in scope, and reproduces. This is the false-positive control's positive half: a corpus of correct claims must PASS, or the gate is a check that fails everything, which is not a check either.",
+  "claims": [
+    {
+      "id": "the-fixture-contract-is-present",
+      "text": "the fixture contract file is present",
+      "check": {
+        "argv": [
+          "python3",
+          "-c",
+          "import sys;sys.exit(0 if 'CLAIM LEDGER FIXTURE CONTRACT' in open('fixtures/claims/contract.txt').read() else 1)"
+        ],
+        "expect_exit": 0,
+        "asserts": "fixtures/claims/contract.txt"
+      }
+    },
+    {
+      "id": "the-marker-is-absent-from-the-contract",
+      "text": "the contract file does not carry the marker",
+      "_note": "The check is the exact NEGATION of the one in contradicted.json, over the same scope. It was not that way first: this claim originally grepped for the contract HEADER, which is in no way evidence about the marker, and the claim was still reported reproduced with the marker sitting right there in the file. The scope test could not see it, because the scope string WAS in the argv. limits.md records that as a measured limit of string containment rather than a bug to be papered over, and tests/negative_controls_claim_ledger.py pins the shape so it cannot be quietly restored.",
+      "check": {
+        "argv": [
+          "python3",
+          "-c",
+          "import sys;sys.exit(1 if 'MARKER_PRESENT' in open('fixtures/claims/contract.txt').read() else 0)"
+        ],
+        "expect_exit": 0,
+        "asserts": "fixtures/claims/contract.txt"
+      }
+    }
+  ]
+}

@@ -269,20 +269,44 @@ def timed_run(cmd: list[str], cwd: Path, budget: int) -> dict:
     }
 
 
+class InstrumentFailed(RuntimeError):
+    """An instrument that produced no shard, carrying what it cost to find out.
+
+    The measured seconds travel with the exception because they were measured.
+    `timed_run` returns `runtime_seconds` on every path, and raising a bare
+    `TimeoutError`/`RuntimeError` discarded it -- so a payload about a failed
+    run carried no timing for the failure, which is the one number a reader
+    wants when asking whether a run was slow.
+
+    `timed_out` is carried rather than inferred from the exception type
+    because "this exceeded its budget" and "this exited non-zero" are
+    different facts, and collapsing them is what made a 0.2s exit-1 print as
+    `TIMED OUT: instrument exceeded 600s`. See the coercion this replaced.
+    """
+
+    def __init__(self, message: str, runtime_seconds: float | None = None,
+                 timed_out: bool = False):
+        super().__init__(message)
+        self.runtime_seconds = runtime_seconds
+        self.timed_out = timed_out
+
+
 def run_instrument(instrument: Path, budget: int) -> tuple[dict, str, dict]:
     """Run the instrument and read back the shard it claims to have written."""
     workdir = instrument.parent
     run = timed_run([sys.executable, str(instrument)], workdir, budget)
     if run["status"] == "TIMEOUT":
-        raise TimeoutError(
+        raise InstrumentFailed(
             f"instrument exceeded the {budget}s budget after "
-            f"{run['runtime_seconds']}s: {instrument}"
+            f"{run['runtime_seconds']}s: {instrument}",
+            runtime_seconds=run["runtime_seconds"], timed_out=True,
         )
     shard = workdir / "out" / "shard.json"
     if not run["ok"] or not shard.is_file():
-        raise RuntimeError(
+        raise InstrumentFailed(
             f"instrument exited {run['returncode']} and produced no shard.json\n"
-            f"{run['stdout'][-2000:]}\n{run['stderr'][-2000:]}"
+            f"{run['stdout'][-2000:]}\n{run['stderr'][-2000:]}",
+            runtime_seconds=run["runtime_seconds"], timed_out=False,
         )
     return json.loads(shard.read_text()), run["stdout"], run
 
@@ -725,13 +749,22 @@ def gate_skill(skill: Skill, budget: int) -> tuple[dict, int]:
     try:
         shard, stdout, run = run_instrument(instrument, budget)
         runtime["instrument"] = run["runtime_seconds"]
-    except (TimeoutError, RuntimeError) as exc:
+    except (InstrumentFailed, TimeoutError, RuntimeError) as exc:
         shard = {}
         stdout = ""
         instrument_error = str(exc)
-        timed_out_phase = "instrument" if isinstance(exc, TimeoutError) else None
-        if timed_out_phase:
-            runtime["instrument"] = None
+        # "Exceeded its budget" and "exited non-zero" are different facts and
+        # only the first one is a timeout. Collapsing them is what made a
+        # 0.2s exit-1 print as `TIMED OUT: instrument exceeded 600s`.
+        timed_out_phase = "instrument" if (
+            isinstance(exc, TimeoutError) or getattr(exc, "timed_out", False)
+        ) else None
+        # Recorded rather than nulled: the seconds were measured, and dropping
+        # them made a failure that never started indistinguishable from one
+        # that ran long.
+        measured = getattr(exc, "runtime_seconds", None)
+        if measured is not None:
+            runtime["instrument"] = measured
 
     if shard:
         facts = verify_facts(shard, ledger)
@@ -745,8 +778,15 @@ def gate_skill(skill: Skill, budget: int) -> tuple[dict, int]:
         # An instrument that did not produce a shard has not been measured, so
         # there is nothing to verify. Report that as the failure it is instead
         # of as an empty pass, and still hand back a payload a consumer can read.
+        #
+        # `timed_out_phase` is NOT set here. It used to be coerced to
+        # "instrument" for every no-shard outcome, which contradicted
+        # references/contract.md ("whether any phase hit the budget") and made
+        # elohim_gate/mutation.py's `instrument_error` branch unreachable, so
+        # every non-timeout failure was misattributed to the budget in the
+        # mutation report. A missing shard is reported by `instrument_error`,
+        # which is what that field is for.
         facts, traps, hygiene, claims = [], {}, {"ok": False}, {"ok": False}
-        timed_out_phase = timed_out_phase or "instrument"
 
     for phase, value in (("traps", traps), ("hygiene", hygiene), ("claim_binding", claims)):
         if isinstance(value, dict) and value.get("status") == "TIMEOUT" and not timed_out_phase:

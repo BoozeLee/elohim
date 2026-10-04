@@ -1,0 +1,20 @@
+{
+  "schema": "elohim.claim_ledger.claims/1",
+  "author": "fixture:overstated",
+  "note": "The claim says the report is consistent; its check greps a different file entirely, passes, and establishes nothing about the report. This is the most common real failure in agent self-reporting and it is invisible to anything reading verdicts rather than argv.",
+  "claims": [
+    {
+      "id": "the-report-is-consistent",
+      "text": "the generated report is internally consistent",
+      "check": {
+        "argv": [
+          "python3",
+          "-c",
+          "import sys;sys.exit(0 if 'CLAIM LEDGER FIXTURE CONTRACT' in open('fixtures/claims/contract.txt').read() else 1)"
+        ],
+        "expect_exit": 0,
+        "asserts": "fixtures/claims/ABSENT-FROM-THE-TREE.json"
+      }
+    }
+  ]
+}
