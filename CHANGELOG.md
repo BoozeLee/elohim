@@ -96,6 +96,20 @@ one of the twelve commits sitting unpushed.
   first-wins deduplication had already cost this project a day.
 - **Comparisons that could reach agreement by measuring nothing are refused**
   (`elohim_gate/compare.py`).
+- **A roadmap claim that a gate passes was not attached to a run.** `E1`'s wheel
+  clause rested on *"the clause moved because that gate passes, not because this
+  file says so"* — a claim with no run behind it, and no clause named, in a file
+  that elsewhere insists `E1`'s *third* clause is still open. The `--dist` mode
+  that sentence leans on had been run exactly once, and that run failed: a
+  relative `--dist dist/` reached an install subprocess whose working directory
+  is a scratch tree outside the checkout, so pip was asked for a path that does
+  not exist. Every test in the repository passed, because every one of them
+  handed the tool an absolute path — a mode that refused everything and one that
+  worked were identical to the whole suite. The claim is now bound to what was
+  actually measured, both halves of it: a local run at `70f59e4` with every
+  probe passing, and a GitHub runner that has never seen the mode go green. The
+  control is `tests/test_wheel_dist.py`, which fails when the absolutising is
+  removed.
 
 ### Known limitations
 
@@ -143,9 +157,17 @@ git log v0.2.0..HEAD --format=%s
 
 The second command is the real check: it lists every subject in the range, so a
 commit missing from this section is a subject on that list that no entry accounts
-for. The count was 27 when this section was written; it is one more now, because
-the commit that wrote this section is itself in the range. Re-derive both rather
-than trusting either number printed here.
+for. **Those entries do not currently account for the whole range, and that is
+declared here instead of being written over.** `git rev-list --count v0.2.0..HEAD`
+read **79** at `0822385`, the commit before this one; the count grows with every
+commit that lands in the range, including the commits writing these lines, so
+re-derive it rather than trusting any number printed here. The entries account for
+the commits that were in the range when this section was written, plus the
+corrections it names and the commits that wrote it; the remainder is owed and is
+owed *visibly*, which is what a declared debt is for. The count remains the
+weaker of the two checks and the section says so without a hedge: a bullet count
+is not a check, and a count nobody re-measured is a number waiting to be wrong
+on arrival — as this very paragraph was, printing 28 against a measured 79.
 
 ## [0.2.0] — 2026-10-03
 

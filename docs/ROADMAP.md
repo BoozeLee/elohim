@@ -789,15 +789,35 @@ which in a wheel *is* `site-packages`, so installing the package and then import
 the library raised `FileNotFoundError` on a path the caller had never heard of. One
 resolver, `skills_root()`, now serves every call site, and
 `tools/verify_wheel.py` builds the real artifact, installs it into a clean venv, and
-calls the library from outside the checkout. The clause moved because that gate
-passes, not because this file says so. It has two modes, and both are asked on
+calls the library from outside the checkout. **The wheel clause — the second of
+`E1`'s three, not the third, which is still open — moved because that gate
+passes, not because this file says so.** It has two modes, and both are asked on
 every push: run with no argument it builds the wheel itself, which is what asks
 whether the checkout builds an installable artifact, and run with `--dist DIR` it
 installs the artifact it was handed and builds nothing, which is the question
 `publish.yml` asks about the wheel on its way to the index. The second mode is
-the one that reads a directory rather than making one, and until `ci.yml` ran it
-too, a `--dist` mode that refused everything was indistinguishable from a
-working one in every test here.
+the one that reads a directory rather than making one, and `ci.yml` did run it:
+the run **failed**, and recording that is the point. A relative `--dist dist/`
+reached a subprocess whose working directory is a scratch tree outside the
+checkout, so pip was asked to install a path under that scratch directory, and
+the gate refused at the install — after printing a selection and passing every
+content check, so nothing above the install had said anything was wrong. Every
+test in this repository passed, because every one of them handed the tool an
+absolute path. `tests/test_wheel_dist.py` now pins the shape that defect needed,
+`_one_wheel` returning an absolute path, and that assertion fails when the
+absolutising is removed.
+
+**The unverified half, reported before the verified half.** That `--dist` mode
+has never been green on a GitHub runner. The one run that executed it is the
+failure above; its fix (`70f59e4`) landed after the last green run on `main`
+(13:25:44Z), and every run since completed in seconds having executed no step
+at all. What the mode has instead is a local run at that commit — the two steps
+`ci.yml`'s `wheel` job runs, taken in a scratch environment on the workflow's
+exact pins, the build producing the sdist and the wheel and
+`verify_wheel.py --dist dist/` exiting 0 with every probe passing and the
+installed package byte-identical to this checkout. A reader deciding whether to
+take the clause on this file's word is owed both halves, and only one of them
+was measured on a runner.
 
 ### E2. Bootstrap the ledger
 **Why:** a judgment consult was asked what stands between this tool and a caller
