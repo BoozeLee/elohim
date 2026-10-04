@@ -140,12 +140,16 @@ jobs:
       # "The artifact this run is about to send" was the sentence here, and it
       # was wrong in the singular. The build above is `python3 -m build` with no
       # `--wheel`, so it leaves a wheel *and* an sdist in `dist/`, and the upload
-      # step sends both. This step checks the wheel and nothing else in this
-      # workflow checks the sdist: it is published on the strength of having
-      # come out of the same build as the wheel, which is an argument, not a
-      # check. So a run here reports that a *wheel* was verified and says
-      # nothing about the sdist travelling beside it. Naming that is the whole
-      # point of writing the limit down instead of rounding the claim up.
+      # step sends both.
+      #
+      # This step used to check the wheel and nothing else, which left the sdist
+      # being published on the strength of having come out of the same build as
+      # the wheel: an argument, not a check. It does not do that any more. The
+      # gate rebuilds a wheel out of the sdist and puts it through the same
+      # verification the wheel beside it just went through, so one run here
+      # reports on both artifacts or refuses. An sdist that unpacks into
+      # something no longer installable is caught above the upload, which is
+      # the only place catching it is worth anything.
       #
       # What it does not check is the bytes as the index received them -- nothing in
       # this workflow does -- and the step is named for what it does rather than
