@@ -91,6 +91,24 @@ jobs:
       - name: build the distribution
         run: python3 -m build --outdir dist/
 
+      # `pyproject.toml` is edited by a person, and the index does not replace
+      # a released version. So a dispatch offering a version that is already
+      # published cannot succeed, and without this step it fails at the upload:
+      # after the build, after the token exchange, having established nothing
+      # except the number to bump. `elohim` 0.3.0 is released, which makes that
+      # the state this repository is actually in.
+      #
+      # It asks the JSON API and never the web page, because the web page
+      # answers HTTP 200 for names that do not exist. `docs/PUBLISHING.md`
+      # records that trap and both ways a check written against it comes out
+      # backwards.
+      #
+      # A step of its own rather than an `if:` on the upload, for the reason the
+      # `if:` below gives: a dry run must still do the work. A guard that only
+      # runs when it matters is a guard nobody has ever watched pass.
+      - name: the version being offered is not already released
+        run: python3 tools/verify_release_slot.py
+
       # v1.14.2. The sha is the commit the annotated tag v1.14.2 resolves to,
       # dereferenced rather than copied from the tag object, so it names code
       # rather than a name that can be moved.

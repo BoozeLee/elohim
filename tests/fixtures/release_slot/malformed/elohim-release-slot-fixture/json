@@ -1,0 +1,4 @@
+{
+  "_fixture": "SYNTHETIC. Never fetched from a real index. Valid json with no releases map. Reading this as an empty releases map is how a taken version gets reported as free, so it must not be read that way.",
+  "info": {}
+}
