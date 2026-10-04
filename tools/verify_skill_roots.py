@@ -63,24 +63,26 @@ EXIT_OK, EXIT_FINDING, EXIT_BAD_INPUT = 0, 1, 2
 # the roots it checks does not notice one added later. That failure has shipped in
 # this repository once already -- the census enumerated a population it did not
 # cover and reported the smaller number as the rate.
+# The roots a loader can independently reach, and only those. `skills/` is the
+# canonical source and `plugins/elohim/skills/` is a derived, byte-identical
+# distribution copy -- AGENTS.md, CONSTRAINTS.md, CONTRIBUTING.md and README.md
+# all say so, and `tools/sync_adapters.py --check` is the gate that keeps them
+# equal. Naming the mirror here as a second root made this gate report all nine
+# skill names as duplicated, which is a true statement about two directories
+# and a false statement about what a loader sees: the second copy is not an
+# independent place a name is reachable from, it is the same skill shipped
+# twice through one source, and the sync gate already owns that.
+#
+# Which leaves the real problem, which the zero-subject floor below now says out
+# loud: none of these three roots exists in this repository, so this gate has no
+# subject here. It is not registered in .gate-manifest for that reason. A gate
+# that cannot see anything is not a gate, and the honest fix is to stop calling
+# it one rather than to widen its subject until it has something to complain
+# about.
 PROJECT_ROOTS = (
     ".opencode/skills",
     ".claude/skills",
     ".agents/skills",
-    # The two roots this repository actually ships skills in. They were missing
-    # here, and their absence was invisible: with none of the three above
-    # present in a fresh clone, this gate inspected zero roots and reported "OK
-    # no duplicated name across 0 project-local roots" -- a clean verdict about
-    # a population it had never seen. All nine skill names are reachable from
-    # both of these, which is what the gate was written to report and could not,
-    # because it was not looking at either.
-    #
-    # Whether the pair is a deliberate mirror (a plugin directory shipping the
-    # same skills) or an accident is a question about this repository's layout,
-    # not about this gate. Until it is answered the gate is red, and a red gate
-    # that has looked is worth more than a green one that has not.
-    "skills",
-    "plugins/elohim/skills",
 )
 
 # Never inspected unless --global is passed, and named in every failure message so

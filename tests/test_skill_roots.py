@@ -288,46 +288,60 @@ def test_the_shipped_fixture_is_still_caught(tmp_path):
     ), "the committed fixture must still be caught"
 
 
-def test_this_repository_reports_the_duplicates_it_actually_has():
+def test_this_repository_has_no_root_this_gate_can_inspect():
     """The real tree, through the same entry point CI uses.
 
     This asserted EXIT_OK for years and was asserting nothing. PROJECT_ROOTS
-    named only .opencode/skills, .claude/skills and .agents/skills, none of
-    which exist in this repository, so the gate inspected zero roots, found no
-    duplicates, and reported a clean verdict over a population it had never
-    seen. The test then asserted that clean verdict was correct.
+    names .opencode/skills, .claude/skills and .agents/skills; none of them
+    exists in this repository, which ships from `skills/` and publishes a
+    derived copy at `plugins/elohim/skills/`. The gate inspected zero roots,
+    found no duplicated name among them, and reported "OK no duplicated name
+    across 0 project-local roots" -- a clean verdict over a population it had
+    never seen. The test then asserted that clean verdict was correct.
 
-    It is now EXIT_FINDING, and the nine names it reports are the real ones:
-    every skill ships from both skills/ and plugins/elohim/skills/. Whether
-    that pair is a deliberate mirror or an accident is a question about this
-    repository's layout rather than about this gate, and it is deliberately not
-    answered here. What is answered here is that the gate is looking, which it
-    was not before.
+    It is now EXIT_BAD_INPUT, which is the true answer: this gate has no subject
+    in this repository.
+
+    The obvious "fix" -- adding `skills` and `plugins/elohim/skills` to
+    PROJECT_ROOTS -- is wrong, and this test is where that was found. It made
+    the gate report all nine names as duplicated, which is true of the two
+    directories and false of what a loader sees. AGENTS.md, CONSTRAINTS.md,
+    CONTRIBUTING.md and README.md all state that `plugins/` is derived and kept
+    byte-identical by `tools/sync_adapters.py --check`; the second copy is not
+    an independent place a name is reachable from, it is one skill shipped twice
+    through one source. The sync gate already owns that property.
+
+    So the gate stays honest about having nothing to look at, and is not
+    registered in `.gate-manifest` for the same reason.
     """
     assert roots_tool.run([str(REPO_ROOT)], expect_findings=False, include_global=False) == (
-        roots_tool.EXIT_FINDING
+        roots_tool.EXIT_BAD_INPUT
     )
 
 
-def test_the_gate_actually_inspects_this_repositorys_skills():
-    """A guard on the guard: the roots this gate inspects must exist here.
+def test_the_derived_mirror_is_not_a_root_this_gate_should_inspect():
+    """A guard on the guard, and the one that caught the wrong fix.
 
-    Without this, a future edit that drops `skills` or `plugins/elohim/skills`
-    from PROJECT_ROOTS would put the gate back to inspecting nothing -- and the
-    test above would go red for the wrong reason, or worse, the floor would
-    catch it and this repository would look unverified rather than repaired.
+    `plugins/elohim/skills/` is byte-identical to `skills/` by design. If a
+    future edit adds it to PROJECT_ROOTS, this gate starts reporting nine
+    duplicates that are not duplicates, and the repository goes red for a
+    property it has deliberately. Asserting the mirror is derived means the
+    next person to widen this gate's subject finds out here.
     """
     for relative in ("skills", "plugins/elohim/skills"):
-        assert (REPO_ROOT / relative).is_dir(), (
-            f"{relative} is named in PROJECT_ROOTS and is absent, so "
-            f"verify_skill_roots.py cannot see the skills this repository ships"
+        assert (REPO_ROOT / relative).is_dir(), f"{relative} is expected to exist"
+    for root in ("skills", "plugins/elohim/skills"):
+        assert not any(
+            str(roots_tool.PROJECT_ROOTS).find(f'"{root}"') >= 0
+            for _ in (0,)
+        ), (
+            f"{root} is in PROJECT_ROOTS. It is a derived, byte-identical copy "
+            f"kept equal by tools/sync_adapters.py --check, not an independent "
+            f"root a loader can reach the same name from."
         )
-    roots = roots_tool.reachable_roots(REPO_ROOT, include_global=False)
-    assert len(roots) >= 2, (
-        f"expected at least the two shipped roots, got {[label for label, _ in roots]}"
-    )
-    reachable = sum(1 for _, root in roots for _ in root.rglob("SKILL.md"))
-    assert reachable > 0, "the inspected roots hold no SKILL.md, so the gate is blind"
+    a = sorted(p.name for p in (REPO_ROOT / "skills").iterdir() if p.is_dir())
+    b = sorted(p.name for p in (REPO_ROOT / "plugins" / "elohim" / "skills").iterdir() if p.is_dir())
+    assert a == b, f"the derived copy has drifted: {a} vs {b}"
 
 
 def test_a_tree_with_no_skills_is_bad_input_not_a_pass(tmp_path):

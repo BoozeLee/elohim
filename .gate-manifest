@@ -33,4 +33,19 @@
 # ci-command: ./scripts/run-skill-gates.sh
 
 skill-tree  relocated  tools/verify_skill_frontmatter.py
-skill-tree  relocated  tools/verify_skill_roots.py
+
+# tools/verify_skill_roots.py is NOT registered, and its absence is deliberate.
+# It names .opencode/skills, .claude/skills and .agents/skills; this repository
+# ships from `skills/` and publishes a derived byte-identical copy at
+# `plugins/elohim/skills/`, so none of its three roots exists here and it has no
+# subject to audit. It now returns 2 saying exactly that, instead of "OK, no
+# duplicated name across 0 project-local roots" -- which is the fix that landed
+# with the zero-subject floors.
+#
+# Adding `skills` and `plugins/elohim/skills` to its PROJECT_ROOTS would make it
+# report nine "duplicates" that are not duplicates: AGENTS.md, CONSTRAINTS.md,
+# CONTRIBUTING.md and README.md all state that `plugins/` is derived, and
+# `tools/sync_adapters.py --check` is the gate that keeps the two equal. A
+# gate that can see nothing is not a gate; a gate pointed at a mirror reports
+# fiction. It is run by matrix.yml against a committed fixture, where it does
+# have a subject, and that is where its verdict belongs.

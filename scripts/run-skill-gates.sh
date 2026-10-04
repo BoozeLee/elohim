@@ -19,10 +19,8 @@ cd "$repo_root"
 gate_names=(
   "meta-gate self-test"
   "frontmatter self-test"
-  "skill-roots self-test"
   "meta-gate audit"
   "frontmatter audit"
-  "skill-roots audit"
 )
 # The --expect-findings steps are the committed negative controls, invoked
 # exactly as matrix.yml invokes them. Both need the fixture named: without
@@ -33,11 +31,16 @@ gate_names=(
 gate_cmds=(
   "scripts/check-gates-are-honest.sh --self-test"
   "tools/verify_skill_frontmatter.py --skill-root tests/fixtures/skill_frontmatter --expect-findings"
-  "tools/verify_skill_roots.py --root tests/fixtures/skill_roots --expect-findings"
   "scripts/check-gates-are-honest.sh"
   "tools/verify_skill_frontmatter.py"
-  "tools/verify_skill_roots.py"
 )
+
+# tools/verify_skill_roots.py is absent from this list on purpose. It is run by
+# matrix.yml against its committed fixture, where it has a subject, but none of
+# the three roots it inspects exists in this repository, so on the real tree it
+# has nothing to audit and says so with exit 2. Listing it here would make this
+# entry point red forever for a gate that is correctly reporting that it is
+# blind. See the note in .gate-manifest.
 
 if [ "${1:-}" = "--list" ]; then
   printf '%s\n' "${gate_names[@]}"
