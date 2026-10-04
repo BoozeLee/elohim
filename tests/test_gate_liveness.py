@@ -362,3 +362,88 @@ def test_the_summary_write_does_not_replace_the_committed_log(tmp_path, monkeypa
     assert set(payload) == {"gates"}, payload
     assert payload["gates"]["w.yml:j:a gate"]["run"] == "run-42"
     assert "run-42" not in log.read_text().split("_comment")[0][:0] + ""  # log stays JSON
+
+
+def test_the_recorder_prints_its_delta_so_the_step_log_can_recover_it(
+    tmp_path, monkeypatch, capsys
+):
+    """The delta must be readable somewhere that is not the Summary tab.
+
+    Turn red by reducing the `print` in `main()` back to a bare count -- the
+    state of `main` before this change, so this test fails there.
+
+    The step summary alone does not deliver the promise the recorder's own
+    docstring makes. It says the delta is written "so a person has the exact
+    records to commit rather than re-running anything to recover them", and a
+    gate name that appears only in `$GITHUB_STEP_SUMMARY` is not recoverable by
+    a person reading `gh run view --log`: the count is printed, the names are
+    not. So the claim was backed by a surface that could not be read from the
+    terminal, which is the only place the person refreshing the log is.
+
+    Stdout is the surface that survives: the step log is retained, greppable,
+    and needs no API that does not expose job summaries.
+    """
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    root = tmp_path / "tree"
+    (root / "tools").mkdir(parents=True)
+    (root / ".github" / "workflows").mkdir(parents=True)
+    (root / ".github" / "workflows" / "w.yml").write_text(
+        "jobs:\n  j:\n    steps:\n"
+        "      - name: a gate\n        run: python3 tools/x.py\n"
+        "      - name: another gate\n        run: python3 tools/y.py\n"
+    )
+    (root / "tools" / gl.LOG_NAME).write_text(json.dumps({"gates": {}}))
+
+    rc = rec.main(
+        [
+            "--root", str(root),
+            "--job", "w.yml:j",
+            "--run", "run-42",
+            "--at", "2026-10-04T00:00:00Z",
+        ]
+    )
+    assert rc == 0
+
+    out = capsys.readouterr().out
+    for name in ("w.yml:j:a gate", "w.yml:j:another gate"):
+        assert name in out, "delta missing from the step log: %r" % out
+    assert "run-42" in out, out
+
+
+def test_the_printed_delta_is_the_delta_and_not_the_whole_log(tmp_path, monkeypatch, capsys):
+    """Printing the delta must not become printing the log.
+
+    Turn red by having `main()` iterate the committed log instead of the list
+    `record()` returned -- which would print every gate the repository has ever
+    recorded, not the ones this job just observed.
+    """
+    monkeypatch.delenv("GITHUB_STEP_SUMMARY", raising=False)
+    root = tmp_path / "tree"
+    (root / "tools").mkdir(parents=True)
+    (root / ".github" / "workflows").mkdir(parents=True)
+    (root / ".github" / "workflows" / "w.yml").write_text(
+        "jobs:\n  j:\n    steps:\n      - name: a gate\n        run: python3 tools/x.py\n"
+    )
+    (root / ".github" / "workflows" / "other.yml").write_text(
+        "jobs:\n  k:\n    steps:\n      - name: elsewhere\n        run: python3 tools/z.py\n"
+    )
+    log = root / "tools" / gl.LOG_NAME
+    log.write_text(
+        json.dumps(
+            {
+                "gates": {
+                    "other.yml:k:elsewhere": {
+                        "status": "success", "run": "run-1", "via": "other.yml:k"
+                    }
+                }
+            }
+        )
+    )
+
+    rec.main(["--root", str(root), "--job", "w.yml:j", "--run", "run-42", "--at", "t"])
+
+    out = capsys.readouterr().out
+    assert "w.yml:j:a gate" in out, out
+    assert "other.yml:k:elsewhere" not in out, (
+        "printed a gate this job did not observe: %r" % out
+    )
