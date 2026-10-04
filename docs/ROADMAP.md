@@ -63,7 +63,7 @@ workflow red instead.
 | traps re-derived independently | 53 |
 | claims a real agent made, read by hand from one real session | hand-adjudicated from one real session \| claims adjudicated 14, of which contradicted 0, and asserted-but-never-measured 2; the gate flags both of those with no false alarm |
 | instrument checksums pinned | 8, all PASS |
-| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.13 → 3.14.7** † *(not re-measured since the population moved; still describes a five-instrument tree)* |
+| interpreters the gate was run under | **17 binaries, 8 versions, 3.10.20 → 3.14.7** † *(not re-measured since the population moved; still describes a five-instrument tree; lower endpoint corrected 3.10.13 → 3.10.20 on 2026-10-04, see below)* |
 | instrument source pins identical across all of them | **yes, 5/5 byte-for-byte, for the five sealed instruments** † *(same)* |
 | recorded seals identical across 3.10.20 → 3.14.5 | **4 of 5; `estimator_bias` splits into exactly two classes at the CPython 3.12 boundary** † *(same)* |
 | instrument mutation sites enumerated exhaustively, seal forged | **1,937** † |
@@ -113,6 +113,55 @@ self-check holds and all 25 gate runs pass, because the ledger's tolerances
 absorb a shift that size. The pinned values are therefore measuring the
 mathematics through a small measured interpreter-induced offset, and the size
 of that offset is now the thing B1 pins.
+
+### The interpreter range, re-measured 2026-10-04
+
+`tools/matrix.py` was run over **six** interpreters and exited **0**: every
+observed seal is a pinned one, and there is no third class.
+
+| interpreter | class | seals |
+|---|---|---|
+| 3.10.20 | `pre312` | one identical set; `estimator_bias` `06631f4cb544` |
+| 3.11.9 | `pre312` | identical to 3.10.20 |
+| 3.12.13 | `312plus` | `estimator_bias` `8163ec2d879a`; rest identical |
+| 3.13.13 | `312plus` | identical to 3.12.13 |
+| 3.14.5 | `312plus` | identical to 3.12.13 |
+| **3.14.7** | `312plus` | **identical to 3.14.5** |
+
+That last row is why this note exists. The row above reads `3.10.13 → 3.14.7`,
+and the B1 narrative further down reads "Measured across 3.10.20, 3.11.9,
+3.12.13, 3.13.13 and **3.14.7**" — and **3.14.7 is real**. It is installed at
+`/usr/bin/python3.14`, it lands in class `312plus`, and it produces seals
+**byte-identical to 3.14.5** for all seven instrumented skills. So that B1
+sentence is a **true record**, and it is left exactly as written. Only the
+`3.10.13` lower endpoint — on no interpreter this machine has, and covered by no
+measurement in this repository — has been corrected, to `3.10.20`.
+
+`traps.md` still names five interpreters and is still right about what the *pins*
+were measured across: 3.10.20, 3.11.9, 3.12.13, 3.13.13 and 3.14.5. The table's
+"17 binaries, 8 versions" stays as the † one-off measurement it is labelled as.
+What this note adds is what is true *now*, on this machine: **16 candidate
+interpreter paths resolving to 6 distinct versions** (3.10.20, 3.11.9, 3.12.13,
+3.13.13, 3.14.5, 3.14.7) — 10 paths under `uv`, 5 symlinked into `~/.local/bin`,
+and the sixth at `/usr/bin/python3.14`.
+
+**A gotcha worth naming: the documented command cannot run unattended here.**
+
+```sh
+python3 tools/matrix.py --json --expect-interpreters 5
+# matrix: REFUSED: 3.14 is claimed by two interpreters with different patch
+# versions: kept 3.14.5 at ~/.local/share/uv/python/cpython-3.14-.../bin/python3,
+# found 3.14.7 at /usr/bin/python3.14
+# exit 3, empty stdout
+```
+
+Two interpreters claim minor 3.14 at different patch versions, and which one
+"the range" means is not something the tool will guess — so it refuses and
+reports nothing. That is the **correct** behaviour and not a defect: the refusal
+is a *discovery* failure, not a *measurement* one. Naming the interpreters with
+`--interpreter PATH`, as the six-row run above did, bypasses the ambiguity
+entirely, and the class table was never in doubt — the answer is the same either
+way.
 
 ### An open CI outage, recorded 2026-10-04
 
