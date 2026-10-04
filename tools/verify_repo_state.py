@@ -157,13 +157,23 @@ def _resolve(name: str):
     return globals()["check_" + name]
 
 
-def verify(*, require_visibility: bool = False) -> dict[str, list[str]]:
+def verify(*, require: frozenset[str] = frozenset()) -> dict[str, list[str]]:
     """Run every check and return `{name: findings}`.
 
-    `require_visibility` is for CI, where `GITHUB_TOKEN` exists and an
-    unobservable claim should fail the job. Left False, an unobservable
-    visibility check is still *reported* as unverified -- the finding is never
-    dropped, only its exit-code weight changes.
+    `require` names the claims whose being *unobservable* must be a failure.
+    It is not a way to turn a check off: a check in `require` that raises
+    `Unverified` is reported as a finding, exactly as a check that finds
+    something would be.
+
+    CI passes `{"visibility"}`. The visibility claim is a remote property and
+    on a runner `GITHUB_TOKEN` exists, so there is no excuse for not measuring
+    it. The divergence claim is the opposite: on a `pull_request` checkout
+    there is no `refs/remotes/origin/main` to compare against, and asking for
+    one would fail every pull request over a fact that cannot exist there.
+    That check earns its keep locally, where a real clone can diverge -- which
+    is the situation `docs/DISTRIBUTION.md` described. Demanding it of a
+    shallow merge-ref checkout would be a check that can only ever fail, which
+    is the same defect as one that can never fail.
     """
     results: dict[str, list[str]] = {}
     for name in CHECK_NAMES:
@@ -172,7 +182,9 @@ def verify(*, require_visibility: bool = False) -> dict[str, list[str]]:
         except Unverified as exc:
             results[name] = ["UNVERIFIED: %s" % exc]
     visibility = results.get("visibility") or []
-    if not require_visibility and visibility and visibility[0].startswith("UNVERIFIED"):
+    if "visibility" not in require and visibility and visibility[0].startswith(
+        "UNVERIFIED"
+    ):
         results["visibility_note"] = [
             "visibility was not observable here; this run does not speak to it"
         ]
@@ -184,8 +196,15 @@ def main(argv: list[str] | None = None) -> int:
     if "--help" in argv or "-h" in argv:
         print(__doc__)
         return 0
-    require_visibility = "--require-visibility" in argv
-    results = verify(require_visibility=require_visibility)
+    require = frozenset(
+        argv[index + 1] for index, arg in enumerate(argv) if arg == "--require" and index + 1 < len(argv)
+    )
+    unknown = require - set(CHECK_NAMES)
+    if unknown:
+        print("verify_repo_state: unknown claim(s) in --require: %s" % ", ".join(sorted(unknown)))
+        print("verify_repo_state: known claims are: %s" % ", ".join(CHECK_NAMES))
+        return 2
+    results = verify(require=require)
 
     # An empty list means "checked, nothing to report". A non-empty list whose
     # first entry starts with UNVERIFIED means "could not check". Conflating
@@ -204,7 +223,7 @@ def main(argv: list[str] | None = None) -> int:
         for finding in entries(name):
             if finding.startswith("UNVERIFIED"):
                 unverified_count += 1
-                if require_visibility:
+                if name in require:
                     findings.append(finding)
             else:
                 findings.append(finding)

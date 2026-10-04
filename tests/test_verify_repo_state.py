@@ -146,10 +146,41 @@ def test_verify_reports_an_unobservable_check_as_a_finding_not_as_absence(monkey
         raise vrs.Unverified("no token")
 
     monkeypatch.setattr(vrs, "check_visibility", unobservable)
-    results = vrs.verify(require_visibility=False)
+    results = vrs.verify()
     assert results["visibility"][0].startswith("UNVERIFIED: "), results
     # Present as a named finding. Not absent. Not an empty list.
     assert "visibility_note" in results, results
+
+
+def test_a_required_claim_that_cannot_be_observed_fails(monkeypatch):
+    """`--require` names the claims whose unobservability is a failure.
+
+    Turn red by requiring a claim that raises, which is what a runner does to
+    `visibility` when it has no token.
+    """
+    monkeypatch.setattr(vrs, "check_hardening", lambda: [])
+    monkeypatch.setattr(vrs, "check_divergence", lambda: [])
+    monkeypatch.setattr(
+        vrs, "check_visibility", lambda: (_ for _ in ()).throw(vrs.Unverified("no token"))
+    )
+    results = vrs.verify(require=frozenset({"visibility"}))
+    assert results["visibility"][0].startswith("UNVERIFIED: "), results
+    assert "visibility_note" not in results, "a required claim must not be excused"
+
+
+def test_a_required_claim_is_not_turned_off_by_being_required_twice(monkeypatch):
+    """Naming a claim in --require does not skip it; it only adds weight."""
+    monkeypatch.setattr(vrs, "check_hardening", lambda: [])
+    monkeypatch.setattr(vrs, "check_divergence", lambda: [])
+    monkeypatch.setattr(vrs, "check_visibility", lambda: [])
+    results = vrs.verify(require=frozenset({"visibility", "hardening"}))
+    assert results["hardening"] == [], results
+    assert results["visibility"] == [], results
+
+
+def test_an_unknown_claim_in_require_is_refused_rather_than_ignored(capsys):
+    assert vrs.main(["--require", "not_a_claim"]) == 2
+    assert "unknown claim" in capsys.readouterr().out
 
 
 def test_the_tool_exits_non_zero_when_a_check_reports(monkeypatch, capsys):
