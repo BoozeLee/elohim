@@ -475,6 +475,24 @@ DOC_FIGURES: list[tuple[str, str, str, str]] = [
     ("docs/ROADMAP.md", "of which contradicted ", "after", "replay_claims_contradicted"),
     ("docs/ROADMAP.md", "asserted-but-never-measured ", "after",
      "replay_claims_unverified"),
+    # The public front door. This file was the worst offender in the repository and had
+    # no gate at all: it omitted two of the eight skills, under-counted `elohim` by
+    # nine facts, carried an instrument pin a later edit had invalidated, reported the
+    # pre-`claim-ledger` 81/38/6, and asserted in prose that its own numbers were "not
+    # typed in by hand" while being exactly that. Nothing would have caught any of it.
+    #
+    # Six figures, not the whole table. The three totals and the three recall counts
+    # are derivable from the tree and from the label fixture. The per-skill cells are
+    # NOT bound, because a derivation for them does not exist and inventing one to
+    # close the gap would be a gate that looks load-bearing and is not. Those cells
+    # come from each skill's committed ledger; a future figure that can derive them
+    # should.
+    ("README.md", "pinned facts, ", "before", "total_facts"),
+    ("README.md", "independent trap re-derivations, ", "before", "total_traps"),
+    ("README.md", " instrument pins. Every", "before", "pins_passing"),
+    ("README.md", "claims adjudicated ", "after", "replay_claims_adjudicated"),
+    ("README.md", "of which contradicted ", "after", "replay_claims_contradicted"),
+    ("README.md", "asserted-but-never-measured ", "after", "replay_claims_unverified"),
 ]
 
 _INT = re.compile(r"\d[\d,]*")

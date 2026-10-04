@@ -265,11 +265,29 @@ def doc_figure_controls() -> int:
     fires on a correctly-dated historical figure is worse than no scanner,
     because a gate that cries wolf gets ignored.
 
-    The tree is copied once and docs/ROADMAP.md is restored from its pristine
-    bytes between cases, so one control cannot cause the next to fail.
+    The tree is copied once and every document under test is restored from its
+    pristine bytes between cases, so one control cannot cause the next to fail.
+
+    Two documents are covered. `docs/ROADMAP.md` was the first, and it is the
+    internal status table. `README.md` is the public front door and had no gate
+    at all until the recall work bound it -- it had been omitting two of the
+    eight skills and under-counting a third for months, and nothing in the
+    repository would have noticed. A control per document is what keeps the
+    second one from quietly becoming the first one's fate.
     """
+    def _row(pattern: str, what: str, text: str, doc: str) -> str:
+        found = re.search(pattern, text)
+        if not found:
+            raise SystemExit(
+                f"selftest: {what} is no longer in {doc}, so these controls cannot run. "
+                "A doc-figure control that skips is worse than one that fails."
+            )
+        return found.group(0)
+
     doc = "docs/ROADMAP.md"
     pristine = (ROOT / doc).read_text(encoding="utf-8")
+    readme_rel = "README.md"
+    readme = (ROOT / readme_rel).read_text(encoding="utf-8")
 
     # These three literals are DERIVED from the document, not written out here.
     #
@@ -285,18 +303,11 @@ def doc_figure_controls() -> int:
     # So each literal is read out of the pristine document and only the WRONG value
     # is written here. If the row is ever renamed, the controls refuse to run rather
     # than silently passing.
-    def _row(pattern: str, what: str) -> str:
-        found = re.search(pattern, pristine)
-        if not found:
-            raise SystemExit(
-                f"selftest: {what} is no longer in {doc}, so these controls cannot run. "
-                "A doc-figure control that skips is worse than one that fails."
-            )
-        return found.group(0)
-
-    traps_row = _row(r"\| traps re-derived independently \| \d+ \|", "the traps row")
-    facts_row = _row(r"\| facts promoted \| \d+ across \d+ ledger-bearing skills \|", "the facts row")
-    exact_prose = _row(r"Of the \d+ facts, \*\*\d+ are exact", "the exact-facts prose")
+    traps_row = _row(r"\| traps re-derived independently \| \d+ \|", "the traps row", pristine, doc)
+    facts_row = _row(r"\| facts promoted \| \d+ across \d+ ledger-bearing skills \|",
+                     "the facts row", pristine, doc)
+    exact_prose = _row(r"Of the \d+ facts, \*\*\d+ are exact",
+                       "the exact-facts prose", pristine, doc)
 
     must_catch = [
         (traps_row,
@@ -328,6 +339,21 @@ def doc_figure_controls() -> int:
          "666 pinned facts and 311 independently",
          "Tier C narrative stays true of the tree it names and must not be bound"),
     ]
+
+    # The README set. One case per bound figure, and the anchor is derived so the
+    # case cannot expire the way the ROADMAP ones did.
+    readme_cases = []
+    for pattern, wrong, what in (
+        (r"\d+ pinned facts,", "999 pinned facts,", "README total facts"),
+        (r"\d+ independent trap re-derivations,", "77 independent trap re-derivations,",
+         "README total traps"),
+        (r"\d+ instrument pins\. Every", "5 instrument pins. Every", "README instrument pins"),
+        (r"claims adjudicated \d+,", "claims adjudicated 21,", "README claims adjudicated"),
+        (r"of which contradicted \d+,", "of which contradicted 4,", "README claims contradicted"),
+        (r"asserted-but-never-measured \d+", "asserted-but-never-measured 6",
+         "README claims unverified"),
+    ):
+        readme_cases.append((_row(pattern, what, readme, readme_rel), wrong, what))
 
     bad = 0
     with tempfile.TemporaryDirectory() as tmp:
@@ -381,6 +407,28 @@ def doc_figure_controls() -> int:
                     if "FAIL" in ln:
                         print(f"    {ln.strip()[:150]}")
         target.write_text(pristine, encoding="utf-8")
+
+        # README.md, same three-part discipline. Restored from its own pristine bytes
+        # rather than ROADMAP's, so a case that writes one document cannot leave the
+        # other mutated for the next group.
+        readme_target = work / readme_rel
+        for old, new, why in readme_cases:
+            if old not in readme:
+                print(f"  SKIP {old[:40]!r} is not in {readme_rel} any more")
+                bad += 1
+                continue
+            readme_target.write_text(readme.replace(old, new, 1), encoding="utf-8")
+            rc, out = run_check(work)
+            ok = rc == 1 and "FAIL doc:rel=README.md" in out
+            print(f"  CATCH  {why[:52]:<52} {'CAUGHT' if ok else 'rc=%d' % rc}")
+            if not ok:
+                bad += 1
+            else:
+                line = next((ln for ln in out.splitlines()
+                             if "FAIL doc:rel=README.md" in ln), "")
+                if line:
+                    print(f"    {line.strip()[:150]}")
+        readme_target.write_text(readme, encoding="utf-8")
 
     sys.path.insert(0, str(HARNESS_SCRIPTS))
     import claim_binding as cb
