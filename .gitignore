@@ -11,6 +11,12 @@ __pycache__/
 .venv/
 .pytest_cache/
 
+# build output -- `python3 -m build` writes the wheel and the sdist here, and
+# both workflows read the directory rather than either file. The trailing slash
+# is load-bearing: it matches a *directory* named dist at any depth and not
+# `tests/fixtures/wheel_dist`, whose 0-byte wheels are committed fixtures.
+dist/
+
 # node
 node_modules/
 
