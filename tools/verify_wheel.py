@@ -238,6 +238,35 @@ class Refusal(Exception):
     """
 
 
+def _readable(wheel: Path) -> None:
+    """Raise a `Refusal` unless `wheel` is a file this process can open.
+
+    A name ending in `.whl` is not a wheel. `dist/` can hold a *directory*
+    called `elohim-0.3.0-py3-none-any.whl`, a wheel left mode `000`, or a
+    symlink pointing at a build that was cleaned up, and each of those satisfies
+    a count of exactly one and a suffix of `.whl` and is therefore "selected".
+    Left unchecked, the selection is announced by the caller before it is real,
+    and the run then dies in an `OSError` traceback that names a Python class
+    rather than the artifact that was wrong -- the same defect `_entries` exists
+    to prevent, one step earlier.
+
+    Opened rather than stat'd, because the three cases do not agree on what a
+    stat says: a directory stats fine and is not a wheel, and a mode-`000` file
+    stats fine and cannot be read. All three raise `OSError` from `open`, and
+    all three fail closed.
+
+    Called from `_one_wheel` and not from `_entries` so the two problems stay
+    two sentences: a path that is not a readable file is a different defect
+    from a readable file that is not a zip, and the caller prints a line about
+    the selected artifact that must not be printed for either.
+    """
+    try:
+        with open(wheel, "rb"):
+            pass
+    except OSError as exc:
+        raise Refusal("%s cannot be read as a wheel: %s" % (wheel.name, exc))
+
+
 def _one_wheel(dist: Path) -> Path:
     """The single wheel in `dist`, or a `Refusal` naming what was there instead.
 
@@ -246,6 +275,12 @@ def _one_wheel(dist: Path) -> Path:
     picking either of them is how a gate ends up checking an artifact nobody
     chose -- so the count is checked rather than assumed, and a directory that
     is not there at all is a refusal rather than an empty result.
+
+    One, and openable: the count and the `.whl` suffix are both satisfiable by
+    something that is not a wheel at all, so the winner is handed to
+    `_readable` before it is returned. Returning a path is a claim that the
+    thing at that path can be checked, and a caller that prints the selection
+    has to be entitled to make it.
 
     Side-effect free: it reads a directory and either returns a path or raises,
     which is what lets `tests/test_wheel_dist.py` exercise both directions
@@ -259,6 +294,7 @@ def _one_wheel(dist: Path) -> Path:
         raise Refusal("expected exactly one wheel in %s, found %d: %s"
                       % (dist, len(wheels),
                          ", ".join(w.name for w in wheels) or "no *.whl"))
+    _readable(wheels[0])
     return wheels[0]
 
 
@@ -268,12 +304,22 @@ def _entries(wheel: Path) -> list:
     Without this the next line raises `zipfile.BadZipFile` out of `main`, and a
     traceback is not a gate: it names a Python exception rather than the
     artifact that was wrong.
+
+    `OSError` is caught as well, and that arm should be unreachable now that
+    `_readable` opens the file first. It is kept because the two are separate
+    moments in time: a wheel that is deleted or re-permissioned between the
+    selection and this line raises here, and a gate that turns red on a race it
+    could have named is the gate being right. It says so rather than pretending
+    the earlier check is a lock.
     """
     try:
         with zipfile.ZipFile(wheel) as zf:
             return zf.namelist()
     except zipfile.BadZipFile as exc:
         raise Refusal("%s is not a readable wheel: %s" % (wheel.name, exc))
+    except OSError as exc:
+        raise Refusal("%s became unreadable while it was being read: %s"
+                      % (wheel.name, exc))
 
 
 def static_check() -> list[str]:
