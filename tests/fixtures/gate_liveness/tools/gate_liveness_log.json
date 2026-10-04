@@ -1,0 +1,47 @@
+{
+  "_comment": [
+    "A fixture log holding passes for the six TESTS and none of the four workflow",
+    "steps. The vacuous tests have a recorded pass and no control, so they are",
+    "NO_CONTROL alone -- which is the case worth proving, because it is the one",
+    "that looks greenest from the outside. The four steps have neither, and are",
+    "NEVER_PASSED."
+  ],
+  "gates": {
+    "tests/vacuous_one.py::test_something_true_about_fixture_one": {
+      "status": "success",
+      "run": "fixture-run",
+      "via": "fixture",
+      "at": "fixture-time"
+    },
+    "tests/vacuous_two.py::test_something_true_about_fixture_two": {
+      "status": "success",
+      "run": "fixture-run",
+      "via": "fixture",
+      "at": "fixture-time"
+    },
+    "tests/vacuous_three.py::test_something_true_about_fixture_three": {
+      "status": "success",
+      "run": "fixture-run",
+      "via": "fixture",
+      "at": "fixture-time"
+    },
+    "tests/vacuous_four.py::test_something_true_about_fixture_four": {
+      "status": "success",
+      "run": "fixture-run",
+      "via": "fixture",
+      "at": "fixture-time"
+    },
+    "tests/fine_with_a_control.py::test_something_true_about_the_fixture": {
+      "status": "success",
+      "run": "fixture-run",
+      "via": "fixture",
+      "at": "fixture-time"
+    },
+    "tests/fine_with_a_control.py::test_the_control_which_can_fail": {
+      "status": "success",
+      "run": "fixture-run",
+      "via": "fixture",
+      "at": "fixture-time"
+    }
+  }
+}

@@ -107,6 +107,22 @@ jobs:
       - name: the unit suite is green
         run: python3 -m pytest -q
 
+      # The gate that asks whether any of the gates above has ever actually
+      # passed. It reads `tools/gate_liveness_log.json` and never writes it;
+      # the recorder steps below do the writing, and only from the end of a job
+      # that reached them, which a failing job cannot do.
+      - name: every gate has either passed or a written reason
+        run: python3 tools/gate_liveness.py --check
+
+      # The last step in this job, deliberately. Reaching it means every gate
+      # above passed, and that is the observation `core` contributes to the
+      # log for the whole test suite -- one runner, 268 tests, none of them
+      # reporting on itself.
+      - name: record what this job proved
+        run: >-
+          python3 tools/gate_liveness_record.py --job ci.yml:core --suite
+          && python3 tools/gate_liveness_record.py --job ci.yml:core
+
   # A separate job, not a fifth step above. That is the whole point: Core CI
   # cannot read skills/elohim/artifacts/, so deleting artifacts/ together with
   # tools/verify_published.py leaves the four gates above byte-for-byte the
