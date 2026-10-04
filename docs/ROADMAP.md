@@ -114,6 +114,55 @@ absorb a shift that size. The pinned values are therefore measuring the
 mathematics through a small measured interpreter-induced offset, and the size
 of that offset is now the thing B1 pins.
 
+### An open CI outage, recorded 2026-10-04
+
+Every push workflow on every branch has failed since **2026-10-04T16:26:06Z**.
+
+```
+CLAIM:     the CI outage since 2026-10-04T16:26:06Z is not a defect in this tree
+STATE:     verified
+EVIDENCE:  4 branches x 3 workflows (Core CI, CodeQL, Interpreter Matrix); every
+           job lives 1-3 s with runner_name "" and steps []; core (3.10) started
+           16:59:42Z and completed 16:59:43Z; last green on main 11:46:48Z on
+           af3fd88; ci.yml parses
+FALSIFIER: a run on any branch with a populated steps[] that fails on a real
+           step -> the outage is over; delete this section
+
+CLAIM:     the cause is an exhausted Actions allowance
+STATE:     assumed, and REFUTED for this repository: 363 runner-minutes summed
+           since 2026-10-01 across 100 runs, against the 2,000-minute free
+           private-repo allowance
+FALSIFIER: an account-level or platform-level cause would be refuted by a human
+           reporting the billing page shows a healthy balance
+```
+
+Two things about that signature. **No runner was ever assigned** — `runner_name`
+and `runner_group_name` are both empty — and **no log was ever created**, so
+`GET /actions/jobs/{id}/logs` returns `BlobNotFound` and the check-runs API 404s
+with the scopes available here. A defect in one branch cannot fail four branches
+at once. Note the direction too: these jobs report `failure`, not `skipped`. A
+gate that cannot run says so rather than going green, which is the fail-closed
+direction and is not itself a defect.
+
+**The cause is not the repository's to fix, and the check is a person's browser** —
+the same class of step as the `D2` sponsorship item further down. In that same
+spirit the recording sheet ships **empty**: filling it in is the human's job, and
+an agent that fills it in has manufactured the one piece of evidence this section
+lacks.
+
+1. Open `github.com/settings/billing` at the **account** level, not the repository
+   level — this repository's own allowance is measured as not exhausted, which is
+   precisely what makes the account level the part that matters.
+2. Record the Actions minutes used and included, and any spending-limit or
+   payment state. ☐ recorded: ______
+3. Open `githubstatus.com` and record whether Actions is degraded.
+   ☐ recorded: ______
+4. If billing is healthy and status is clear, the cause is neither; record that
+   and stop escalating. ☐ recorded: ______
+
+Until someone fills that in, the cause is unnamed. It is not recorded here as an
+exhausted allowance, because that specific guess is refuted above.
+
 ## The three findings that shaped this roadmap
 
 These came from asking the gate to audit itself. Each one **corrected** an
@@ -319,7 +368,16 @@ existing traps weakened, but because the two new skills are leaf-heavy and
 nearly trap-free: `pay-signal` contributes 217 leaves watched by **one**
 independent trap and `reproducibility` 34 leaves watched by **none**, which is
 251 of the 789 leaves and 1 of the 110 independent catches. `reproducibility` is
-1 seal check and **6 traps that fire on nothing at all**.
+1 seal check and 6 traps that **this harness cannot reach** — which is not the
+same as traps that are broken, unnecessary, or firing on nothing. Its six read
+sibling `ledger.json` files, the `PINNED_CLASSES` table, and the shard's
+**types**; `tools/seal_independence.py` perturbs leaf **values** and re-seals, so
+none of them observes a change. `references/traps.md` documents a different
+probe — the class-table probe, with its stale-bytecode hazard — that does
+exercise all six. They are unexercised *by this sweep*. So read the 13.9 % and
+86.1 % above as figures about the leaves **this harness tampers with**, not as a
+measurement of the trap suite, and do not "fix" the † row below by deleting traps
+that a different probe does reach.
 
 **The number this item was opened for reproduced, at 13.5× the sample.** The
 recorded 11-of-15 for `tolerance-prover` (73%) measures as **177 of 203 shard
