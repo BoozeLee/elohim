@@ -107,9 +107,19 @@ one of the twelve commits sitting unpushed.
   handed the tool an absolute path — a mode that refused everything and one that
   worked were identical to the whole suite. The claim is now bound to what was
   actually measured, both halves of it: a local run at `70f59e4` with every
-  probe passing, and a GitHub runner that has never seen the mode go green. The
-  control is `tests/test_wheel_dist.py`, which fails when the absolutising is
-  removed.
+  probe passing, and — as of run `37223438858` on 2026-10-04 — a GitHub runner
+  whose `wheel` job executed ten steps, the seventh of them being this mode in
+  `--dist` form, all `success`. The control is `tests/test_wheel_dist.py`, which
+  fails when the absolutising is removed.
+
+  The five hours between those two facts are the rest of this entry. This
+  repository received no run that executed a step between 13:25:44Z and 18:05Z
+  on 2026-10-04, because the repository was **private**, and GitHub blocks usage
+  on a private repository once the free-plan quota is spent. It was made public,
+  and the next dispatched run executed. For that window every claim this
+  repository makes about "every push" was a claim about a runner that was not
+  running — including this entry's own, which is why it names the run rather
+  than the intention.
 
 ### Known limitations
 

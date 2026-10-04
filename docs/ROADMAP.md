@@ -807,17 +807,27 @@ absolute path. `tests/test_wheel_dist.py` now pins the shape that defect needed,
 `_one_wheel` returning an absolute path, and that assertion fails when the
 absolutising is removed.
 
-**The unverified half, reported before the verified half.** That `--dist` mode
-has never been green on a GitHub runner. The one run that executed it is the
-failure above; its fix (`70f59e4`) landed after the last green run on `main`
-(13:25:44Z), and every run since completed in seconds having executed no step
-at all. What the mode has instead is a local run at that commit — the two steps
-`ci.yml`'s `wheel` job runs, taken in a scratch environment on the workflow's
-exact pins, the build producing the sdist and the wheel and
-`verify_wheel.py --dist dist/` exiting 0 with every probe passing and the
-installed package byte-identical to this checkout. A reader deciding whether to
-take the clause on this file's word is owed both halves, and only one of them
-was measured on a runner.
+**What that run was not, for a while.** Between 13:25:44Z and 18:05Z on
+2026-10-04 this repository received no run that executed a step, and this
+paragraph said so: the `--dist` mode had never been green on a GitHub runner,
+its fix (`70f59e4`) had landed after the last green run, and the only evidence
+it had was a local one. That was true when written, and it is kept here because
+a correction that erases its own history is not a correction.
+
+**It is green now, and the reason is worth more than the fact.** Run
+`37223438858` reports the `wheel` job with ten executed steps, all `success`,
+and the seventh of them — *the artifact in `dist/` installs and its API runs* —
+is this mode. So the clause below rests on a runner after all. What changed was
+not this repository: Actions had stopped starting jobs because the repository
+was **private**, and GitHub's documented behaviour for a private repository on a
+free plan is that usage is *blocked* once the included quota is spent, with
+standard runners free only in public repositories. The repository was made
+public, and the next dispatched run executed. The correction, then, is not
+"this gate passes" but "this gate passes, and here is the run, and here is why
+it could not run for five hours while this file claimed it had".
+
+A reader is owed both halves in that order: what was verified, and what was not
+when the claim was made.
 
 ### E2. Bootstrap the ledger
 **Why:** a judgment consult was asked what stands between this tool and a caller
