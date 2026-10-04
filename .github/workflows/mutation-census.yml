@@ -2,8 +2,15 @@ name: Mutation Census
 
 # Nightly, not per-PR, and the reason is measured rather than preferred.
 #
-# The full population is 1679 (operator x site) pairs and is finite, so it is
-# enumerated rather than sampled. The sampled arm is NOT a substitute: N=200
+# The full population is every (operator x site) pair in every instrumented
+# skill, it is finite, so it is enumerated rather than sampled. Its size is
+# DERIVED -- `mutation.instrumented_skills()` over the ledgers on disk, counted
+# by `sites.enumerate_sites` -- so it is not written into this file. The figure
+# this job is held to is read further down from the recorded-figures table in
+# docs/MUTATION_SURVIVAL.md, which is its single home. This comment used to say
+# 1679, which was a fourth copy of a number three other places already carried
+# and the reason the nightly was red for 1,679 sites on a tree with 1,937.
+# The sampled arm is NOT a substitute: N=200
 # reads 0.2686 against a population of 0.0375, because 200 draws reach only 47
 # (operator x skill) cells and always take site #1 of each. That is structural
 # bias, not noise, so it does not converge on the population rate as N grows.
@@ -17,7 +24,8 @@ name: Mutation Census
 on:
   schedule:
     # 03:17 UTC. An off-round minute on purpose: every workflow scheduled at
-    # :00 queues behind the same wave, and this one runs 1679 subprocesses.
+    # :00 queues behind the same wave, and this one runs one subprocess per
+    # (operator x site) pair in the tree.
     - cron: "17 3 * * *"
   workflow_dispatch:
     inputs:
@@ -39,11 +47,17 @@ concurrency:
 jobs:
   census:
     runs-on: ubuntu-latest
-    # The population is 1679 mutations at a 45s per-mutation budget each.
-    # Measured 600s wall on 12 cores; a GitHub runner has 4, so jobs defaults
-    # to 2 and the run is roughly 3x that. The cap is set well above the
-    # expected time rather than at it, because a timeout here produces no
-    # verdict and would read as "no regression found".
+    # One subprocess per (operator x site) pair, at a 45s per-mutation budget.
+    # Measured 1098.7 s wall on 12 cores at 6 jobs; a GitHub runner has 4, so
+    # jobs defaults to 2 and the run is longer than that. The cap is set well
+    # above the expected time rather than at it, because a timeout here produces
+    # no verdict and would read as "no regression found".
+    #
+    # The leaf diff that replaced byte-equality made this run slower than the
+    # 890.6 s the same tree took under the old discriminator, and a timeout set
+    # against the old number is the same stale-constant defect in a different
+    # file. 90 minutes is the measured 1098.7 s with a wide margin, not a
+    # prediction.
     timeout-minutes: 90
 
     steps:
