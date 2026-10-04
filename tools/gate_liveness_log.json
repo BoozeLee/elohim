@@ -980,6 +980,94 @@
       "via": "ci.yml:core:the unit suite is green",
       "workflow": "Publish to PyPI"
     },
+    "tests/test_ledger_init.py::test_a_skill_with_no_discovery_script_gets_a_ledger_not_a_backlog": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_an_initialised_skill_is_locatable_by_the_gate": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_claim_binding_binds_nothing_from_it_until_promoted": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_is_exclusive_of_the_verbs_that_read_a_ledger": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_pins_nothing": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_refuses_to_overwrite_a_ledger": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_refuses_to_pin_an_env_override_outside_the_skill": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_refuses_to_pin_the_legacy_home_instrument": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_promotion_still_works_afterwards": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_the_committed_fixtures_ship_no_ledger": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_the_pin_it_writes_is_one_the_gate_accepts": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
     "tests/test_matrix_interpreters.py::test_an_unreadable_candidate_is_skipped_not_refused": {
       "at": "2026-10-04T21:00:00Z",
       "note": "completed/success; slot check, artifact gate and upload all success",
