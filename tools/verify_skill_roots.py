@@ -67,6 +67,20 @@ PROJECT_ROOTS = (
     ".opencode/skills",
     ".claude/skills",
     ".agents/skills",
+    # The two roots this repository actually ships skills in. They were missing
+    # here, and their absence was invisible: with none of the three above
+    # present in a fresh clone, this gate inspected zero roots and reported "OK
+    # no duplicated name across 0 project-local roots" -- a clean verdict about
+    # a population it had never seen. All nine skill names are reachable from
+    # both of these, which is what the gate was written to report and could not,
+    # because it was not looking at either.
+    #
+    # Whether the pair is a deliberate mirror (a plugin directory shipping the
+    # same skills) or an accident is a question about this repository's layout,
+    # not about this gate. Until it is answered the gate is red, and a red gate
+    # that has looked is worth more than a green one that has not.
+    "skills",
+    "plugins/elohim/skills",
 )
 
 # Never inspected unless --global is passed, and named in every failure message so
@@ -184,8 +198,32 @@ def run(repo_roots, *, expect_findings: bool, include_global: bool = False) -> i
         return EXIT_BAD_INPUT
 
     duplicates = []
+    inspected_roots = []
     for base in paths:
-        duplicates.extend(duplicate_names(reachable_roots(base, include_global=include_global)))
+        found = reachable_roots(base, include_global=include_global)
+        inspected_roots.extend(found)
+        duplicates.extend(duplicate_names(found))
+    reachable = sum(1 for _, root in inspected_roots for _ in root.rglob("SKILL.md"))
+
+    # The floor, checked before --expect-findings for the same reason as in
+    # verify_skill_frontmatter.py. The question this gate asks is whether one
+    # skill name can be reached from two roots; where no root holds a skill there
+    # is no name, so the question has no subject and the answer is not "no
+    # duplicates". This was unreachable while PROJECT_ROOTS named only
+    # directories this repository does not have, which is precisely why the
+    # no-op went unnoticed: the gate could not distinguish "clean" from "blind".
+    if reachable == 0:
+        absent = ", ".join(r for r in PROJECT_ROOTS if not (paths[0] / r).is_dir())
+        print(
+            f"verify_skill_roots: none of the {len(PROJECT_ROOTS)} project roots "
+            f"exists here"
+            + (f" ({absent})" if absent else "")
+            + ", so no skill name could be reachable from two roots. That is an "
+            "unverified tree, not a clean one, and the difference is what exit 2 "
+            "is for.",
+            file=sys.stderr,
+        )
+        return EXIT_BAD_INPUT
 
     if expect_findings:
         if not duplicates:
@@ -223,7 +261,7 @@ def run(repo_roots, *, expect_findings: bool, include_global: bool = False) -> i
         )
         return EXIT_FINDING
 
-    inspected = sum(1 for label, _ in reachable_roots(paths[0], include_global=include_global))
+    inspected = len(inspected_roots)
     scope = "project-local roots" + (f" and {inspected} global" if include_global else "")
     print(f"verify_skill_roots: OK  no duplicated name across {inspected} {scope}")
     if not include_global:
