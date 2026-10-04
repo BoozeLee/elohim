@@ -15,11 +15,13 @@ shows the assertion would have passed on an uncorrupted input had the harness
 not noticed. That is the difference between a test that can fail and a test
 that is merely green.
 
-The census is expensive, so nothing here runs it. `census.py` takes about ten
-minutes for the full 1,679-site population. What is cheap and what is slow
-are different kinds of evidence: the slow one is committed as
-`docs/MUTATION_SURVIVAL.md`, and what belongs in a unit test is the population
-arithmetic and the classification rules that decide what that document says.
+The census is expensive, so nothing here runs it. `census.py` takes minutes over
+the full population -- around thirteen for the 1,937 sites this tree measures on
+six workers, and it was ten for the 1,679 it measured when this file last said so
+in a figure nothing checked. What is cheap and what is slow are different kinds
+of evidence: the slow one is committed as `docs/MUTATION_SURVIVAL.md`, and what
+belongs in a unit test is the population arithmetic and the classification rules
+that decide what that document says.
 """
 from __future__ import annotations
 

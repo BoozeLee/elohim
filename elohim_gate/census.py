@@ -8,11 +8,25 @@ Design history, because it is the finding:
                    10 "effective survivors" were 2 distinct mutants sampled 4
                    and 6 times. A rate computed over that is decoration.
 
-  v2 (this)        enumerate every (operator, site) in all six instruments --
-                   1,679 of them -- and sample WITHOUT replacement. N=200 and
-                   N=2000 are then both prefixes of one exhaustive census, so
-                   the roadmap's two data points fall out of a single run that
-                   is strictly stronger than either.
+  v2 (this)        enumerate every (operator, site) in every instrumented skill
+                   and sample WITHOUT replacement. N=200 and N=2000 are then
+                   both prefixes of one exhaustive census, so the roadmap's two
+                   data points fall out of a single run that is strictly
+                   stronger than either.
+
+                   The population is DERIVED, never written here. It was
+                   "all six instruments -- 1,679 of them" until a seventh and
+                   eighth skill arrived and this line quietly became a lie that
+                   no gate read: a docstring is scanned by check_text and bound
+                   by nothing. mutation.instrumented_skills() discovers the
+                   population from the ledgers on disk, and the count is
+                   len(jobs) built from sites.enumerate_sites. The published
+                   figure lives in docs/MUTATION_SURVIVAL.md, and
+                   claim_binding.py re-derives it from the tree to check that
+                   document against it. Nothing in this file or that document
+                   needs editing when a skill lands; the tripwire in
+                   .github/workflows/mutation-census.yml fires instead, which is
+                   what it is for.
 
 Each row is also classified by whether the mutant moved the shard:
 
