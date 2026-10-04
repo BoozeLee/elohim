@@ -164,16 +164,16 @@ jobs:
           doc_text = DOC.read_text(encoding="utf-8")
           RECORDED = {}
           for _name, _value in re.findall(
-                  r"^\| (population sites|defect-arm effective|defect-arm n|"
-                  r"survivor identity digest) \| ([^|]+?) \|$",
+                  r"^\| (population sites|defect-arm effective|defect-arm reported|"
+                  r"defect-arm n|survivor identity digest) \| ([^|]+?) \|$",
                   doc_text, re.MULTILINE):
               if _name in RECORDED:
                   raise SystemExit(
                       f"{DOC} records {_name!r} more than once, so the figure it "
                       f"states cannot be read unambiguously")
               RECORDED[_name] = _value.strip().replace(",", "")
-          missing = {"population sites", "defect-arm effective", "defect-arm n",
-                     "survivor identity digest"} - set(RECORDED)
+          missing = {"population sites", "defect-arm effective", "defect-arm reported",
+                     "defect-arm n", "survivor identity digest"} - set(RECORDED)
           if missing:
               raise SystemExit(
                   f"{DOC} no longer records {sorted(missing)}, so the census has "
@@ -230,6 +230,27 @@ jobs:
                   f"recorded {EXPECTED_EFFECTIVE}/{EXPECTED_DEFECT_ARM_N}, even though "
                   f"the surviving sites matched. The rate and the sites are pinned "
                   f"separately because they can move apart.")
+          # REPORTED is pinned too, and it is pinned SEPARATELY from EFFECTIVE
+          # because that is the whole point of it: a shard moving in fields the
+          # gate does not decide on is a different claim from the gate deciding
+          # something new, and a census that checked one and not the other would
+          # be checking whichever it happened to print. A drop here is a skill
+          # that stopped reporting evidence, which is a real change to the shard
+          # and deserves the same human read.
+          #
+          # Read from `defect_arm_total`, NOT from `forged`: the inert class is
+          # excluded from the gated rate for a stated reason, and comparing a
+          # defect-arm figure against a forged-arm one is the same unit error
+          # that made this check red on its own first run.
+          got_reported = s["defect_arm_total"]["REPORTED"]
+          want_reported = int(RECORDED["defect-arm reported"])
+          if got_reported != want_reported:
+              raise SystemExit(
+                  f"{got_reported} mutants moved only fields the gate does not decide "
+                  f"on; {DOC} records {want_reported}, both on the defect arm. The "
+                  f"reported count is not the gated rate, but it is this document's "
+                  f"other headline, and it moving without a human reading is how a "
+                  f"shard quietly stops publishing what it used to.")
 
           print(f"population {cov['population_sites']}, attempted {cov['forged_sites_attempted']}")
           print(f"GATED defect-arm rate {t['rate_measured']} "

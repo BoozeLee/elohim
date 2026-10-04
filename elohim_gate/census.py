@@ -64,6 +64,72 @@ SCHEMA = "elohim.mutation-census/2"
 # anything else moves. Reporting it as a delta would name the symptom twice.
 DELTA_EXCLUDE = {"seal"}
 
+# ---------------------------------------------------------------- discriminator
+#
+# Byte-equality was the discriminator until 2026-10-04, and it overcounted, which
+# a leaf-level re-diff of all 158 survivors then measured rather than argued:
+#
+#     0  moved the gate's own verdict
+#     2  moved nothing but the seal
+#    13  moved a verdict-bearing leaf
+#   143  moved only descriptive leaves -- perimeters, scan metadata, evidence
+#         lists, run counters. The gate decided identically in all 143.
+#
+# So `EFFECTIVE` now means what the census always claimed it meant: the gate
+# decided something it had not decided before, and nothing noticed. A survivor
+# that moves only descriptive leaves is `REPORTED` -- still counted, still
+# published, still a real statement about how much each instrument chooses to
+# say, but not a gap in the gate's reasoning. Both numbers are in the report;
+# collapsing them into one is the mistake this replaces.
+#
+# The rule is a DECLARED list of leaf names, not a derivation, and that is its
+# honest weakness: a skill that decides its verdict from a differently-named
+# field would have a real survivor filed as REPORTED. The list is therefore
+# spelled out here rather than inferred, and the control below is what keeps it
+# from being vacuous. `verdict_bearing_paths` is the whole rule in one function.
+VERDICT_LEAF_PATHS = frozenset({"verdict", "verdict_ok", "instrument_pin_holds"})
+VERDICT_LEAF_NAMES = frozenset({"pass", "ran", "actual_exit", "expect_exit"})
+
+
+def verdict_bearing_paths(before: object, after: object) -> list[str]:
+    """Leaf paths that differ AND that the gate's own decision depends on.
+
+    A shard is compared leaf-wise rather than as text, so a survivor that only
+    reorders keys or moves a number nothing reads is not counted as a decision
+    the gate got wrong.
+    """
+    return [p for p in leaf_deltas(before, after) if is_verdict_bearing(p)]
+
+
+def is_verdict_bearing(path: str) -> bool:
+    # `leaf_deltas` addresses a top-level key as ".verdict" and a nested one as
+    # ".traps[0].pass", so the leading dot is part of the syntax rather than the
+    # name. Normalising here keeps the two tables above readable as plain names.
+    path = path.lstrip(".")
+    return path in VERDICT_LEAF_PATHS or path.rsplit(".", 1)[-1] in VERDICT_LEAF_NAMES
+
+
+def leaf_deltas(before: object, after: object, prefix: str = "") -> list[str]:
+    """Every leaf path at which two JSON values differ. Lists compare by index."""
+    if type(before) is not type(after):
+        return [prefix or "<root>"]
+    if isinstance(before, dict):
+        out: list[str] = []
+        for key in sorted(set(before) | set(after)):
+            if key not in before or key not in after:
+                out.append(f"{prefix}.{key}")
+            else:
+                out += leaf_deltas(before[key], after[key], f"{prefix}.{key}")
+        return out
+    if isinstance(before, list):
+        out = []
+        if len(before) != len(after):
+            out.append(f"{prefix}.__len__")
+        for i in range(min(len(before), len(after))):
+            out += leaf_deltas(before[i], after[i], f"{prefix}[{i}]")
+        return out
+    return [] if before == after else [prefix or "<root>"]
+
 
 def canon(obj) -> str:
     return json.dumps(obj, sort_keys=True, separators=(",", ":"))
@@ -186,13 +252,34 @@ def one(job: dict) -> dict:
                        cause="verdict PASS, shard byte-identical to pristine")
             row["seconds"] = round(time.time() - t0, 2)
             return row
-        row.update(outcome="EFFECTIVE", equiv=False,
-                   cause="verdict PASS and the shard DIFFERS from pristine",
-                   shard_digest=f"{digest(baseline)}->{digest(text)}")
+        row["shard_digest"] = f"{digest(baseline)}->{digest(text)}"
+        # The discriminator. Byte-equality says the shard moved; only a leaf diff
+        # says whether the GATE moved. A shard that cannot be parsed cannot be
+        # shown to have kept its decision, so it is counted as the strongest
+        # class rather than the weakest -- a control that cannot measure must not
+        # report the reassuring answer.
         try:
             base_obj, mut_obj = json.loads(baseline), json.loads(text)
         except json.JSONDecodeError:
-            base_obj = mut_obj = None
+            row.update(outcome="EFFECTIVE", equiv=False,
+                       cause="verdict PASS, the shard changed, and it is not JSON so no "
+                             "leaf diff can show the decision was unchanged")
+            row["seconds"] = round(time.time() - t0, 2)
+            return row
+        moved = [p for p in leaf_deltas(base_obj, mut_obj)
+                 if p.lstrip(".").split(".")[0] not in DELTA_EXCLUDE]
+        decisive = [p for p in moved if is_verdict_bearing(p)]
+        row["n_leaves"] = len(moved)
+        row["decisive_leaves"] = decisive[:16]
+        if decisive:
+            row.update(outcome="EFFECTIVE", equiv=False,
+                       cause=f"verdict PASS and {len(decisive)} leaf field(s) the gate "
+                             f"decides on moved: {', '.join(decisive[:4])}")
+        else:
+            row.update(outcome="REPORTED", equiv=False,
+                       cause=f"verdict PASS and the shard moved, but only in "
+                             f"{len(moved)} descriptive leaf field(s) the gate does not "
+                             f"decide on: {', '.join(moved[:4]) or '<none>'}")
         deltas = []
         if isinstance(base_obj, dict) and isinstance(mut_obj, dict):
             for key in sorted(set(base_obj) | set(mut_obj)):
@@ -228,13 +315,17 @@ def build_population(skills: list[str]) -> tuple[list[dict], dict]:
 
 
 def summarise(rows: list[dict], population_size: int) -> dict:
-    live = ("CAUGHT", "EQUIVALENT", "EFFECTIVE", "ARTEFACT")
+    # REPORTED is live: it is a real survivor of a real mutant, it is counted in
+    # every denominator, and it is what the byte-equality discriminator used to
+    # fold into EFFECTIVE. It is counted SEPARATELY, never added to effective,
+    # because the whole point of naming it is that it is a different claim.
+    live = ("CAUGHT", "EQUIVALENT", "EFFECTIVE", "REPORTED", "ARTEFACT")
+    outcomes = ("CAUGHT", "EQUIVALENT", "EFFECTIVE", "REPORTED", "ARTEFACT", "SKIPPED")
 
     def block(sel):
-        c = {k: sum(1 for r in sel if r["outcome"] == k)
-             for k in ("CAUGHT", "EQUIVALENT", "EFFECTIVE", "ARTEFACT", "SKIPPED")}
+        c = {k: sum(1 for r in sel if r["outcome"] == k) for k in outcomes}
         c["n"] = sum(c[k] for k in live)
-        for k in ("EFFECTIVE", "EQUIVALENT", "CAUGHT"):
+        for k in ("EFFECTIVE", "REPORTED", "EQUIVALENT", "CAUGHT"):
             c[f"{k.lower()}_rate"] = round(c[k] / c["n"], 6) if c["n"] else None
         return c
 
@@ -254,9 +345,9 @@ def summarise(rows: list[dict], population_size: int) -> dict:
         g: dict = {}
         for r in src:
             d = g.setdefault(keyfn(r), {"n": 0, "caught": 0, "equivalent": 0,
-                                        "effective": 0, "artefact": 0})
+                                        "effective": 0, "reported": 0, "artefact": 0})
             d["n"] += 1
-            d[{"CAUGHT": "caught", "EQUIVALENT": "equivalent",
+            d[{"CAUGHT": "caught", "EQUIVALENT": "equivalent", "REPORTED": "reported",
                "EFFECTIVE": "effective", "ARTEFACT": "artefact"}[r["outcome"]]] += 1
         for d in g.values():
             d["effective_rate"] = round(d["effective"] / d["n"], 6) if d["n"] else None
@@ -530,10 +621,11 @@ def main() -> int:
     emit(f"  {'skill':<20} {'n':>5} {'caught':>7} {'equiv':>6} {'eff':>4} {'rate':>8}")
     for name, o in summary["by_skill"].items():
         emit(f"  {name:<20} {o['n']:>5} {o['caught']:>7} {o['equivalent']:>6} "
-              f"{o['effective']:>4} {o['effective_rate']:>8}")
+              f"{o['effective']:>4} {o['reported']:>8} {o['effective_rate']:>8}")
 
     eff = [r for r in rows if r["outcome"] == "EFFECTIVE"]
-    emit(f"\n=== EFFECTIVE survivors: {len(eff)} (the shard moved and the gate passed) ===")
+    emit(f"\n=== EFFECTIVE survivors: {len(eff)} (a leaf the gate decides on moved, "
+         f"and the gate passed) ===")
     by_site = Counter((r["operator"], r["skill"], r["lineno"]) for r in eff)
     for (op, skill, line), n in by_site.most_common():
         emit(f"  {n:>3}x {op:<14} {skill:<18} L{line}")
@@ -545,10 +637,21 @@ def main() -> int:
         seen.add(key)
         emit(f"\n  --- {r['operator']} {r['skill']} L{r['lineno']} ---")
         emit(f"      site: {r['site']}")
+        emit(f"      {r['cause']}")
         for dl in r.get("deltas", [])[:6]:
             emit(f"      {dl['path']}:")
             emit(f"        pristine: {dl['pristine']}")
             emit(f"        mutant  : {dl['mutant']}")
+
+    rep = [r for r in rows if r["outcome"] == "REPORTED"]
+    emit(f"\n=== REPORTED: {len(rep)} (the shard moved, the gate did not) ===")
+    emit("  Counted, never added to EFFECTIVE and never gated on. Named because")
+    emit("  'the gate reports values it never promised to pin' is a real finding")
+    emit("  about these shards, and folding it into EFFECTIVE is what made the")
+    emit("  byte-equality rate 7.5x the decision-level one.")
+    for name, o in sorted(Counter(r["skill"] for r in rep).items(),
+                          key=lambda kv: -kv[1]):
+        emit(f"  {name:<20} {o:>5}")
 
     # A census that cannot fail is a census that reports a clean run whether or not
     # it measured one. This is the same rule mutate.py applies, kept identical so

@@ -2,11 +2,14 @@
 
 **The shape of the result, which is the part that stays true:** across the whole
 derived population, **no mutant was ever caught having turned a failing gate
-into a passing one.** Every survivor in the current census is a defect in what
-the gate *reports*, not in what it *decides*. The one genuinely new hole is that
-a trap's own `pass` boolean and the overall verdict are two independent
-transcriptions of the same condition, and nothing asserts they agree — 13 rows
-move that boolean while the verdict stays PASS.
+into a passing one**, and no mutant survived by doing so. Of 1,937 sites, **13
+moved a field the gate's own decision depends on** — 0.007 on the defect arm.
+The other **145** moved fields the gate does not read, which is a real and
+separately reported statement about how much each instrument chooses to publish,
+and which is not a gap in the gate's reasoning. All 13 are the same defect, in
+one skill: a trap's `pass` boolean and the run's verdict are two independent
+transcriptions of one condition, so 12 mutants report a trap as failed while the
+gate reports the run as passed, and a 13th nulls the self-pin trap's verdict.
 
 **Status: A2 measured, and cross-checked against a second independent harness,
 `tools/mutation_survival.py`, which is committed to this repository — see the
@@ -14,7 +17,7 @@ caveat under "Reproducing this". A prior claim, that 0 of 200 mutations
 survived, was false and is retracted below.**
 
 **Date of the current measurement:** 2026-10-04, seed 1, 45 s harness budget,
-890.6 s wall, coverage 1937/1937 = 1.0, 8 instrumented skills.
+1098.7 s wall, coverage 1937/1937 = 1.0, 8 instrumented skills.
 **Date of the run this document was first written from:** 2026-10-02.
 **Instrument under test:** the six instrumented skills at tag `v0.1.0`
 (`6dc3587`), plus `elohim-harness`, which ships without a ledger. The current
@@ -164,20 +167,22 @@ statement about numeric literals, so per-operator rates are primary below.
 ## Result
 
 Full census at the current population, seed 1, 6 workers, 45 s harness budget,
-890.6 s wall, **coverage 1937/1937 = 1.0**.
+1098.7 s wall, **coverage 1937/1937 = 1.0**.
 
-| arm | n | caught | equivalent | effective | artefacts | gap rate |
+| arm | n | caught | equivalent | **effective** | **reported** | artefacts |
 | --- | --- | --- | --- | --- | --- | --- |
-| forged | 1937 | 1151 | 624 | **161** | 1 | **0.083118** |
-| stale | 60 | 60 | 0 | 0 | 0 | 0.0 |
-| all | 1997 | 1211 | 624 | **161** | 1 | 0.080621 |
+| forged | 1937 | 1151 | 624 | **13** | **148** | 1 |
+| stale | 60 | 60 | 0 | 0 | 0 | 0 |
+| all | 1997 | 1211 | 624 | **13** | **148** | 1 |
 
-The quantity CI gates on is the **defect-arm rate, 158/1848 = 0.0854978354978355**,
+The quantity CI gates on is the **defect-arm rate, 13/1848 = 0.007034632034632035**,
 which excludes the inert class from numerator and denominator alike for the
-reason given below.
+reason given below. **REPORTED rides in the same denominator and is never gated
+on**: 145 of 1848. Both numbers are real and both are published; the rate that
+gates is the one about the gate's reasoning.
 
 Inert class, reported and not counted: `docstring_kill` produced **86
-equivalent and 3 effective of 89**, and caught 0. Removing a docstring changes
+equivalent and 3 reported of 89**, and caught 0. Removing a docstring changes
 documentation, not behaviour, so it is excluded from the rate rather than
 allowed to flatter it.
 
@@ -188,21 +193,40 @@ is a bystander. The **pristine control agreed for 8 of 8 skills**, which is what
 licenses the word "identical" in the classifier at all; that control was red
 until this measurement, for the reason given under "Method".
 
-### The shape of the 158, which is the part worth keeping
+### The discriminator changed, and here is what it cost
 
-Every one of the 158 was re-run individually and its shard diffed against a
-pristine shard **at leaf resolution**, not byte resolution, because a byte diff
-cannot tell `traps[3].residual` from `traps[3].pass`. **158 of 158 reproduced.**
-The control for that differ is the same leaf differ run over two pristine runs
-per skill: **0 leaf deltas, 8 of 8 skills.**
+`EFFECTIVE` used to mean *"the gate passed and the shard's bytes moved."* That
+was a proxy, and a leaf-level re-diff of all 158 survivors of the previous run
+measured exactly what the proxy was worth:
 
-| what moved | n | what it is |
+| what the byte test called a survivor | n | what it actually was |
 | --- | --- | --- |
-| the gate's own verdict (`verdict`, `verdict_ok`, `instrument_pin_holds`) | **0** | — |
-| nothing but the `seal` | 2 | byte-equality overcount; the differ proves it |
-| a trap's own `pass` boolean | **13** | a real hole, new to this document — see below |
-| verdict *content* (a threshold constant) | 8 | the tolerance working, as below |
-| descriptive/reporting leaves only | 135 | the unbound-field class, as below |
+| a leaf the gate decides on moved | **13** | a real gap in the gate's reasoning |
+| only descriptive leaves moved | 143 | the gate decided identically |
+| nothing but the `seal` moved | 2 | the test measuring the checksum |
+
+The census now compares shards **leaf-wise** and asks the second question. A
+survivor is `EFFECTIVE` when a leaf the gate's decision depends on moved —
+`verdict`, `verdict_ok`, `instrument_pin_holds`, or any `pass` / `ran` /
+`actual_exit` / `expect_exit` — and `REPORTED` when the shard moved without any
+of those. **This loosens a control, and the diagnosis that motivated it is what
+licenses that**: the previous run's 158 were each re-run, diffed, and read, and
+145 of them were the gate reaching the same answer.
+
+That rule is a **declared list of leaf names, not a derivation**, and it is the
+honest weakness of the change: a skill that decides its verdict from a
+differently-named field would have a real survivor filed as `REPORTED`. So the
+list is spelled out in `census.py` rather than inferred, and
+`tests/test_census_discriminator.py` pins it in both directions — a
+discriminator neutered to always-`REPORTED` and one neutered to always-`EFFECTIVE`
+both fail that test, because a rule that answers every case the same way is how
+a broken discriminator is mistaken for a strict one.
+
+**The result is that all 13 are the same defect, in one skill.** Seven of the
+eight skills now report **0** effective survivors. That is the strongest form the
+finding takes: the gate decides the same thing under every mutation that does not
+directly edit one of its own decision fields, and where it does not, the reason is
+one duplicated line of code rather than thirteen scattered ones.
 
 ### The recorded figures
 
@@ -216,16 +240,26 @@ no longer ran. One home, read by everything.
 | figure | value |
 | --- | --- |
 | population sites | 1,937 |
-| defect-arm effective | 158 |
+| defect-arm effective | 13 |
+| defect-arm reported | 145 |
 | defect-arm n | 1,848 |
-| survivor identity digest | f3618600e947ca86 |
+| survivor identity digest | 95f3e14307040eab |
+
+`defect-arm reported` is pinned as well as `defect-arm effective`, and separately,
+because that is the whole point of the split: a shard moving in fields the gate
+does not decide on is a different claim from the gate deciding something new. A
+census that checked one and not the other would be checking whichever it happened
+to print. `defect-arm reported` is counted in the same denominator and is never
+gated on; it is pinned so that a shard quietly ceasing to publish what it used to
+still costs somebody a look.
 
 `survivor identity digest` is the sha256, truncated to 16 hex, of every
-`(operator, skill, site_index)` that survived in the forged arm, sorted and
-joined. It pins *which* sites survived, not how many, because a count is equally
-consistent with the right 63 and with 63 different ones. `lineno` is
-deliberately not in it: it moves whenever an unrelated edit shifts a line, and a
-pin that fires on unrelated edits is a pin that gets ignored.
+`(operator, skill, site_index)` that survived **as EFFECTIVE**, sorted and
+joined. It pins *which* sites moved a field the gate decides on, not how many,
+because a count is equally consistent with the right 13 and with 13 different
+ones. `lineno` is deliberately not in it: it moves whenever an unrelated edit
+shifts a line, and a pin that fires on unrelated edits is a pin that gets
+ignored.
 
 Moving any of these is legitimate — pinning another fact really does remove a
 survivor — and each one turns the nightly red until a human reads it, which is
@@ -236,39 +270,43 @@ match a stale run.
 
 **Not one mutant in 1,937 was caught having turned a FAIL into a PASS, and not
 one survived by doing so.** That is the claim that survives the next skill
-landing; the count 158 will not, because it moves when a shard's *reporting*
-shape moves rather than when the gate's reasoning moves.
+landing. The reported count is the one that moves when a shard's *shape* moves
+rather than when the gate's reasoning moves, which is exactly why it is published
+next to the effective count instead of being folded into it.
 
-The number is dominated by shard *shape*, and this is measured rather than
-asserted. `claim-ledger` alone contributes **77 of the 158** — nearly half — at a
-**53.8 %** effective rate, and every one of those 77 is a mutation landing
-inside `traps[].measured[]` or `traps[].residual`, the per-trap evidence its
-traps publish. But the rate does **not** track raw leaf count, and saying so
-plainly matters, because the first draft of this argument here claimed exactly
-that and the data refutes it. What tracks is whether a shard's traps carry a
-`measured` **evidence list**. Measured across all eight pristine shards:
+The reported count is dominated by shard shape, and this is measured rather than
+asserted. `claim-ledger` alone contributes **67 of the 145** reported, and every
+one of them is a mutation landing inside `traps[].measured[]` or
+`traps[].residual`, the per-trap evidence its traps publish. The rate does
+**not** track raw leaf count, and saying so plainly matters, because the first
+draft of this argument here claimed exactly that and the data refutes it — 
+`tolerance-prover` publishes 228 leaf fields and `claim-ledger` 90. What tracks
+is whether a shard's traps carry a `measured` **evidence list**. Measured across
+all eight pristine shards:
 
-| skill | traps in shard | `measured` is a list | effective rate |
-| --- | --- | --- | --- |
-| claim-ledger | 7 | yes | 0.538462 |
-| pay-signal | 5 | yes | 0.168224 |
-| estimator-bias | 0 | — | 0.064220 |
-| invariant-hunter | 0 | — | 0.063830 |
-| reproducibility | 0 | — | 0.044444 |
-| elohim | 0 | — | 0.038526 |
-| precision-budget | 0 | — | 0.016129 |
-| tolerance-prover | 0 | — | 0.011673 |
+| skill | traps in shard | `measured` is a list | reported | effective |
+| --- | --- | --- | --- | --- |
+| claim-ledger | 7 | yes | 67 | 13 |
+| pay-signal | 5 | yes | 18 | 0 |
+| elohim | 0 | — | 23 | 0 |
+| estimator-bias | 0 | — | 21 | 0 |
+| invariant-hunter | 0 | — | 9 | 0 |
+| reproducibility | 0 | — | 4 | 0 |
+| precision-budget | 0 | — | 3 | 0 |
+| tolerance-prover | 0 | — | 3 | 0 |
 
-**The only two skills that publish per-trap evidence lists are the only two above
-17 %, and the six that publish no traps at all are all below 7 %.** That is the
-mechanism, and it is a property of the shard's shape rather than of the gate's
-reasoning: a mutation inside a trap's own evidence changes what the report says
-about that trap, and byte-equality scores that as a survivor.
+**The two skills that publish per-trap evidence lists are the two that report the
+most, and the six that publish no traps at all report between 3 and 23.** That
+is the mechanism, and it is a property of the shard's shape rather than of the
+gate's reasoning: a mutation inside a trap's own evidence changes what the
+report says about that trap, and byte-equality scored that as a gap in the
+gate's reasoning. It is now scored as `REPORTED`, which is what it is.
 
-### The new class: a trap's verdict and the gate's verdict can disagree
+### The one defect, and it is one duplicated line
 
-This is the one finding here that is not a reporting-field artefact, and it is
-invisible in the number 158 — it is 8.2 % of it.
+Every one of the 13 effective survivors is this, in `claim-ledger` and nowhere
+else. It is the only finding in this document that is not a statement about what
+the shards choose to publish.
 
 `skills/claim-ledger/instrument/claim_ledger.py` computes the run's verdict in
 one place and re-transcribes the same conditions in another:
@@ -304,25 +342,29 @@ twice: build the traps from `verdict_ok`, or assert on every run that a trap's
 the first. That assertion is itself a trap, and it is the one this measurement
 earns.
 
-### What the rest of the 158 are
+### The 145 reported, and what they are
 
-- **135 moved only descriptive leaves.** These are the class this document
-  already named: *"the gate reports values it never promised to pin, and nothing
-  requires it to notice when they change."* Nothing about them is new; what is
-  new is that there are 2.1× as many, because two reporting-dense skills landed.
-- **8 moved verdict content, not the verdict.** Every one is a threshold
-  constant — `TIGHTNESS_FLOOR = 0.999` (`tolerance-prover:58`, three operators),
+They are the class this document has named since its first run: *"the gate
+reports values it never promised to pin, and nothing requires it to notice when
+they change."* Grouped by what actually moved, from the leaf-level re-diff that
+licensed the split:
+
+- **67 of them are `claim-ledger`'s per-trap evidence** — `traps[].measured[]`
+  and `traps[].residual`. The instrument publishes what each trap measured; a
+  mutation inside that evidence changes the report and nothing else.
+- **8 of them moved a declared threshold constant** and the verdict recomputed
+  consistently around it: `TIGHTNESS_FLOOR = 0.999` (`tolerance-prover:58`),
   `TIGHT_FLOOR = 1.98` (`precision-budget:48`), `BIAS_THRESHOLD = 1e-3`
-  (`estimator-bias:65`), and two at `pay-signal:195`/`:210`. They perturb a
-  declared threshold and the verdict recomputes consistently around it. This is
-  the tolerance working, not a failure, and it is recorded so the number is not
-  over-read.
-- **2 moved nothing but the seal.** The census's discriminator is byte-equality;
-  a byte diff calls these survivors and a leaf diff correctly calls them
-  nothing. The census already excludes `seal` from its reported deltas, and this
-  analysis excludes it too.
+  (`estimator-bias:65`), and two at `pay-signal:195`/`:210`. This is the
+  tolerance working, and it is recorded so the reported count is not over-read.
+- **2 of them moved nothing but the `seal`.** The old discriminator called those
+  survivors; a leaf diff calls them nothing.
 
-### The two older runs, kept as history
+The rest are perimeters, scan metadata, and run counters. None of them is a gate
+defect, and all of them are still worth a reader's time, which is why the number
+is published instead of deleted.
+
+### The older runs, kept as history
 
 The first census ran at 12:55 on 2026-10-02 against a tree that reported 66
 effective survivors:
@@ -342,54 +384,52 @@ giving the figures this document was written against:
 | stale | 40 | 40 | 0 | 0 | 0 | 0.0 |
 | all | 1719 | 1083 | 572 | **63** | 1 | 0.036649 |
 
-Both are superseded by the 1,937-site run above and neither is wrong; they are
-dated. The reconciliation for 66 → 63 is in "Why the count moved from 66 to 63"
-below. **63 and 158 are not comparable numbers**: they are rates over different
-populations, and 158/1848 against 63/1598 is not a 2.5× regression in the gate —
-it is mostly two new skills whose shards report more.
+**None of these three numbers is comparable to the current 13**, and the reason
+is not only the population. 66 and 63 were measured by the byte-equality
+discriminator, which this run replaced after measuring what it was worth; 13 is
+the decision-level count. 13/1848 is therefore not a 5× improvement in the gate
+over 63/1598 — it is the same tree, asked a sharper question. What the byte test
+would have said about *this* run is on the record above: 161, of which 148 are
+`REPORTED` here.
 
 ### Per operator (forged, every site, inert excluded)
 
-| operator | n | caught | equivalent | effective | rate |
+| operator | n | caught | equivalent | **effective** | **reported** |
 | --- | --- | --- | --- | --- | --- |
-| bool_flip | 66 | 19 | 32 | 15 | **0.227273** |
-| cmp_flip | 165 | 59 | 84 | 21 | 0.127273 |
-| num_add | 779 | 526 | 191 | 62 | 0.079589 |
-| num_mul | 779 | 523 | 201 | 55 | 0.070603 |
-| ret_flip | 21 | 5 | 15 | 1 | 0.047619 |
-| ret_type | 21 | 12 | 8 | 1 | 0.047619 |
-| tol_widen | 17 | 7 | 7 | 3 | 0.176471 |
+| cmp_flip | 165 | 59 | 84 | **5** | 16 |
+| num_add | 779 | 526 | 191 | **4** | 58 |
+| num_mul | 779 | 523 | 201 | **4** | 51 |
+| bool_flip | 66 | 19 | 32 | 0 | 15 |
+| ret_flip | 21 | 5 | 15 | 0 | 1 |
+| ret_type | 21 | 12 | 8 | 0 | 1 |
+| tol_widen | 17 | 7 | 7 | 0 | 3 |
 
-`bool_flip` is now the worst operator at 22.7 %, and it is the one whose
-survivors this document has just found a home for: 13 of the 15 are the
-trap-`pass` rows, because a trap's `pass` is a boolean comparison that a single
-operator can invert. The operators that move only a reporting number still
-dominate the raw count, which is the shape effect stated above.
-
-`ret_flip` and `ret_type` have **1 effective survivor each**, against 0 in the
-1,679-site run. An earlier draft of that measurement reported 19 `ret_flip`
-survivors; all 19 were equivalent mutants, which is what the shard test is for.
-The number moves when the population does; the classifier did not get weaker.
+The 13 sit in three operators and all 13 are the same four lines of
+`claim_ledger.py`. `bool_flip` is the sharpest illustration of why the
+discriminator changed: it was the **worst** operator under byte-equality, at
+0.227, and under a verdict-bearing discriminator it has **zero** — because
+flipping a boolean inside a trap's `measured` or a shard's scan counter changes
+the report and not the decision, while flipping the one boolean the verdict reads
+shows up as `cmp_flip` on a comparison.
 
 ### Per skill (forged, inert excluded)
 
-| skill | n | caught | equivalent | effective | rate |
+| skill | n | caught | equivalent | **effective** | **reported** |
 | --- | --- | --- | --- | --- | --- |
-| claim-ledger | 143 | 66 | **0** | 77 | **0.538462** |
-| pay-signal | 107 | 42 | 47 | 18 | 0.168224 |
-| estimator-bias | 327 | 233 | 73 | 21 | 0.064220 |
-| invariant-hunter | 141 | 102 | 30 | 9 | 0.063830 |
-| reproducibility | 90 | 35 | 51 | 4 | 0.044444 |
-| elohim | 597 | 355 | 218 | 23 | 0.038526 |
-| precision-budget | 186 | 126 | 57 | 3 | 0.016129 |
-| tolerance-prover | 257 | 192 | 62 | 3 | 0.011673 |
+| claim-ledger | 143 | 66 | **0** | **13** | 67 |
+| elohim | 597 | 355 | 218 | 0 | 23 |
+| estimator-bias | 327 | 233 | 73 | 0 | 21 |
+| invariant-hunter | 141 | 102 | 30 | 0 | 9 |
+| pay-signal | 107 | 42 | 47 | 0 | 18 |
+| reproducibility | 90 | 35 | 51 | 0 | 4 |
+| precision-budget | 186 | 126 | 57 | 0 | 3 |
+| tolerance-prover | 257 | 192 | 62 | 0 | 3 |
 
-`claim-ledger` is the outlier and its shape is the finding: **0 equivalent
-mutants out of 143.** Every other skill lands between 21.3 %
-(`invariant-hunter`) and 56.7 % (`reproducibility`). A shard with no equivalent
-mutants at all is not a shard with a high gap — it is a shard in which
-*something* moves for any mutation at all, because every trap publishes a
-`measured` evidence list and byte-equality counts each of those values.
+**Seven of eight skills report zero effective survivors**, and the eighth
+accounts for all 13. `claim-ledger` also has **0 equivalent mutants in 143**,
+where every other skill lands between 21.3 % (`invariant-hunter`) and 56.7 %
+(`reproducibility`) — a shard in which something moves for any mutation at all,
+because every trap publishes a `measured` evidence list.
 
 ### The one artefact
 
@@ -404,9 +444,10 @@ the reconciliation below names them, so the field census here describes that run
 rather than the current tree. **It is kept because the method it establishes is
 the one the current run reuses**: each survivor re-probed individually, shard
 diffed field-by-field, and the moved fields classified by whether a fact reaches
-them. The current run's 158 are in "The shape of the 158" above, decomposed the
-same way; what follows is the original working-out of that method, against the
-81 facts and 38 traps of that tree.
+them. The current run is in "The discriminator changed" above, decomposed the
+same way and then split by whether the gate's decision moved; what follows is
+the original working-out of the method, against the 81 facts and 38 traps of
+that tree.
 
 Each survivor was re-probed individually (0 errors, 66 of 66 reproduced) and its
 shard diffed field-by-field. The log's inline preview truncates shards at 190
@@ -478,7 +519,7 @@ correctly calls it nothing. Byte-equality is the weaker test and it overcounts.
 > and it stops earning runner time.
 
 **The criterion does not fire.** The rate is 3.5 % at N=200 (that prefix is
-unchanged; the population grew *after* row 200) and **8.55 % across the whole
+unchanged; the population grew *after* row 200) and **0.70 % across the whole
 population** at 1,937 sites, recomputed from the committed tool on 2026-10-04.
 The instrument has not saturated. It is still producing signal
 that this repository's own standing table got wrong — and this run produced a
@@ -531,7 +572,7 @@ list is a to-do list for the ledger.
 
 - **Eight syntactic operators is not a mutation generator.** No operator changes
   control flow structurally, renames, deletes statements, or touches imports.
-  The 8.55 % is a floor on the gap
+  The 0.70 % is a floor on the gap
 - **538 equivalent mutants — 29.1 % of the non-inert population — changed no
   reported value.** That is a coverage statement about the shards, and it is
   arguably the more important number in this document: nearly a third of the
@@ -560,9 +601,12 @@ list is a to-do list for the ledger.
   sides of it.
 
 **The number to quote is 0, and it is the first row of the decomposition table
-above: not one mutant in 1,937 turned a failing gate into a passing one.** 158
-survivors among 1,937 sites is a description of where the ledger's promises stop
-— and, measured this run, of how much each instrument chooses to say.
+above: not one mutant in 1,937 turned a failing gate into a passing one.** The
+13 that moved a field the gate decides on are a description of where the
+ledger's promises stop. The 145 that moved a field it does not are a
+description of how much each instrument chooses to say — which is a different
+sentence, and is why this document now counts them separately instead of letting
+one number carry both.
 
 ## Reproducing this
 
@@ -584,10 +628,12 @@ whether the **full gate** notices — facts and traps both.
 > one recorded run of a committed tool rather than a figure two runs have
 > agreed on, and the defect-arm rate — whose method is fully specified above —
 > as the load-bearing result. That rate was 0.0393 when this table was first
-> written, then 0.0375, and is 0.0855 now. The first two moves are reconciled
-> in "Why the count moved from 66 to 63"; the third is the population change
-> described at the top, and **the two numbers are not comparable** — different
-> populations, and the new one is dominated by two reporting-dense skills.
+> written, then 0.0375, and is 0.0070 now. The first two moves are reconciled
+> in "Why the count moved from 66 to 63"; the third is not a change in the tree
+> at all but a change in the question — the same 1,937 sites, classified by
+> whether a leaf the gate decides on moved. **The three are not comparable
+> numbers**, and the document says so at each one rather than letting a reader
+> infer a 5x improvement in the gate.
 
 Cross-checked on the same shards, seed 20261002, 522 forged leaves decided:
 
@@ -595,7 +641,8 @@ Cross-checked on the same shards, seed 20261002, 522 forged leaves decided:
 |---|---|---|---|
 | traps only, seal forged | survived | 420 / 522 | **0.8046** |
 | full gate, seal forged (1,679-site run) | effective | 63 / 1598 sites | **0.039424** |
-| full gate, seal forged (current, 1,937 sites) | effective | 158 / 1848 sites | **0.085498** |
+| full gate, seal forged (current, 1,937 sites) | effective | 13 / 1848 sites | **0.007035** |
+| full gate, byte-equality (same run, old test) | effective | 161 / 1937 sites | 0.083118 |
 
 Joined per leaf, by whether any ledger fact path reaches it:
 
@@ -608,12 +655,15 @@ Joined per leaf, by whether any ledger fact path reaches it:
 missed by every trap.** Those have nothing left to catch them: no fact reaches
 them, so fact verification cannot fire, and no trap watches them.
 
-The 0.8046 and the 0.0855 are not in conflict, and the gap between them is the
+The 0.8046 and the 0.0070 are not in conflict, and the gap between them is the
 result: the trap-only harness has no fact check behind it, so it over-reports.
 The 47 % of fact-bound leaves that slip the traps are still caught downstream by
 verification against `expect`. Only an unbound leaf is invisible to both halves
-of the gate — and those are what the effective count consists of, 135 of the 158
-in the current run.
+of the gate — and those are exactly the `REPORTED` class, 145 of 1848 in the
+current run. That is the cleanest statement of the split this document now makes:
+the trap-only harness over-reports 0.8046 on leaves, the full gate under-reports
+0 because no fact and no trap watches an unbound leaf, and the 145 is the size of
+the space neither half covers.
 
 The harness for this report is now **committed**: `elohim_gate/mutation.py`,
 `elohim_gate/sites.py` and `elohim_gate/census.py`. It uses only the standard
@@ -669,8 +719,9 @@ and the honest way to state the tool's scope is narrower than that:
 - **The real finding, stated so it is not mistaken for a defect in the gate:**
   the gap is not "the gate computed a wrong answer" — it is that **the gate
   reports values it never promised to pin, and nothing requires it to notice when
-  they change.** 66 of 68 fields that moved under mutation sit in that space, and
-  135 of the current run's 158 survivors are the same shape. The
+  they change.** 66 of 68 fields that moved under mutation sit in that space,
+  and 145 of the current run's survivors are the same shape — now named
+  `REPORTED` and published beside the gated count rather than inside it. The
   checksum caught every one of the 1,937 sites when the seal was left stale
   (60/60). The gap only opens when the seal is forged to agree — which is
   precisely the threat model the project exists to reason about, and precisely
