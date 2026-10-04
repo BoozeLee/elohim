@@ -89,6 +89,89 @@ AUTHOR_ENV = "ELOHIM_CLAIM_AUTHOR"
 CLAIMS_SCHEMA = "elohim.claim_ledger.claims/1"
 
 
+# --- the conditions, declared once ----------------------------------------
+#
+# Every condition the verdict depends on lives in this table and nowhere else.
+# `verdict` and the traps are both derived from it, so they cannot disagree.
+#
+# They used to be written out twice -- once as a hand-built `verdict_ok` boolean
+# and once per trap -- and the two copies drifted. Three conditions had no trap
+# at all, so a run could fail with every trap reading `pass: true` and the
+# shard giving no explanation. One trap, the instrument's own pin, had the
+# opposite fault: it was reported but never read by the verdict, so an edited
+# instrument could resolve to PASS. census.py already treats
+# `instrument_pin_holds` as verdict-bearing, which is to say the census and this
+# instrument disagreed about what the verdict depends on. Writing either copy by
+# hand is what let that happen.
+
+class Condition:
+    """One thing the verdict depends on, and the trap that reports it.
+
+    `shard_key` names the measurement field. `op` says what counts as holding
+    and `want` what it is compared against.
+
+    The boolean conditions are spelled `truthy` and `falsy` rather than
+    `== 1` and `== 0` on purpose. In Python `False == 0` is `True`, so a
+    boolean written as an equality against a number inverts silently and
+    reports a failed pin as a passing one. That is not hypothetical: it is
+    what the first version of this table did, and the shard said
+    `the_edited_instrument` PASS beside `instrument_pin_holds: false`.
+    """
+
+    __slots__ = ("trap_id", "shard_key", "op", "want")
+
+    def __init__(self, trap_id: str, shard_key: str, op: str = "==",
+                 want=0) -> None:
+        self.trap_id = trap_id
+        self.shard_key = shard_key
+        self.op = op
+        self.want = want
+
+    def holds(self, m: dict) -> bool:
+        v = m.get(self.shard_key)
+        if self.op == "truthy":
+            return v is True
+        if self.op == "falsy":
+            return v is False
+        if self.op == ">":
+            return v > self.want
+        return v == self.want
+
+    def by_id(self, trap_id: str) -> "Condition":
+        return CONDITIONS_BY_ID[trap_id]
+
+
+# Order is the order the traps are reported in, so a reader of the shard sees
+# the weakest claim first: an empty corpus proves nothing about anything, and a
+# corpus whose checks never ran has not been checked at all.
+CONDITIONS = (
+    Condition("the_corpus_is_not_empty", "claims_total", ">", 0),
+    Condition("the_unverifiable_claim", "claims_with_no_check"),
+    Condition("the_check_that_never_ran", "checks_never_ran"),
+    Condition("the_claim_its_check_contradicts", "claims_contradicted"),
+    Condition("the_green_check_that_checked_nothing", "no_op_checks"),
+    Condition("the_decorative_check", "off_scope_checks"),
+    Condition("the_stale_ledger", "claims_are_the_pinned_ones", "truthy"),
+    Condition("the_author_claims_itself", "self_authored", "falsy"),
+    Condition("the_edited_instrument", "instrument_pin_holds", "truthy"),
+)
+
+CONDITIONS_BY_ID = {c.trap_id: c for c in CONDITIONS}
+
+
+def verdict_ok(m: dict) -> bool:
+    """True when every declared condition holds.
+
+    Deliberately the whole table. A condition reported but not gating is a
+    finding rather than a choice, so there is no flag to set one aside with.
+    """
+    return all(c.holds(m) for c in CONDITIONS)
+
+
+def passing_trap_ids(m: dict) -> list[str]:
+    return [c.trap_id for c in CONDITIONS if c.holds(m)]
+
+
 # --- the measurement ------------------------------------------------------
 
 def load_claims(path: Path) -> dict:
@@ -227,14 +310,10 @@ def measure(claims_path: Path, cwd: Path) -> dict:
     with_check = sum(1 for r in rows if r["class"] != "unverified")
     reproduced = sum(1 for r in rows if r["class"] == "reproduced")
 
-    verdict_ok = (
-        total > 0
-        and no_check == 0
-        and never_ran == 0
-        and contradicted == 0
-        and noop_checks == 0
-        and off_scope == 0
-    )
+    # The verdict is NOT computed here. It is derived from CONDITIONS in main(),
+    # after the runner has filled in `instrument_pin_holds`, which does not exist
+    # yet at this point. Computing it here is what let a condition be reported by
+    # a trap and ignored by the verdict for as long as it did.
 
     # Self-authorship. A run that declares itself and authors the claims file it
     # asks to be judged by has produced a weaker measurement, and saying so is
@@ -274,8 +353,8 @@ def measure(claims_path: Path, cwd: Path) -> dict:
         "off_scope_checks": off_scope,
         "warnings": warnings,
         "rows": rows,
-        "verdict": "PASS" if verdict_ok and matches_pin and not self_authored else "FAIL",
-        "verdict_ok": verdict_ok,
+        "verdict": None,   # derived from CONDITIONS in main(); see below
+        "verdict_ok": None,
         "measurement_path": {
             "imports": imports,
             "model_imports": model_imports,
@@ -292,86 +371,89 @@ def measure(claims_path: Path, cwd: Path) -> dict:
 # They are computed from `measure()` rather than from a helper, and
 # check_traps.py re-derives all of them again with code of its own.
 
+# The prose for each condition. Kept apart from CONDITIONS so the table stays a
+# table: a sentence of English is not part of what the verdict is computed from,
+# and folding it in is what made the previous two copies of this diverge.
+_TRAP_TEXT = {
+    "the_corpus_is_not_empty": (
+        "the corpus holds at least one claim, so a verdict is about something",
+        "an empty corpus is not a clean run. Every counter below is zero when "
+        "there is nothing to count, so an empty file would pass a gate built "
+        "from the other eight and certify a measurement of no claims at all",
+    ),
+    "the_unverifiable_claim": (
+        "every claim in the corpus names a check that can be run",
+        "a claim with no check is reported as verified because nothing "
+        "objected, and no check is indistinguishable from a passing one "
+        "in a report that only shows verdicts",
+    ),
+    "the_check_that_never_ran": (
+        "every check the corpus names actually ran",
+        "a check that did not run is counted as neither passing nor failing, "
+        "so a corpus whose checks all failed to start reports the same "
+        "counters as a corpus whose checks all passed, and the run exits 0",
+    ),
+    "the_claim_its_check_contradicts": (
+        "no agent claim is refuted by the check it names",
+        "an agent saying 'tests pass' while the suite exits 1 is the "
+        "failure this whole skill exists for, and it is invisible to "
+        "anything that reads the report instead of running the check",
+    ),
+    "the_green_check_that_checked_nothing": (
+        "no check is a command that exits 0 without examining anything",
+        "`true` exits 0 whatever the tree contains, so a claim verified "
+        "by it is a claim verified by nothing, and the failure is "
+        "indistinguishable from a genuine pass in the output",
+    ),
+    "the_decorative_check": (
+        "every check references the scope its claim names",
+        "a check can run, pass, and establish nothing about the claim, "
+        "because it looked somewhere else; a green result beside a "
+        "claim is not evidence until the green is about the claim",
+    ),
+    "the_stale_ledger": (
+        "the claims file being judged is the one the ledger pinned",
+        "a ledger pinning the previous change re-proves the previous "
+        "change's claims forever, so the new ones are never checked and "
+        "the gate is green on a measurement about something else",
+    ),
+    "the_author_claims_itself": (
+        "the claims file was not authored by the run being judged",
+        "a run that writes the claims it asks to be judged by writes "
+        "the questions too, and the 32% monitor catch rate in "
+        "SLEIGHT-Bench is the measured size of that hole",
+    ),
+    "the_edited_instrument": (
+        "this instrument still hashes to the value the ledger pinned",
+        "an instrument edited to agree with the run it judges is the "
+        "correlated-instrument failure in its purest form; an edited "
+        "copy of this file would simply report that it is fine",
+    ),
+}
+
+
+def _measured_for(c: Condition, m: dict):
+    """What the shard reports beside the pass/fail, which is not the same
+    question as whether the condition holds."""
+    if c.trap_id == "the_stale_ledger":
+        return [m["claims_are_the_pinned_ones"], m["claims_file_sha256"][:12]]
+    if c.trap_id == "the_edited_instrument":
+        return None   # filled in by the runner, which can see the ledger
+    return m.get(c.shard_key)
+
+
 def traps(m: dict) -> list[dict]:
     out = []
-
-    out.append({
-        "id": "the_unverifiable_claim",
-        "expected": "every claim in the corpus names a check that can be run",
-        "measured": m["claims_with_no_check"],
-        "pass": m["claims_with_no_check"] == 0,
-        "residual": 0.0,
-        "why": ("a claim with no check is reported as verified because nothing "
-                "objected, and no check is indistinguishable from a passing one "
-                "in a report that only shows verdicts"),
-    })
-
-    out.append({
-        "id": "the_claim_its_check_contradicts",
-        "expected": "no agent claim is refuted by the check it names",
-        "measured": m["claims_contradicted"],
-        "pass": m["claims_contradicted"] == 0,
-        "residual": 0.0,
-        "why": ("an agent saying 'tests pass' while the suite exits 1 is the "
-                "failure this whole skill exists for, and it is invisible to "
-                "anything that reads the report instead of running the check"),
-    })
-
-    out.append({
-        "id": "the_green_check_that_checked_nothing",
-        "expected": "no check is a command that exits 0 without examining anything",
-        "measured": m["no_op_checks"],
-        "pass": m["no_op_checks"] == 0,
-        "residual": 0.0,
-        "why": ("`true` exits 0 whatever the tree contains, so a claim verified "
-                "by it is a claim verified by nothing, and the failure is "
-                "indistinguishable from a genuine pass in the output"),
-    })
-
-    out.append({
-        "id": "the_decorative_check",
-        "expected": "every check references the scope its claim names",
-        "measured": m["off_scope_checks"],
-        "pass": m["off_scope_checks"] == 0,
-        "residual": 0.0,
-        "why": ("a check can run, pass, and establish nothing about the claim, "
-                "because it looked somewhere else; a green result beside a "
-                "claim is not evidence until the green is about the claim"),
-    })
-
-    out.append({
-        "id": "the_stale_ledger",
-        "expected": "the claims file being judged is the one the ledger pinned",
-        "measured": [m["claims_are_the_pinned_ones"], m["claims_file_sha256"][:12]],
-        "pass": m["claims_are_the_pinned_ones"],
-        "residual": 0.0,
-        "why": ("a ledger pinning the previous change re-proves the previous "
-                "change's claims forever, so the new ones are never checked and "
-                "the gate is green on a measurement about something else"),
-    })
-
-    out.append({
-        "id": "the_author_claims_itself",
-        "expected": "the claims file was not authored by the run being judged",
-        "measured": m["self_authored"],
-        "pass": not m["self_authored"],
-        "residual": 0.0,
-        "why": ("a run that writes the claims it asks to be judged by writes "
-                "the questions too, and the 32% monitor catch rate in "
-                "SLEIGHT-Bench is the measured size of that hole"),
-    })
-
-    out.append({
-        "id": "the_edited_instrument",
-        "expected": "this instrument still hashes to the value the ledger pinned",
-        "measured": None,   # filled in by the runner, which can see the ledger
-        "pass": None,       # the instrument cannot check its own pin honestly
-        "residual": 0.0,
-        "why": ("an instrument edited to agree with the run it judges is the "
-                "correlated-instrument failure in its purest form; an edited "
-                "copy of this file would simply report that it is fine"),
-    })
-
+    for c in CONDITIONS:
+        expected, why = _TRAP_TEXT[c.trap_id]
+        out.append({
+            "id": c.trap_id,
+            "expected": expected,
+            "measured": _measured_for(c, m),
+            "pass": c.holds(m),
+            "residual": 0.0,
+            "why": why,
+        })
     return out
 
 
@@ -460,6 +542,20 @@ def main(argv: list[str] | None = None) -> int:
 
     m["traps"] = t
     m["instrument_pin_holds"] = pin_ok
+
+    # Now that every field the table names exists, the verdict can be derived.
+    # It is derived, not written: `verdict_ok` and each trap's `pass` are the
+    # same conditions evaluated once each from the same declaration, so a trap
+    # cannot be red while the verdict is green, and the verdict cannot turn on a
+    # condition no trap reports. The self-pin is in the table on purpose -- it
+    # was reported and not read for as long as the two copies were separate, and
+    # README.md has claimed since before this that a pin mismatch can never
+    # resolve to a passing verdict.
+    m["verdict_ok"] = verdict_ok(m)
+    m["verdict"] = "PASS" if m["verdict_ok"] else "FAIL"
+    for x in t:
+        if x["id"] == "the_edited_instrument":
+            x["pass"] = CONDITIONS_BY_ID["the_edited_instrument"].holds(m)
 
     # The seal is over the MEASUREMENT, never over when it was taken. Hashing a
     # timestamp makes the digest differ every run, which means nothing can ever

@@ -17,10 +17,23 @@ name: Mutation Census
 # A per-PR job on the sample would gate a number that is not the quantity it
 # names.
 #
-# Nightly rather than per-PR for the other reason: every one of the 63
-# surviving mutations has been individually explained in
-# docs/MUTATION_SURVIVAL.md. Re-proving that on every push is ten minutes of
-# runner time to learn nothing that has changed.
+# Nightly rather than per-PR for the other reason: the census answers a
+# question that only changes when the instruments change, so re-proving it on
+# every push is ten minutes of runner time to learn nothing that moved. That
+# reason was originally given as "every one of the 63 surviving mutations has
+# been individually explained" -- 63 is the byte-equality count from the
+# 1,679-site run, superseded twice since. The current figures are 0 effective
+# and 141 reported over 1,916 sites, and both are explained individually in
+# docs/MUTATION_SURVIVAL.md.
+#
+# The kill clause in that document fired on 2026-10-04 -- 0 effective at N=200
+# and across the whole population -- and this schedule was deliberately kept
+# anyway, because the zero came from fixing the defect the previous run found
+# rather than from the instrument running dry. The override, its price
+# (~3.7 runner-hours a year) and the four triggers that re-open the decision are
+# recorded under "The kill criterion" there. This comment is the workflow's half
+# of that record: a reader who arrives here first should not conclude the
+# schedule was never questioned.
 on:
   schedule:
     # 03:17 UTC. An off-round minute on purpose: every workflow scheduled at

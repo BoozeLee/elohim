@@ -201,9 +201,22 @@ def run_instrument_control(name: str, expect_red: str,
     """
     work = Path(tempfile.mkdtemp(prefix="claimledger-instr."))
     try:
+        original = INSTRUMENT.read_text(encoding="utf-8")
+        mutated = edit(original)
+        # A mutation that changes nothing produces a file byte-identical to the
+        # real one, whose pin therefore MATCHES, so the trap the control is there
+        # to break does not break and the control reports itself. That is worse
+        # than no control: it reads green forever while proving nothing. Control
+        # 7 was exactly this for a while -- it rewrote the literal text
+        # "verdict_ok = (", which stopped existing when the verdict moved into
+        # the CONDITIONS table, and the replace became a silent no-op.
+        if mutated == original:
+            return {"name": name, "ok": False,
+                    "why": "the mutation changed nothing: the instrument text it "
+                           "aims at no longer exists, so this control is "
+                           "vacuous and would pass without ever running"}
         forged = work / "claim_ledger_forged.py"
-        forged.write_text(edit(INSTRUMENT.read_text(encoding="utf-8")),
-                          encoding="utf-8")
+        forged.write_text(mutated, encoding="utf-8")
         shard = work / "shard.json"
         r1 = subprocess.run([sys.executable, str(INSTRUMENT), "--json"],
                             capture_output=True, text=True)
@@ -224,6 +237,50 @@ def run_instrument_control(name: str, expect_red: str,
                            % r2.stderr[-300:]}
         payload = json.loads(r2.stdout)
         failed = [t["id"] for t in payload["traps"] if not t["pass"]]
+        return {
+            "name": name, "expected_to_break": expect_red, "traps_failed": failed,
+            "ok": expect_red in failed,
+            "note": ("broke %s as required -- %s" % (expect_red, why)
+                     if expect_red in failed
+                     else "did NOT break %s, so that trap cannot currently fail "
+                          "(broke: %s)" % (expect_red, failed or "nothing")),
+        }
+    finally:
+        shutil.rmtree(work, ignore_errors=True)
+
+
+def run_shard_control(name: str, doc: dict, expect_red: str, why: str) -> dict:
+    """Controls 9 and 10: read the trap out of the INSTRUMENT's own shard.
+
+    The two conditions added with the CONDITIONS table --
+    `the_corpus_is_not_empty` and `the_check_that_never_ran` -- are not
+    re-derived by check_traps.py, so the checker cannot report them and
+    run_control() would see nothing fail. What has to be shown is that the
+    instrument's own row goes red, which is the claim being made about it.
+
+    This is a weaker control than the others and it is worth being plain about
+    why: it reads one implementation's own output rather than two independent
+    ones agreeing. It proves the trap CAN fail. It does not prove a second
+    reader agrees. The structural half -- that every gating condition has a row
+    and every row is gating -- is checked separately, in
+    tests/test_verdict_conditions.py.
+    """
+    work = Path(tempfile.mkdtemp(prefix="claimledger-shard."))
+    try:
+        cpath = work / "claims.json"
+        cpath.write_text(json.dumps(doc, indent=2), encoding="utf-8")
+        env = dict(os.environ)
+        env.pop(AUTHOR_ENV, None)
+        r = subprocess.run(
+            [sys.executable, str(INSTRUMENT), "--claims", str(cpath), "--json"],
+            capture_output=True, text=True, env=env)
+        try:
+            shard = json.loads(r.stdout)
+        except json.JSONDecodeError:
+            return {"name": name, "ok": False,
+                    "why": "the instrument did not produce a shard: rc=%d %s"
+                           % (r.returncode, (r.stderr or r.stdout)[-300:])}
+        failed = [t["id"] for t in shard["traps"] if not t["pass"]]
         return {
             "name": name, "expected_to_break": expect_red, "traps_failed": failed,
             "ok": expect_red in failed,
@@ -314,11 +371,18 @@ def controls() -> list[dict]:
     # 7. The instrument edited to agree with whatever it is judging. The pin is
     #    the only thing that can notice, because an edited file would happily
     #    report that it is fine.
+    #
+    #    The mutation is aimed at the verdict derivation, which is where "agree
+    #    with the run it judges" now lives. It used to rewrite the opening of the
+    #    hand-built `verdict_ok = (...)` expression, and when that expression was
+    #    replaced by a table the replace silently did nothing. The guard added to
+    #    run_instrument_control is what now catches that class of rot.
     out.append(run_instrument_control(
         "an_edited_instrument",
         "the_edited_instrument",
         lambda src: src.replace(
-            "verdict_ok = (", "verdict_ok = True or (", 1),
+            "    return all(c.holds(m) for c in CONDITIONS)",
+            "    return True", 1),
         "the instrument now always reports a good corpus"))
 
     # 8. A model/network import added to the measurement path. The whole
@@ -330,6 +394,41 @@ def controls() -> list[dict]:
         lambda src: src.replace(
             "import subprocess", "import subprocess\nimport requests", 1),
         "the measurement path stopped being deterministic"))
+
+    # 9. An empty corpus. Every other counter is zero when there is nothing to
+    #    count, so an empty file passes a gate built from the other eight and
+    #    certifies a measurement of no claims at all. This is the condition
+    #    that had no trap while it was already gating the exit code, which is
+    #    how a run could fail with all seven traps green and no explanation.
+    out.append(run_shard_control(
+        "an_empty_corpus",
+        claims_file("control:empty", []),
+        "the_corpus_is_not_empty",
+        "a verdict about zero claims is not a verdict"))
+
+    # 10. A check that cannot start. `ran` is False, so the row is neither
+    #     reproduced nor contradicted, and every counter a report shows is zero
+    #     -- the same numbers a corpus of passing checks produces. Before this
+    #     condition was gating, that corpus exited 0.
+    #
+    #     The path named in argv does not exist AND has to carry the scope
+    #     string, because the scope check runs first: a check whose `asserts`
+    #     appears nowhere in its argv is counted as decorative and never
+    #     started. Naming a non-existent path under the right scope is the only
+    #     way to reach the branch this control is about, and the first version
+    #     of this control used a bare binary name, so it broke
+    #     `the_decorative_check` instead and the control reported itself.
+    out.append(run_shard_control(
+        "a_check_that_cannot_start",
+        claims_file("control:neverran", [{
+            "id": "never-runs",
+            "text": "the contract is present",
+            "check": {"argv": ["/nonexistent/bin/fixtures/claims/contract.txt"],
+                      "expect_exit": 0,
+                      "asserts": "fixtures/claims/contract.txt"},
+        }]),
+        "the_check_that_never_ran",
+        "a check that did not start is not a check that passed"))
     return out
 
 

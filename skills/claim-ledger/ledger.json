@@ -1,123 +1,123 @@
 {
-  "label": "CLAIM LEDGER",
-  "version": "claim_ledger_ledger_v1",
-  "note": "Every entry is re-measured on every run. A drifting residual is a finding, not a warning. The counts describe ONE committed claims file read by an exit-code contract -- they are not a score of how good an agent's work is, and nothing here survives the day a run supplies its own claims file. The corpus is fixed precisely so that a change here means the instrument moved, not that some run got more honest.",
-  "instrument": {
-    "path": "instrument/claim_ledger.py",
-    "sha256": "63c8ee7aa5f69ee78086e08e2a99e7fb899353418d2c570d385b965695e85582",
-    "bytes": 21439,
-    "note": "Editing this file is itself a measurable event, and the pin is re-derived by scripts/check_traps.py rather than by the file being pinned -- an edited copy of the instrument would report that it is fine. The harness reports both hashes and never resolves to a passing verdict on a modified instrument."
-  },
   "claims_pin": {
+    "note": "The file under judgement is pinned as well as the instrument. Without this the ledger would keep re-proving the previous change's claims forever, and the gate would read PASS on a measurement about something else. Applied mode -- a run's own claims file -- therefore reports claims_are_the_pinned_ones false and its verdict FAIL by construction, which is the correct answer and not a defect.",
     "path": "fixtures/claims/healthy.json",
-    "sha256": "a38e0649cb8512ad446564b4b2948f558f09875e67e58549245c3addae9f7bdb",
-    "note": "The file under judgement is pinned as well as the instrument. Without this the ledger would keep re-proving the previous change's claims forever, and the gate would read PASS on a measurement about something else. Applied mode -- a run's own claims file -- therefore reports claims_are_the_pinned_ones false and its verdict FAIL by construction, which is the correct answer and not a defect."
-  },
-  "seal_at_heading": "bac7bcd15a64bf9b338b2d5c5d2d3d8b2910d48d864a9c2060f7401aed2368db",
-  "replay": {
-    "path": "tests/fixtures/session-03-33-40-878.labels.json",
-    "labels_sha256": "54defe7236f2aedbc4c8c558d0ca32c0a271b514b295cb2f87ff169d1069bab9",
-    "note": "The measured recall figure lives in the label fixture, not here, because it is ground truth a human wrote rather than a number this instrument produced. It is pinned for the same reason claims_pin is: the labels ARE the measurement, so an unpinned edit would leave a figure that re-derives cleanly from a ground truth that had been moved under it. scripts/check_traps.py holds `the_labels_are_pinned` and `the_labels_counts_agree` over it.",
-    "figure": "RECALL 2/2 (100.0%) PRECISION 2/2 (100.0%) COVERAGE 2/14 (14.3%) CONTRADICTED 0/0 UNVERIFIED 2",
-    "figure_caveat": "The figure is IDENTICAL when scripts/replay.py is neutered to echo the labels instead of reading the transcript, because every binding in this corpus happens to agree with its label. The controls in tests/test_replay_negative_controls.py -- not this number -- are the evidence that the gate is wired to the transcript. Zero claims were contradicted, so recall-on-contradiction is 0/0 and undefined; the 100 percent is carried entirely by the unverified class. One agent, one session, fourteen claims."
+    "sha256": "a38e0649cb8512ad446564b4b2948f558f09875e67e58549245c3addae9f7bdb"
   },
   "facts": [
     {
-      "id": "corpus_pinned",
       "claim": "the claims file being judged is the one this ledger pinned",
-      "path": "claims_are_the_pinned_ones",
       "expect": true,
-      "origin": "measured; a ledger pinning the previous change re-proves the previous change's claims forever"
+      "id": "corpus_pinned",
+      "origin": "measured; a ledger pinning the previous change re-proves the previous change's claims forever",
+      "path": "claims_are_the_pinned_ones"
     },
     {
-      "id": "instrument_pinned",
       "claim": "the instrument that produced this measurement is the one this ledger pinned",
-      "path": "instrument_pin_holds",
       "expect": true,
-      "origin": "measured; the correlated-instrument failure is only catchable if the instrument is pinned"
+      "id": "instrument_pinned",
+      "origin": "measured; the correlated-instrument failure is only catchable if the instrument is pinned",
+      "path": "instrument_pin_holds"
     },
     {
-      "id": "not_self_authored",
       "claim": "the claims file was not authored by the run under judgement",
-      "path": "self_authored",
       "expect": false,
-      "origin": "measured; a run that writes the claims it asks to be judged by writes the questions too"
+      "id": "not_self_authored",
+      "origin": "measured; a run that writes the claims it asks to be judged by writes the questions too",
+      "path": "self_authored"
     },
     {
-      "id": "verdict",
       "claim": "every claim in the pinned corpus was reproduced by the check it names",
-      "path": "verdict",
       "expect": "PASS",
-      "origin": "measured"
+      "id": "verdict",
+      "origin": "measured",
+      "path": "verdict"
     },
     {
-      "id": "claims_total",
       "claim": "the pinned corpus holds this many claims",
-      "path": "claims_total",
       "expect": 2,
-      "origin": "measured"
+      "id": "claims_total",
+      "origin": "measured",
+      "path": "claims_total"
     },
     {
-      "id": "claims_with_a_check",
       "claim": "every claim in the corpus names a check that can be run",
-      "path": "claims_with_a_check",
       "expect": 2,
-      "origin": "measured; a claim with no check is indistinguishable from a passing one in a verdict-only report"
+      "id": "claims_with_a_check",
+      "origin": "measured; a claim with no check is indistinguishable from a passing one in a verdict-only report",
+      "path": "claims_with_a_check"
     },
     {
-      "id": "claims_reproduced",
       "claim": "both claims were reproduced by running the check they name",
-      "path": "claims_reproduced",
       "expect": 2,
-      "origin": "measured; the second is the exact negation of the refuted claim in contradicted.json, over the same scope"
+      "id": "claims_reproduced",
+      "origin": "measured; the second is the exact negation of the refuted claim in contradicted.json, over the same scope",
+      "path": "claims_reproduced"
     },
     {
-      "id": "claims_contradicted",
       "claim": "no claim in the corpus is refuted by the check it names",
-      "path": "claims_contradicted",
       "expect": 0,
-      "origin": "measured; the failure this skill exists for, and the corpus that must be able to produce it is fixtures/claims/contradicted.json"
+      "id": "claims_contradicted",
+      "origin": "measured; the failure this skill exists for, and the corpus that must be able to produce it is fixtures/claims/contradicted.json",
+      "path": "claims_contradicted"
     },
     {
-      "id": "claims_with_no_check",
       "claim": "no claim is reported as verified without a check to run",
-      "path": "claims_with_no_check",
       "expect": 0,
-      "origin": "measured"
+      "id": "claims_with_no_check",
+      "origin": "measured",
+      "path": "claims_with_no_check"
     },
     {
-      "id": "no_op_checks",
       "claim": "no claim is evidenced by a command that exits 0 without examining anything",
-      "path": "no_op_checks",
       "expect": 0,
-      "origin": "measured; `true` verifies every claim in the world and nothing in particular"
+      "id": "no_op_checks",
+      "origin": "measured; `true` verifies every claim in the world and nothing in particular",
+      "path": "no_op_checks"
     },
     {
-      "id": "off_scope_checks",
       "claim": "every check references the scope its claim names",
-      "path": "off_scope_checks",
       "expect": 0,
-      "origin": "measured as a string test, which is weaker than the sentence sounds; references/limits.md"
+      "id": "off_scope_checks",
+      "origin": "measured as a string test, which is weaker than the sentence sounds; references/limits.md",
+      "path": "off_scope_checks"
     },
     {
-      "id": "checks_never_ran",
       "claim": "no named check failed to execute",
-      "path": "checks_never_ran",
       "expect": 0,
-      "origin": "measured; a check that cannot run is a result, not an exception"
+      "id": "checks_never_ran",
+      "origin": "measured; a check that cannot run is a result, not an exception",
+      "path": "checks_never_ran"
     },
     {
-      "id": "no_llm_in_the_measurement_path",
       "claim": "the measurement imports no model and no network module",
-      "path": "measurement_path.no_llm_in_the_measurement_path",
       "expect": true,
-      "origin": "re-derived every run from this file's own AST rather than asserted as a constant, and re-derived a second time by check_traps.py"
+      "id": "no_llm_in_the_measurement_path",
+      "origin": "re-derived every run from this file's own AST rather than asserted as a constant, and re-derived a second time by check_traps.py",
+      "path": "measurement_path.no_llm_in_the_measurement_path"
     }
   ],
+  "instrument": {
+    "bytes": 26168,
+    "note": "Editing this file is itself a measurable event, and the pin is re-derived by scripts/check_traps.py rather than by the file being pinned -- an edited copy of the instrument would report that it is fine. The harness reports both hashes and never resolves to a passing verdict on a modified instrument.",
+    "path": "instrument/claim_ledger.py",
+    "sha256": "a54e292a47a589aab57fadccc3dccb47a15b509335c5c100da3566e497d00457"
+  },
+  "label": "CLAIM LEDGER",
+  "note": "Every entry is re-measured on every run. A drifting residual is a finding, not a warning. The counts describe ONE committed claims file read by an exit-code contract -- they are not a score of how good an agent's work is, and nothing here survives the day a run supplies its own claims file. The corpus is fixed precisely so that a change here means the instrument moved, not that some run got more honest.",
+  "replay": {
+    "figure": "RECALL 2/2 (100.0%) PRECISION 2/2 (100.0%) COVERAGE 2/14 (14.3%) CONTRADICTED 0/0 UNVERIFIED 2",
+    "figure_caveat": "The figure is IDENTICAL when scripts/replay.py is neutered to echo the labels instead of reading the transcript, because every binding in this corpus happens to agree with its label. The controls in tests/test_replay_negative_controls.py -- not this number -- are the evidence that the gate is wired to the transcript. Zero claims were contradicted, so recall-on-contradiction is 0/0 and undefined; the 100 percent is carried entirely by the unverified class. One agent, one session, fourteen claims.",
+    "labels_sha256": "54defe7236f2aedbc4c8c558d0ca32c0a271b514b295cb2f87ff169d1069bab9",
+    "note": "The measured recall figure lives in the label fixture, not here, because it is ground truth a human wrote rather than a number this instrument produced. It is pinned for the same reason claims_pin is: the labels ARE the measurement, so an unpinned edit would leave a figure that re-derives cleanly from a ground truth that had been moved under it. scripts/check_traps.py holds `the_labels_are_pinned` and `the_labels_counts_agree` over it.",
+    "path": "tests/fixtures/session-03-33-40-878.labels.json"
+  },
+  "seal_at_heading": "bac7bcd15a64bf9b338b2d5c5d2d3d8b2910d48d864a9c2060f7401aed2368db",
   "unbound": [
     "no claim here is about the quality of the work. A claim can be true, reproduced, and worthless, and this gate cannot tell those apart -- it says the outcome was reproduced, not that it was worth reproducing.",
     "these counts describe two claims. They are not a rate, a distribution, or a population, and no claim about agents in general may be read off them.",
     "a check that references the scope its claim names is in scope. That is a string test, not a proof the check establishes the claim: references/limits.md records a fixture that passed it while asserting something unrelated.",
     "the verdict is scoped to exit codes. Whether a check would have FAILED had the world been different is a property of the check, and nothing in this ledger re-derives it."
-  ]
+  ],
+  "version": "claim_ledger_ledger_v1"
 }

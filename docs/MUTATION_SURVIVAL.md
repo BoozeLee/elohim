@@ -2,14 +2,22 @@
 
 **The shape of the result, which is the part that stays true:** across the whole
 derived population, **no mutant was ever caught having turned a failing gate
-into a passing one**, and no mutant survived by doing so. Of 1,937 sites, **13
-moved a field the gate's own decision depends on** — 0.007 on the defect arm.
-The other **145** moved fields the gate does not read, which is a real and
+into a passing one**, and no mutant survived by doing so. Of 1,916 sites, **none
+moved a field the gate's own decision depends on** — 0.0 on the defect arm.
+The other **141** moved fields the gate does not read, which is a real and
 separately reported statement about how much each instrument chooses to publish,
-and which is not a gap in the gate's reasoning. All 13 are the same defect, in
-one skill: a trap's `pass` boolean and the run's verdict are two independent
-transcriptions of one condition, so 12 mutants report a trap as failed while the
-gate reports the run as passed, and a 13th nulls the self-pin trap's verdict.
+and which is not a gap in the gate's reasoning.
+
+**The previous run found 13 of that first kind, all one defect, in one skill:**
+a trap's `pass` boolean and the run's verdict were two independent
+transcriptions of one condition, so 12 mutants reported a trap as failed while
+the gate reported the run as passed, and a 13th nulled the self-pin trap's
+verdict. That defect is **fixed** — `claim-ledger` now builds its traps from a
+single `CONDITIONS` table and computes the verdict from that same table, so
+there is no second copy to drift. The 0 above is the measurement after the
+fix, and "after the fix" is the whole content of the claim: see "The one defect,
+and it is now fixed" below for the before, the fix, and the coverage this run
+gives up in exchange.
 
 **Status: A2 measured, and cross-checked against a second independent harness,
 `tools/mutation_survival.py`, which is committed to this repository — see the
@@ -17,13 +25,30 @@ caveat under "Reproducing this". A prior claim, that 0 of 200 mutations
 survived, was false and is retracted below.**
 
 **Date of the current measurement:** 2026-10-04, seed 1, 45 s harness budget,
-1098.7 s wall, coverage 1937/1937 = 1.0, 8 instrumented skills.
+602.8 s wall on 6 workers, coverage 1916/1916 = 1.0, 8 instrumented skills.
+**Date of the previous measurement:** also 2026-10-04, 1098.7 s wall, coverage
+1937/1937. The two wall times are **not comparable** — different cores, different
+load, and the instrument under test changed size between them. Only the coverage
+fraction and the counts are carried across.
 **Date of the run this document was first written from:** 2026-10-02.
 **Instrument under test:** the six instrumented skills at tag `v0.1.0`
 (`6dc3587`), plus `elohim-harness`, which ships without a ledger. The current
 run adds `claim-ledger` and `pay-signal`, and the population is derived from the
 tree rather than written down, so it moved when they landed.
-**Corrects:** the standing table row `mutations that passed the gate | 0`.
+**The population has now moved twice, for two different reasons, and the second
+one is this document's own doing.** It went 1,679 → 1,937 when `claim-ledger`
+(146) and `pay-signal` (112) landed. It then went 1,937 → 1,916 when
+`claim-ledger`'s instrument was rewritten to derive its traps from one table
+(146 → 125 sites). **A smaller population is a smaller surface being measured,
+not the same measurement taken more carefully**, and the 0.0 defect-arm rate
+below is bought partly with 21 fewer sites. Both moves are why
+`claim_binding` re-derives the population from the tree instead of trusting
+this document.
+**Corrects:** the standing table row `mutations that passed the gate | 0`. The
+current run reaches 0 on the defect arm, but it gets there by having fixed the
+defect that made the old 0 false, not by the old 0 having been right all along:
+under the byte-equality discriminator that row was measuring, 141 mutants still
+pass.
 
 ## The claim under test
 
@@ -127,7 +152,7 @@ guard confirmed the refactor is behaviour-preserving: **47 of 47**
 
 ### The population is smaller than N=2000
 
-Every (operator, site) pair, all instrumented skills: **1,937.** This figure is
+Every (operator, site) pair, all instrumented skills: **1,916.** This figure is
 **derived**, not written into the census: `mutation.instrumented_skills()`
 discovers the skills from the ledgers on disk and the count is `len(jobs)` built
 from `sites.enumerate_sites`. Nothing here needs editing when a skill lands.
@@ -140,13 +165,20 @@ from `sites.enumerate_sites`. Nothing here needs editing when a skill lands.
 | precision-budget | 200 | 6 | 16 | 14 | 80 | 80 | 1 | 1 | 2 |
 | reproducibility | 98 | 10 | 20 | 8 | 26 | 26 | 4 | 4 | — |
 | tolerance-prover | 274 | 8 | 26 | 17 | 109 | 109 | 1 | 1 | 3 |
-| claim-ledger | 146 | 14 | 27 | 3 | 50 | 50 | 1 | 1 | — |
+| claim-ledger | 125 | 16 | 27 | 6 | 36 | 36 | 2 | 2 | — |
 | pay-signal | 112 | 7 | 16 | 5 | 35 | 35 | 7 | 7 | — |
 
 The first six rows are the 1,679-site population this document was written
 against, kept here because the rest of the history quotes it. `claim-ledger`
-(146) and `pay-signal` (112) are the two that landed since, and they are why the
-population moved.
+and `pay-signal` are the two that landed since, and they are why the population
+grew. `claim-ledger` is **125** here rather than the 146 it was when it
+landed, because its own instrument was rewritten, and the row shows exactly what
+that cost: **28 `num_add`/`num_mul` sites gone** (`50`+`50` → `36`+`36`), for
+`bool_flip` +2, `docstring_kill` +3 and `ret_flip`/`ret_type` +1 each. Those 28
+were the numeric literals in the hand-written `"pass": m[...] == 0`
+transcriptions, and deleting the second copy of each condition is what removed
+them. The population shrank because the defect was fixed; those two sentences
+are the same fact.
 
 `tol_widen` has **zero sites in three of eight skills** — `claim-ledger`,
 `pay-signal` and `reproducibility` declare no tolerance literal for it to widen.
@@ -156,33 +188,40 @@ absent, and `population_report()` counted only the non-empty cells while
 `plannable_cells()` now draws from the non-empty cells and refuses when empty.
 
 The roadmap asks for N=2000. **N=2000 exceeds the population.** An exhaustive
-census of all 1,937 sites is strictly stronger than either sample, and both
+census of all 1,916 sites is strictly stronger than either sample, and both
 sample sizes fall out of it as prefixes. This run is therefore the census, not a
 sample, and the N=200 question is answered as a prefix at row 200 of the log.
 
-One consequence worth stating: `num_add` + `num_mul` are **1,558 of 1,937
-sites, 80.4 %** of the population. A single pooled mutation score would be a
+One consequence worth stating: `num_add` + `num_mul` are **1,530 of 1,916
+sites, 79.9 %** of the population. A single pooled mutation score would be a
 statement about numeric literals, so per-operator rates are primary below.
 
 ## Result
 
 Full census at the current population, seed 1, 6 workers, 45 s harness budget,
-1098.7 s wall, **coverage 1937/1937 = 1.0**.
+602.8 s wall, **coverage 1916/1916 = 1.0**.
 
 | arm | n | caught | equivalent | **effective** | **reported** | artefacts |
 | --- | --- | --- | --- | --- | --- | --- |
-| forged | 1937 | 1151 | 624 | **13** | **148** | 1 |
+| forged | 1916 | 1144 | 624 | **0** | **147** | 1 |
 | stale | 60 | 60 | 0 | 0 | 0 | 0 |
-| all | 1997 | 1211 | 624 | **13** | **148** | 1 |
+| all | 1976 | 1204 | 624 | **0** | **147** | 1 |
 
-The quantity CI gates on is the **defect-arm rate, 13/1848 = 0.007034632034632035**,
+The quantity CI gates on is the **defect-arm rate, 0/1824 = 0.0**,
 which excludes the inert class from numerator and denominator alike for the
 reason given below. **REPORTED rides in the same denominator and is never gated
-on**: 145 of 1848. Both numbers are real and both are published; the rate that
+on**: 141 of 1824. Both numbers are real and both are published; the rate that
 gates is the one about the gate's reasoning.
 
+The 147 and the 141 differ, and the difference is the inert class: 6
+`docstring_kill` mutants move only documentation and are reported on the forged
+arm without entering the defect arm. `REPORTED` is read from `defect_arm_total`
+in the workflow for exactly this reason — the two numbers differ by 6, and
+reading the wrong one is a unit error that once turned this workflow red on its
+own first run.
+
 Inert class, reported and not counted: `docstring_kill` produced **86
-equivalent and 3 reported of 89**, and caught 0. Removing a docstring changes
+equivalent and 6 reported of 92**, and caught 0. Removing a docstring changes
 documentation, not behaviour, so it is excluded from the rate rather than
 allowed to flatter it.
 
@@ -239,11 +278,21 @@ no longer ran. One home, read by everything.
 
 | figure | value |
 | --- | --- |
-| population sites | 1,937 |
-| defect-arm effective | 13 |
-| defect-arm reported | 145 |
-| defect-arm n | 1,848 |
-| survivor identity digest | 95f3e14307040eab |
+| population sites | 1,916 |
+| defect-arm effective | 0 |
+| defect-arm reported | 141 |
+| defect-arm n | 1,824 |
+| survivor identity digest | e3b0c44298fc1c14 |
+
+`survivor identity digest` is now the sha256 of the **empty** string, because no
+site survived as EFFECTIVE. That is worth stating rather than leaving to be
+discovered: an identity pin over an empty set cannot distinguish *the right
+zero* from *a run that classified nothing as effective*. It is a vacuous pin in
+the strict sense, and the check that does the work now is `defect-arm
+effective` being pinned at 0 alongside `defect-arm n` and the coverage
+comparison above — a run that silently stopped calling anything EFFECTIVE is
+caught by the count agreeing, not by the digest.
+
 
 `defect-arm reported` is pinned as well as `defect-arm effective`, and separately,
 because that is the whole point of the split: a shard moving in fields the gate
@@ -268,25 +317,27 @@ it exists to catch, and `claim_binding` re-derives the population from the tree
 independently of the workflow, so the two disagree if this table is edited to
 match a stale run.
 
-**Not one mutant in 1,937 was caught having turned a FAIL into a PASS, and not
+**Not one mutant in 1,916 was caught having turned a FAIL into a PASS, and not
 one survived by doing so.** That is the claim that survives the next skill
 landing. The reported count is the one that moves when a shard's *shape* moves
 rather than when the gate's reasoning moves, which is exactly why it is published
 next to the effective count instead of being folded into it.
 
 The reported count is dominated by shard shape, and this is measured rather than
-asserted. `claim-ledger` alone contributes **67 of the 145** reported, and every
+asserted. `claim-ledger` alone contributes **60 of the 141** reported, and every
 one of them is a mutation landing inside `traps[].measured[]` or
 `traps[].residual`, the per-trap evidence its traps publish. The rate does
 **not** track raw leaf count, and saying so plainly matters, because the first
-draft of this argument here claimed exactly that and the data refutes it — 
-`tolerance-prover` publishes 228 leaf fields and `claim-ledger` 90. What tracks
+draft of this argument here claimed exactly that and the data refutes it —
+`tolerance-prover` publishes 228 leaf fields and `claim-ledger` 90 *(both
+measured on the pre-fix tree by the cross-check run, not on the current
+instrument)*. What tracks
 is whether a shard's traps carry a `measured` **evidence list**. Measured across
 all eight pristine shards:
 
 | skill | traps in shard | `measured` is a list | reported | effective |
 | --- | --- | --- | --- | --- |
-| claim-ledger | 7 | yes | 67 | 13 |
+| claim-ledger | 7 | yes | 60 | 0 |
 | pay-signal | 5 | yes | 18 | 0 |
 | elohim | 0 | — | 23 | 0 |
 | estimator-bias | 0 | — | 21 | 0 |
@@ -302,25 +353,29 @@ gate's reasoning: a mutation inside a trap's own evidence changes what the
 report says about that trap, and byte-equality scored that as a gap in the
 gate's reasoning. It is now scored as `REPORTED`, which is what it is.
 
-### The one defect, and it is one duplicated line
+### The one defect, and it is now fixed
 
-Every one of the 13 effective survivors is this, in `claim-ledger` and nowhere
-else. It is the only finding in this document that is not a statement about what
-the shards choose to publish.
+**This section is the reason the current run reads 0.** Every one of the
+**previous** run's 13 effective survivors was this, in `claim-ledger` and nowhere
+else — the only finding in this document that was not a statement about what the
+shards choose to publish. It has been fixed, and the fix is recorded here in the
+past tense on purpose: the pre-fix line numbers below are the ones the mutation
+census read, they no longer exist in the file, and a reader who greps for
+`claim_ledger.py:302` now gets the single-source table instead.
 
-`skills/claim-ledger/instrument/claim_ledger.py` computes the run's verdict in
-one place and re-transcribes the same conditions in another:
+`skills/claim-ledger/instrument/claim_ledger.py` computed the run's verdict in
+one place and re-transcribed the same conditions in another:
 
-- line 230, `verdict_ok` is built from six counters: `no_check == 0`,
+- line 230, `verdict_ok` was built from six counters: `no_check == 0`,
   `never_ran == 0`, `contradicted == 0`, `noop_checks == 0`, `off_scope == 0`,
   `total > 0`.
-- lines 302, 313, 324 and 335 write each trap's `pass` from **its own copy** of
+- lines 302, 313, 324 and 335 wrote each trap's `pass` from **its own copy** of
   those comparisons, as report text: `"pass": m["claims_with_no_check"] == 0`.
 
-Nothing asserts the two agree, and the harness treats the **exit code** as
-authoritative, which is computed from `verdict_ok`. So the traps list is a
-report, and it can be made to contradict the run it describes. Measured, by
-re-running each and reading the value at the moved leaf:
+Nothing asserted the two agreed, and the harness treats the **exit code** as
+authoritative, which is computed from `verdict_ok`. So the traps list was a
+report, and it could be made to contradict the run it describes. Measured on the
+pre-fix tree, by re-running each and reading the value at the moved leaf:
 
 | site | mutation | trap `pass` | overall `verdict` |
 | --- | --- | --- | --- |
@@ -330,35 +385,86 @@ re-running each and reading the value at the moved leaf:
 | `claim_ledger.py:335` `"pass": m["off_scope_checks"] == 0,` | `cmp_flip`, `num_add`, `num_mul` | `true` → **`false`** | **PASS** |
 | `claim_ledger.py:457` `if x["id"] == "the_edited_instrument":` | `cmp_flip` | `true` → **`null`** | **PASS** |
 
-**12 of 13 report a trap as failed while the gate reports the run as passed, and
-the thirteenth deletes the self-pin trap's verdict.** The last row is the
+**12 of 13 reported a trap as failed while the gate reported the run as passed,
+and the thirteenth deleted the self-pin trap's verdict.** The last row is the
 sharpest: `the_edited_instrument` is the trap that exists to notice this file was
 edited — `"an edited copy of this file would simply report that it is fine"` —
-and one character of `==` to `!=` makes it report `pass: null` with nothing red.
+and one character of `==` to `!=` made it report `pass: null` with nothing red.
 
-The fix is not to harden the traps. It is to stop transcribing the condition
-twice: build the traps from `verdict_ok`, or assert on every run that a trap's
-`pass` agrees with the counter it reports, so the second copy cannot drift from
-the first. That assertion is itself a trap, and it is the one this measurement
-earns.
+**The fix, as prescribed and as built.** The paragraph below was written while
+the defect was open and is kept verbatim, because "build the traps from
+`verdict_ok`" is precisely what was done and the record should show the
+recommendation preceded the change rather than being written to fit it:
+
+> The fix is not to harden the traps. It is to stop transcribing the condition
+> twice: build the traps from `verdict_ok`, or assert on every run that a trap's
+> `pass` agrees with the counter it reports, so the second copy cannot drift from
+> the first. That assertion is itself a trap, and it is the one this measurement
+> earns.
+
+The first option was taken. `claim_ledger.py` now holds one `CONDITIONS` table;
+`verdict_ok` is *derived* from it rather than restating it, each trap's `pass` is
+read out of the same table, and the verdict is computed in `main()` **after** the
+seal pin is known, because `total > 0` is not evaluable before the file has been
+hashed. The first copy and the second copy are now the same object, so there is
+nothing to drift.
+
+Two things about the fix are worth recording because they are the shape of this
+project's own bugs rather than of this defect:
+
+- **A boolean written `== 0` fails silently and in the wrong direction.** The
+  first version of the new table expressed a condition as `value == 0` for the
+  falsy case, and `False == 0` is `True` in Python, so the condition evaluated
+  backwards on a boolean and no test noticed. The table now carries explicit
+  `truthy`/`falsy` predicates instead of a comparison against a literal.
+- **The 0 above is not the same measurement, and is not a cleaner one.** The
+  population fell 1,937 → 1,916 as a direct consequence of the fix, and the
+  census's identity digest is now the sha256 of an empty set, so it pins nothing.
+  What supports the claim that the defect is gone is that `defect-arm effective`
+  is pinned at 0 *with* `defect-arm n` and full coverage, and that ten negative
+  controls in `tests/negative_controls_claim_ledger.py` each mutate a condition
+  and assert the named trap catches it — the second option above, taken as a test
+  rather than as a trap. Without those the 0 would be a number, not a guarantee.
 
 ### The 145 reported, and what they are
 
+### The 141 reported, and what they are
+
 They are the class this document has named since its first run: *"the gate
 reports values it never promised to pin, and nothing requires it to notice when
-they change."* Grouped by what actually moved, from the leaf-level re-diff that
-licensed the split:
+they change."*
 
-- **67 of them are `claim-ledger`'s per-trap evidence** — `traps[].measured[]`
-  and `traps[].residual`. The instrument publishes what each trap measured; a
-  mutation inside that evidence changes the report and nothing else.
-- **8 of them moved a declared threshold constant** and the verdict recomputed
-  consistently around it: `TIGHTNESS_FLOOR = 0.999` (`tolerance-prover:58`),
-  `TIGHT_FLOOR = 1.98` (`precision-budget:48`), `BIAS_THRESHOLD = 1e-3`
-  (`estimator-bias:65`), and two at `pay-signal:195`/`:210`. This is the
-  tolerance working, and it is recorded so the reported count is not over-read.
-- **2 of them moved nothing but the `seal`.** The old discriminator called those
-  survivors; a leaf diff calls them nothing.
+The current run's 141 splits by skill as **60 `claim-ledger`, 23 `elohim`,
+21 `estimator-bias`, 18 `pay-signal`, 9 `invariant-hunter`, 4
+`reproducibility`, 3 `precision-budget`, 3 `tolerance-prover`** — measured, and
+summing to the pinned 141.
+
+**What is *not* re-measured on this tree, and is named rather than carried
+forward as if it were:** the finer banding below into *what* each mutant moved.
+That was a leaf-level re-diff, it was run against the pre-fix 145, and
+`claim-ledger`'s instrument has since been rewritten, so re-using those counts
+here would be quoting a decomposition of a population that no longer exists.
+They are kept as the record of the 145:
+
+- **67 of the pre-fix 145 were `claim-ledger`'s per-trap evidence** —
+  `traps[].measured[]` and `traps[].residual`. The instrument publishes what
+  each trap measured; a mutation inside that evidence changes the report and
+  nothing else. The current equivalent is the 60 above; the *mechanism* is
+  unchanged and the count is a re-measurement, but the band boundaries are not.
+- **8 of the pre-fix 145 moved a declared threshold constant** and the verdict
+  recomputed consistently around it: `TIGHTNESS_FLOOR = 0.999`
+  (`tolerance-prover:58`), `TIGHT_FLOOR = 1.98` (`precision-budget:48`),
+  `BIAS_THRESHOLD = 1e-3` (`estimator-bias:65`), and two at
+  `pay-signal:195`/`:210`. This is the tolerance working, and it is recorded so
+  the reported count is not over-read. Those line numbers are pre-fix.
+- **2 of the pre-fix 145 moved nothing but the `seal`.** The old discriminator
+  called those survivors; a leaf diff calls them nothing.
+
+**Open item:** re-run the leaf-level re-diff to band the current 141, or state
+that the banding is a property of the pre-fix tree and stop presenting it as
+this run's decomposition. It is not load-bearing for any pinned figure, and no
+gate reads it — which is precisely why it is written down as outstanding rather
+than quietly re-used.
 
 The rest are perimeters, scan metadata, and run counters. None of them is a gate
 defect, and all of them are still worth a reader's time, which is why the number
@@ -384,13 +490,15 @@ giving the figures this document was written against:
 | stale | 40 | 40 | 0 | 0 | 0 | 0.0 |
 | all | 1719 | 1083 | 572 | **63** | 1 | 0.036649 |
 
-**None of these three numbers is comparable to the current 13**, and the reason
-is not only the population. 66 and 63 were measured by the byte-equality
-discriminator, which this run replaced after measuring what it was worth; 13 is
-the decision-level count. 13/1848 is therefore not a 5× improvement in the gate
-over 63/1598 — it is the same tree, asked a sharper question. What the byte test
-would have said about *this* run is on the record above: 161, of which 148 are
-`REPORTED` here.
+**None of these three numbers is comparable to the 13, and none of them is
+comparable to the current 0.** The reason is not only the population. 66 and 63
+were measured by the byte-equality discriminator, which this run replaced after
+measuring what it was worth; 13 was the decision-level count. 13/1848 was
+therefore not a 5× improvement in the gate over 63/1598 — it was the same tree,
+asked a sharper question. What the byte test would have said about the *current*
+run is 147, and every one of the 147 is `REPORTED`: **the byte test would score
+this run as badly as it scored the last one, and would be wrong about the gate
+in both cases for the same reason.**
 
 ### Per operator (forged, every site, inert excluded)
 
@@ -435,7 +543,9 @@ because every trap publishes a `measured` evidence list.
 
 `cmp_flip` at `elohim:587`, `while n % p == 0:`, exited producing **0 bytes of
 parseable stdout**. The cause is undetermined and is recorded as undetermined.
-1 of 1,937 — the same row, at the same line, as in the 1,679-site run.
+1 of 1,916 — the same row, at the same line, as in the 1,679-site run. The line
+number is stable because `elohim`'s instrument was not touched by the
+`claim-ledger` fix, and the site was re-enumerated and re-hit on this run.
 
 ## What the 66 survivors actually are
 
@@ -518,26 +628,79 @@ correctly calls it nothing. Byte-equality is the weaker test and it overcounts.
 > instrument has saturated as a signal. Then it is a release gate, not a CI gate,
 > and it stops earning runner time.
 
-**The criterion does not fire.** The rate is 3.5 % at N=200 (that prefix is
-unchanged; the population grew *after* row 200) and **0.70 % across the whole
-population** at 1,937 sites, recomputed from the committed tool on 2026-10-04.
-The instrument has not saturated. It is still producing signal
-that this repository's own standing table got wrong — and this run produced a
-defect class the previous two did not have.
+**The criterion now fires, and that is a consequence of the fix rather than
+evidence that the instrument is barren.** The clause reads: 0 at N=200 and 0 at
+N=2000. This run's decision-level rate is **0/1824 = 0.0** across the whole
+population, and the N=200 prefix was also 0 effective (the 3.5 % quoted before is
+the *reported* rate at that prefix, not the decision-level one). So the clause is
+satisfied for the first time, on the arm the clause is about.
+
+**It fires because the one defect it found was fixed, and the clause cannot tell
+those two apart.** It is a criterion about saturation, and a defect-driven zero
+is not saturation. The evidence that the instrument is not empty is beside it:
+**141 reported survivors**, a `REPORTED` class that has moved every run and is
+not shrinking toward nothing, **538 equivalent mutants** over 1,824 non-inert
+sites, and a population of 1,916 enumerated in full. A gate whose decision-level
+count is 0 because it found and fixed its last real gap is a gate that has
+earned a narrower schedule, not one that should be switched off.
+
+**The decision: the clause is overridden, the nightly stays.** Taken 2026-10-04,
+by the repository's owner, on this measurement. Recorded here rather than left
+implicit, because a clause that is disobeyed without a written reason is a clause
+that has stopped being a criterion and become a decoration.
+
+- **The census keeps its nightly schedule.** It is not moved to a release gate.
+- **The reason is that the instrument demonstrated its worth on the previous
+  run.** It found a real defect in one skill — 13 survivors, all one cause, none
+  anywhere else — and that defect is now fixed. Retiring the instrument in the
+  same change that answers its last finding inverts what it was built for. A
+  gate that finds nothing because its last finding was handled is not a gate
+  that has run out of signal.
+- **The cost is named rather than waved at:** the full census is 602.8 s on
+  6 workers, so the nightly is roughly 3.7 runner-hours a year. That is the
+  price of this decision, and it is being paid knowingly rather than by not
+  looking.
+
+**The review trigger, so the override is not permanent by default.** Re-open
+this decision when *any* of these holds:
+
+1. `defect-arm effective` rises above 0 — the instrument is live again and the
+   clause stops applying in the other direction.
+2. **`REPORTED` reaches 0.** This is the one that matters. The decision rests on
+   the claim that the instrument still moves things the gate does not decide on.
+   If 141 goes to 0, that claim is false and the 0.0 is saturation after all.
+3. **20 consecutive green nightlies with 0 effective** — roughly 20 days. A
+   quarter-year of the nightly finding nothing is the cost becoming unjustifiable
+   on its own terms, independent of the clause.
+4. The population moves by more than 50 sites without the figures here being
+   re-measured, since the 0.0 was measured against 1,916 sites and a 0.0 is not
+   a property that transfers across populations.
+
+None of these is currently close. Recorded so that the next person does not have
+to reconstruct the reasoning from a git log, and so that "we decided to keep it"
+is not mistaken for "nobody ever looked".
 
 The fate of the mutator follows from the criterion rather than from taste, as the
 item requires:
 
-- It **qualifies for** CI, at the item's stated N=20 per skill on a schedule. That
-  is 160 sites, roughly 35 s at 11 workers — affordable. The full 1,937-site census
-  is a release-grade measurement at 890.6 s and does not belong on every run.
+- It **qualified for** CI, at the item's stated N=20 per skill on a schedule. That
+  is 160 sites, roughly 35 s at 11 workers — affordable. The full 1,916-site census
+  is a release-grade measurement at **602.8 s** on 6 workers. **The two earlier
+  wall figures in this document's history, 890.6 s and 1098.7 s, are the same
+  population under the old discriminator and on different hardware respectively;
+  they are not comparable to each other or to this one, and the workflow's
+  90-minute timeout is set well above all of them rather than against any of
+  them.**
   **The rate has since been stated, and it was not this document's to invent.**
   The kill clause above is written only as a retiring clause and names no gating
   rate, so on 2026-10-02 that clause alone granted nothing. A rate was then chosen
   with the clause's silence named as the reason: `0.05`, on the defect-arm rate,
   which is 1.33 times the recorded 0.039424. It is wired into
   `.github/workflows/mutation-census.yml`, nightly over the whole population, and
-  has run green.
+  has run green. **The clause fired on 2026-10-04 and was overridden on the same
+  day; the override, its reason, its price and its review triggers are recorded
+  under "The kill criterion" above.** It stays a nightly, and it is a nightly by
+  decision rather than by the clause never having been read.
 - The **decided-by is met.** It requires "the report is committed, and a
   regression in survival rate turns CI red." Both hold. The report is committed,
   and the gate returns 1 in either mode -- no threshold means any survivor fails, a
@@ -572,14 +735,21 @@ list is a to-do list for the ledger.
 
 - **Eight syntactic operators is not a mutation generator.** No operator changes
   control flow structurally, renames, deletes statements, or touches imports.
-  The 0.70 % is a floor on the gap
-- **538 equivalent mutants — 29.1 % of the non-inert population — changed no
+  A decision-level rate of 0.0 % is therefore a floor on the gap, and a floor of
+  zero says nothing on its own: it is consistent with "nothing left" and with
+  "these eight operators cannot express the defects that remain". The number that
+  discriminates between those is the `REPORTED` class, still 141.
+- **538 equivalent mutants — 29.5 % of the 1,824 non-inert sites — changed no
   reported value.** That is a coverage statement about the shards, and it is
   arguably the more important number in this document: nearly a third of the
   mutable surface of these instruments is unobserved by their own output. It
-  also fell, from 572 of 1,598 to 538 of 1,848, because two skills with
-  reporting-dense shards arrived.
-- **`claim-ledger` has 0 equivalent mutants in 143.** The population-wide
+  also fell, from 572 of 1,598 to 538 of 1,824, because two skills with
+  reporting-dense shards arrived. **The numerator did not move on this run** —
+  538 both times — so this is not a real improvement in shard observability.
+  The share went *up*, 29.1 % → 29.5 %, because the denominator got smaller. A
+  rate that improves while its population shrinks is not an improvement, and
+  recording only the numerator would have hidden that.
+- **`claim-ledger` has 0 equivalent mutants in 125.** The population-wide
   equivalent rate is an average over skills that do not behave alike, and one
   skill in eight contributes nothing to it.
 - **One site is `elohim-harness`, not a ledger-bearing instrument.** Its absence
@@ -591,7 +761,7 @@ list is a to-do list for the ledger.
   this was the load-bearing weakness of the whole report. The nightly job answered
   it on CPython 3.13.15 against this box's 3.13.13: same sixteen decimals, same 63
   survivors, same 572 equivalents. That is the 1,679-site run, and the current
-  1,937-site run has not been repeated on a second interpreter. Determinism is
+  1,916-site run has not been repeated on a second interpreter. Determinism is
   measured across a patch release rather than assumed from a rerun — and the
   current run's determinism claim is narrower than that, resting on the 8-of-8
   pristine control and nothing else.
@@ -601,12 +771,13 @@ list is a to-do list for the ledger.
   sides of it.
 
 **The number to quote is 0, and it is the first row of the decomposition table
-above: not one mutant in 1,937 turned a failing gate into a passing one.** The
-13 that moved a field the gate decides on are a description of where the
-ledger's promises stop. The 145 that moved a field it does not are a
-description of how much each instrument chooses to say — which is a different
-sentence, and is why this document now counts them separately instead of letting
-one number carry both.
+above: not one mutant in 1,916 turned a failing gate into a passing one.** The
+13 that used to move a field the gate decides on were a description of where the
+ledger's promises stopped, and they are 0 now because that description has been
+acted on — the promises no longer stop there. The 141 that move a field the gate
+does not decide on are a description of how much each instrument chooses to say —
+a different sentence, and why this document counts them separately instead of
+letting one number carry both.
 
 ## Reproducing this
 
@@ -628,12 +799,16 @@ whether the **full gate** notices — facts and traps both.
 > one recorded run of a committed tool rather than a figure two runs have
 > agreed on, and the defect-arm rate — whose method is fully specified above —
 > as the load-bearing result. That rate was 0.0393 when this table was first
-> written, then 0.0375, and is 0.0070 now. The first two moves are reconciled
-> in "Why the count moved from 66 to 63"; the third is not a change in the tree
-> at all but a change in the question — the same 1,937 sites, classified by
-> whether a leaf the gate decides on moved. **The three are not comparable
+> written, then 0.0375, then 0.0070, and is 0.0 now. **Four numbers, three
+> distinct reasons, and the fourth is the one a reader is most likely to
+> over-read.** The first two moves are reconciled in "Why the count moved from
+> 66 to 63". The third was not a change in the tree at all but a change in the
+> question — the same 1,937 sites, classified by whether a leaf the gate decides
+> on moved. The fourth is a change in the tree: 1,916 sites, and the one defect
+> the third measurement found has been fixed. **None of the four are comparable
 > numbers**, and the document says so at each one rather than letting a reader
-> infer a 5x improvement in the gate.
+> infer that the gate improved 5× and then improved to nothing. The 0.0 is a
+> fixed defect, not a vanishing gap.
 
 Cross-checked on the same shards, seed 20261002, 522 forged leaves decided:
 
@@ -641,8 +816,9 @@ Cross-checked on the same shards, seed 20261002, 522 forged leaves decided:
 |---|---|---|---|
 | traps only, seal forged | survived | 420 / 522 | **0.8046** |
 | full gate, seal forged (1,679-site run) | effective | 63 / 1598 sites | **0.039424** |
-| full gate, seal forged (current, 1,937 sites) | effective | 13 / 1848 sites | **0.007035** |
-| full gate, byte-equality (same run, old test) | effective | 161 / 1937 sites | 0.083118 |
+| full gate, seal forged (1,937-site run) | effective | 13 / 1848 sites | **0.007035** |
+| full gate, seal forged (current, 1,916 sites) | effective | 0 / 1824 sites | **0.0** |
+| full gate, byte-equality (1,937-site run, old test) | effective | 161 / 1937 sites | 0.083118 |
 
 Joined per leaf, by whether any ledger fact path reaches it:
 
@@ -655,22 +831,23 @@ Joined per leaf, by whether any ledger fact path reaches it:
 missed by every trap.** Those have nothing left to catch them: no fact reaches
 them, so fact verification cannot fire, and no trap watches them.
 
-The 0.8046 and the 0.0070 are not in conflict, and the gap between them is the
+The 0.8046 and the 0.0 are not in conflict, and the gap between them is the
 result: the trap-only harness has no fact check behind it, so it over-reports.
 The 47 % of fact-bound leaves that slip the traps are still caught downstream by
 verification against `expect`. Only an unbound leaf is invisible to both halves
-of the gate — and those are exactly the `REPORTED` class, 145 of 1848 in the
+of the gate — and those are exactly the `REPORTED` class, 141 of 1824 in the
 current run. That is the cleanest statement of the split this document now makes:
-the trap-only harness over-reports 0.8046 on leaves, the full gate under-reports
-0 because no fact and no trap watches an unbound leaf, and the 145 is the size of
-the space neither half covers.
+the trap-only harness over-reports 0.8046 on leaves, the full gate's
+decision-level count is 0 because the one thing that made it non-zero was fixed,
+and the 141 is the size of the space neither half covers. **The 0.0 and the 0.8046
+survive for opposite reasons, and neither is evidence the other way round.**
 
 The harness for this report is now **committed**: `elohim_gate/mutation.py`,
 `elohim_gate/sites.py` and `elohim_gate/census.py`. It uses only the standard
 library, never writes to the source repository — each mutation runs in a private
 `tempfile.TemporaryDirectory` copy — and takes `--seed`, `--sample`, `--jobs`,
 `--budget` and `--out`. `census.py` is the exhaustive entry point and reports real
-coverage (`1937/1937`); `mutate.py --sample N` is the sampled runner, and its own
+coverage (`1916/1916`); `mutate.py --sample N` is the sampled runner, and its own
 report now states that `sample` counts cells visited rather than sites mutated.
 `deltas.py` and `binding.py` were analysis scratch for writing this document and
 are not part of the measurement path, so they are not promoted.
@@ -720,10 +897,10 @@ and the honest way to state the tool's scope is narrower than that:
   the gap is not "the gate computed a wrong answer" — it is that **the gate
   reports values it never promised to pin, and nothing requires it to notice when
   they change.** 66 of 68 fields that moved under mutation sit in that space,
-  and 145 of the current run's survivors are the same shape — now named
+  and 141 of the current run's survivors are the same shape — now named
   `REPORTED` and published beside the gated count rather than inside it. The
-  checksum caught every one of the 1,937 sites when the seal was left stale
-  (60/60). The gap only opens when the seal is forged to agree — which is
+  checksum caught every site in the stale arm when the seal was left stale
+  (60/60, both runs). The gap only opens when the seal is forged to agree — which is
   precisely the threat model the project exists to reason about, and precisely
   the case the standing table got wrong.
 - **The one finding that is *not* in that class, and should not be filed with
