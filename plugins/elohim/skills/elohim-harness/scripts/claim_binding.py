@@ -440,9 +440,18 @@ EXEMPTIONS = Path(__file__).resolve().parent / "claim_binding_exemptions.json"
 
 DOC_FIGURES: list[tuple[str, str, str, str]] = [
     # The table. `| facts promoted | 103 across 8 ledger-bearing skills` holds
-    # two figures on one line, so the second is anchored past the first.
+    # two figures on one line, so the second is reached from the RIGHT.
+    #
+    # That second anchor used to be "| facts promoted | 103 across", which
+    # embedded the very figure it exists to locate. Harmless until the tree
+    # grows: the document would then read 104, the anchor would no longer be
+    # found, and the failure would be "anchor missing" rather than the clean
+    # mismatch a reader needs. `proof-before-claim` names the shape exactly --
+    # a checker holding its own copy of the expectation drifts one level
+    # further out, leaving two stale numbers instead of one. Anchoring from the
+    # right removes the copy, and `test_no_anchor_embeds_the_figure` holds it.
     ("docs/ROADMAP.md", "| facts promoted |", "after", "total_facts"),
-    ("docs/ROADMAP.md", "| facts promoted | 103 across", "after", "ledger_bearing_skills"),
+    ("docs/ROADMAP.md", "ledger-bearing skills |", "before", "ledger_bearing_skills"),
     ("docs/ROADMAP.md", "| traps re-derived independently |", "after", "total_traps"),
     ("docs/ROADMAP.md", "| instrument checksums pinned |", "after", "pins_passing"),
     # Prose restatements of the same figures. These are what a reader meets

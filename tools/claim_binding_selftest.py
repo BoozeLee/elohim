@@ -22,6 +22,7 @@ tests the failure modes rather than the happy path.
 from __future__ import annotations
 
 import json
+import re
 import shutil
 import subprocess
 import sys
@@ -377,6 +378,25 @@ def doc_figure_controls() -> int:
           f"{'agrees' if ok else 'DOES NOT BALANCE'}")
     if not ok:
         bad += 1
+
+    # An anchor that embeds the figure it exists to locate is a second copy of
+    # the expectation, one level further out. It reads fine right up to the
+    # commit that changes the number: the document moves to 104, the anchor
+    # stops matching, and the reported failure is "anchor missing" rather than
+    # the mismatch a reader needs. The first draft of DOC_FIGURES did exactly
+    # this with "| facts promoted | 103 across".
+    embedded = [
+        (anchor, key) for _, anchor, _, key in cb.DOC_FIGURES
+        if re.search(r"\d{2,}", anchor)
+    ]
+    if embedded:
+        for anchor, key in embedded:
+            print(f"  ANCHOR {anchor!r} embeds a multi-digit number, and it is "
+                  f"supposed to locate {key}")
+        bad += len(embedded)
+    else:
+        print(f"  ANCHOR {'no anchor embeds a figure':<28} {len(cb.DOC_FIGURES)} anchors, "
+              f"none carries its own number")
     return bad
 
 
