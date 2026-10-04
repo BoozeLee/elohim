@@ -48,7 +48,8 @@ The control that makes the JSON API trustworthy: `requests` and `pytest` must
 return real `info` from the same endpoint, or it is not answering and its
 `Not Found` means nothing.
 
-**The workflow now repeats this check itself, and refuses before it builds.**
+**The workflow now repeats this check itself, and refuses after it builds,
+before it uploads.**
 `tools/verify_release_slot.py` reads the version out of `pyproject.toml` and asks
 the same JSON API whether the index already holds it. If it does, the run stops
 with exit 1 and names the number to bump; if the index cannot be read at all it

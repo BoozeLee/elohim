@@ -118,9 +118,20 @@ jobs:
       #
       # What it proves, stated exactly rather than generously. `--dist dist/`
       # makes it install the wheel the build step above already produced and
-      # upload nothing itself, so what it checks is the artifact this run is
-      # about to send rather than a second build of the same checkout. What it
-      # does not check is the bytes as the index received them -- nothing in
+      # upload nothing itself, so what it checks is the wheel this run is about
+      # to send rather than a second build of the same checkout.
+      #
+      # "The artifact this run is about to send" was the sentence here, and it
+      # was wrong in the singular. The build above is `python3 -m build` with no
+      # `--wheel`, so it leaves a wheel *and* an sdist in `dist/`, and the upload
+      # step sends both. This step checks the wheel and nothing else in this
+      # workflow checks the sdist: it is published on the strength of having
+      # come out of the same build as the wheel, which is an argument, not a
+      # check. So a run here reports that a *wheel* was verified and says
+      # nothing about the sdist travelling beside it. Naming that is the whole
+      # point of writing the limit down instead of rounding the claim up.
+      #
+      # What it does not check is the bytes as the index received them -- nothing in
       # this workflow does -- and the step is named for what it does rather than
       # for what it hoped to check, because the version of this comment that
       # said "published" was false.
