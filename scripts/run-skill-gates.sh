@@ -24,9 +24,15 @@ gate_names=(
   "frontmatter audit"
   "skill-roots audit"
 )
+# The --expect-findings steps are the committed negative controls, invoked
+# exactly as matrix.yml invokes them. Both need the fixture named: without
+# --skill-root / --root they audit the real tree, find nothing, and --expect-
+# findings correctly reports that the fixture stopped reproducing its defect --
+# which is how this first version failed, by running a control against the
+# wrong subject.
 gate_cmds=(
   "scripts/check-gates-are-honest.sh --self-test"
-  "tools/verify_skill_frontmatter.py --expect-findings"
+  "tools/verify_skill_frontmatter.py --skill-root tests/fixtures/skill_frontmatter --expect-findings"
   "tools/verify_skill_roots.py --root tests/fixtures/skill_roots --expect-findings"
   "scripts/check-gates-are-honest.sh"
   "tools/verify_skill_frontmatter.py"
