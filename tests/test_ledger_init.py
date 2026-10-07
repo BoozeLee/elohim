@@ -274,7 +274,7 @@ def test_a_skill_with_no_discovery_script_gets_a_ledger_not_a_backlog(tmp_path, 
 
 # 8 --------------------------------------------------------------------------
 
-def test_it_refuses_to_pin_the_legacy_home_instrument(tmp_path, capsys):
+def test_it_refuses_to_pin_the_legacy_home_instrument(tmp_path, capsys, monkeypatch):
     """A skill with no instrument of its own must not pin someone else's.
 
     `Skill.instrument()` falls back to the pre-1.0 out-of-tree copy in the
@@ -283,9 +283,26 @@ def test_it_refuses_to_pin_the_legacy_home_instrument(tmp_path, capsys):
     and `verify_pin` warns about exactly this when it says a legacy path
     "proves nothing about this distribution".
 
+    The legacy copy is created here rather than assumed. This control used to
+    read `~/elohim/summoning_shard.py` off whatever machine ran the suite, so it
+    went green on a developer box still carrying a pre-1.0 install and red on
+    every clean runner -- the ambient-state false green this repository keeps
+    hunting, sitting in the suite that hunts it. It asserted on the
+    "(legacy resolution found ..., which this skill does not ship and must not
+    pin)" clause, and that clause is appended only when the fallback actually
+    resolved something (`harness_run.py:558`), so the control proved nothing on
+    any machine that did not happen to have the file. `LEGACY_INSTRUMENT` is
+    resolved at import, so rebinding `Path.home()` would be too late; the
+    constant is what gets pinned.
+
     Mutation: restore the bare `instrument is None` guard. The legacy fallback
     satisfies it, and the unrelated file is written into the ledger.
     """
+    legacy = tmp_path / "home" / "elohim" / "summoning_shard.py"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text("# pre-1.0 out-of-tree instrument\n")
+    monkeypatch.setattr(harness, "LEGACY_INSTRUMENT", legacy)
+
     skill_dir = tmp_path / "no-instrument"
     skill_dir.mkdir()
     (skill_dir / "SKILL.md").write_text(
