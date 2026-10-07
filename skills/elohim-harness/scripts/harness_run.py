@@ -27,6 +27,7 @@ passed down.
 Usage:
     harness_run.py --skill-dir PATH             verify everything
     harness_run.py --skill-dir PATH --json      machine-readable result
+    harness_run.py --skill-dir PATH --init      bootstrap a ledger, pinning nothing
     harness_run.py --skill-dir PATH --discover  measure unrecorded structures
     harness_run.py --skill-dir PATH --list-backlog
     harness_run.py --skill-dir PATH --promote ID:PATH[:TOL]
@@ -503,6 +504,146 @@ def print_human(skill: Skill, payload: dict) -> None:
         print(f"  PIN DRIFT: {pin['detail']}")
     print("=" * 74)
     print(f"verdict {payload['verdict']}, report at {skill.report}")
+
+
+def do_init(skill: Skill, budget: int) -> int:
+    """Write a ledger skeleton for a skill that has none, and pin nothing.
+
+    This exists because authoring a correct ``ledger.json`` by hand is currently
+    the whole of a new caller's experience. Everything else in Track E is
+    packaging around that manual step.
+
+    What it writes is a pin and an **empty** ``facts`` array, which is the part
+    that matters. A bootstrapped ledger that looked trusted on creation would
+    be this repository's own failure reproduced inside a convenience feature, so
+    nothing is promoted here: candidate values go to ``backlog.json`` exactly
+    as ``--discover`` puts them there, and a value stays bound to nothing until
+    a person reads what it means and promotes it. There is no ``unverified``
+    field on a fact and none is added, because a value is either in ``facts``
+    or it is in the backlog, and the ledger has no third state to represent.
+
+    The instrument's checksum *is* written, because it is computable right now
+    and a ledger carrying a true pin is immediately well-formed. That is a
+    different question from whether any claim in it has been checked, and
+    ``verify_pin`` already answers them apart: a ledger that pins no checksum
+    and does not declare ``instrument.bootstrap`` is ``MALFORMED`` rather than
+    passing.
+    """
+    if skill.ledger_path.is_file():
+        print(
+            f"refusing to initialise: {skill.ledger_path} already exists. A ledger "
+            "is written by a person or by --promote, and is never overwritten by "
+            "a bootstrap. Edit it, or delete it deliberately if the skill really "
+            "has no ledger.",
+            file=sys.stderr,
+        )
+        return EXIT_FAIL
+    try:
+        instrument, source = skill.instrument()
+    except SystemExit as exc:
+        print(f"refusing to initialise: {exc}", file=sys.stderr)
+        return EXIT_UNLOCATED
+    # `instrument()` falling back to the legacy out-of-tree copy is not a
+    # licence to pin it. A skill with no `instrument/` resolves to a file in the
+    # operator's home directory, and writing that checksum into this ledger would
+    # claim a pin over code that belongs to some other skill -- the exact thing
+    # `verify_pin` calls out when it warns that a legacy path "proves nothing
+    # about this distribution". The pin is only written for an instrument this
+    # skill actually ships, which is also the only thing `Skill` can resolve it
+    # back to on the next run.
+    if instrument is None or not instrument.is_relative_to(skill.instrument_dir):
+        print(
+            f"refusing to initialise {skill.root.name}: no instrument under "
+            f"{skill.instrument_dir}, so there is nothing to pin and nothing for "
+            "a ledger to be about."
+            + (
+                f" ({source} resolution found {instrument}, which this skill does "
+                "not ship and must not pin.)"
+                if instrument is not None
+                else ""
+            ),
+            file=sys.stderr,
+        )
+        return EXIT_UNLOCATED
+
+    # The pin's own `path` is read back through its filename by Skill, so a
+    # skill-relative path is preferred and the bare name is the fallback for an
+    # instrument resolved from outside the tree by ELOHIM_<SKILL>_SCRIPT.
+    try:
+        pin_path = instrument.relative_to(skill.root).as_posix()
+    except ValueError:
+        pin_path = instrument.name
+
+    ledger = {
+        "label": skill.label,
+        "note": (
+            "Bootstrapped by `elohim --init`. `facts` is empty on purpose: a "
+            "measurement becomes a fact only after someone has read what it "
+            "means and promoted it with --promote, and until then this skill "
+            "contributes no pinned value and claim_binding binds nothing from "
+            "it. The instrument is pinned because its checksum is computable "
+            "now; a true pin says which code runs, not that any claim in this "
+            "file has been checked."
+        ),
+        "facts": [],
+        "instrument": {
+            "path": pin_path,
+            "sha256": sha256_of(instrument),
+            "bytes": instrument.stat().st_size,
+        },
+    }
+    skill.ledger_path.write_text(json.dumps(ledger, indent=2) + "\n")
+    print(f"wrote {skill.ledger_path}")
+    print(
+        f"  instrument {pin_path} pinned from {source}: "
+        f"{ledger['instrument']['sha256'][:16]} "
+        f"({ledger['instrument']['bytes']} bytes)"
+    )
+    print("  facts: 0 — nothing is pinned, and nothing is claimed")
+
+    if not skill.discover_script.is_file():
+        # A missing discovery script is a partial success, not a failure: the
+        # ledger is what unblocks the gate, and the candidates are only a
+        # convenience. Guessing at values from the shard instead would be this
+        # repository inventing the measurements it exists to check.
+        print(
+            f"\nno discovery script at {skill.discover_script}, so there are no "
+            "candidates to review. The ledger is written and the gate can run; "
+            "add scripts/discover.py and re-run --discover to have something to "
+            "promote."
+        )
+        return EXIT_OK
+
+    print()
+    code = do_discover(skill, budget)
+    if code != EXIT_OK:
+        # Deliberately not rolled back. The ledger above is valid and the skill
+        # is locatable because of it; a gate that cannot find its ledger is a
+        # worse outcome than one whose discovery step failed.
+        print(
+            f"the ledger at {skill.ledger_path} was written and is valid; "
+            f"priming the backlog failed with rc={code}",
+            file=sys.stderr,
+        )
+        return code
+
+    backlog = load(skill.backlog_path).get("measurements", [])
+    if not backlog:
+        print("\nno candidates. --discover measured nothing new to review.")
+        return EXIT_OK
+    print("\nnothing below is a fact yet. To pin one, read what it claims, then:")
+    for item in backlog:
+        tol = item.get("tolerance")
+        suffix = "" if tol is None else f":{tol}"
+        print(
+            f"  elohim --skill-dir {skill.root} --promote "
+            f"{item['id']}:{item['path']}{suffix}"
+        )
+    print(
+        "\nuntil one is promoted, this skill pins no value and claim_binding "
+        "refuses any document asserting figures from it."
+    )
+    return EXIT_OK
 
 
 def do_discover(skill: Skill, budget: int) -> int:
@@ -1007,6 +1148,11 @@ def main() -> int:
     )
     parser.add_argument("--skill-dir")
     parser.add_argument("--json", action="store_true")
+    parser.add_argument(
+        "--init", action="store_true",
+        help="write a ledger skeleton for a skill that has none: the instrument "
+             "pin and an empty facts array, promoting nothing",
+    )
     parser.add_argument("--discover", action="store_true")
     parser.add_argument("--promote", metavar="ID:PATH[:TOL]")
     parser.add_argument("--list-backlog", action="store_true")
@@ -1052,6 +1198,24 @@ def main() -> int:
         return code
 
     skill = Skill(Path(args.skill_dir).expanduser().resolve())
+    if args.init:
+        # Checked here rather than with the verbs below, because --init is the
+        # one of the four that is supposed to be run on a skill with no ledger.
+        clash = [
+            name for name, on in (("--discover", args.discover),
+                                  ("--promote", args.promote),
+                                  ("--list-backlog", args.list_backlog))
+            if on
+        ]
+        if clash:
+            print(
+                f"ERROR --init is exclusive of {', '.join(clash)}: it writes a "
+                "ledger and reviews candidates, while those read or extend one "
+                "that already exists",
+                file=sys.stderr,
+            )
+            return EXIT_UNLOCATED
+        return do_init(skill, args.max_seconds)
     if args.list_backlog or args.discover or args.promote:
         if not skill.ledger_path.is_file():
             print(f"ERROR no ledger at {skill.ledger_path}", file=sys.stderr)

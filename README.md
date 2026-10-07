@@ -8,6 +8,9 @@ anything moved — including the instrument itself. One of them, `reproducibilit
 the other seven to that: it runs each of them, reads back the seal each recorded, and
 turns the gate red when a shard arrives from an interpreter class nobody pinned.
 
+For the argument, the evidence, and the limits stated at length, see
+[docs/CASE-STUDY.md](docs/CASE-STUDY.md).
+
 It exists because of six specific failures. Each of the six produced a result
 that was internally consistent, readable, and wrong, and none of them announced
 itself. Writing the arithmetic down independently is what caught each one, and
