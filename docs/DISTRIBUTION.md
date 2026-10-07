@@ -10,8 +10,8 @@ The first job of this plan is to make that claim true or to delete it.
 
 | fact | value | how it was measured | how it can be wrong |
 |---|---|---|---|
-| gated skills shipped | 5 | `docs/ROADMAP.md` table; `tests/test_all.py` | none; the tamper test fails if a count drifts |
-| skills on disk | 7 dirs, all with a `SKILL.md` | `ls skills/` | none |
+| gated skills shipped | 8 | `docs/ROADMAP.md` table; `tests/test_all.py` | none; the tamper test fails if a count drifts |
+| skills on disk | 9 dirs, all with a `SKILL.md` | `ls -1 -d skills/*/ \| wc -l` | none |
 | `skills/reproducibility` committed | yes, 8 files | `git ls-files` | none |
 | entries in `skills.sh.json` | 6 | read the file | **`reproducibility` is absent from it** |
 | `reproducibility` mentions | `skills.sh.json` 0, `CHANGELOG.md` 0, `README.md` 1, `ROADMAP.md` 5 | grep per file | none |
@@ -27,7 +27,7 @@ The first job of this plan is to make that claim true or to delete it.
 | wheel runtime dependencies | **0** | `pyproject.toml` declares none | none; `check_hygiene.py` enforces stdlib-only imports in the instruments regardless |
 | wheel carries the ledgers | 62 `_skills/` entries, 12 `ledger.json` | `unzip -l` the built wheel, 2026-10-02 | a packaging rule could drop them; the count is the check |
 | installed gate agrees with the repo gate | `ALL_SKILLS_PASS`, 81/81 facts, 38/38 traps, 0 unbound, exit 0 | `.venv/bin/elohim --all` run from `/tmp`, outside the repo, 2026-10-02 | none; this is the claim that would break first if the wheel shipped different code |
-| on PyPI | **no** | never published | `pip install elohim` resolves nothing today; treat it as unproven, not as working |
+| on PyPI | **yes** — 0.3.0 and 0.4.0 | `pip install elohim==0.4.0` into a clean venv from `/tmp`, 2026-10-04 | a yanked or removed release would stop resolving; the check that matters is the clean-venv install reaching `verdict PASS`, not the version listing |
 
 Rows dated 2026-09-30 are measured as the header says. The five wheel rows were
 measured on **2026-10-02**, later than this file's header date, and each names
@@ -52,11 +52,18 @@ elohim --all   (run from /tmp, not the repo) -> ALL_SKILLS_PASS, exit 0
                                                  hygiene 0, claims 0 unbound
 ```
 
-What was **not** verified, and must not be written down as if it were:
+What was **not** verified **on 2026-10-02**, and must not be written down as if it
+were then — the date is the qualifier, and a reader who skips it will find two
+claims below that no longer hold:
 
-- **Nothing is published to PyPI.** `pip install elohim` fails today. The
+- ~~**Nothing is published to PyPI.** `pip install elohim` fails today. The
   verified paths are `pip install .` from a clone and `pip install` of a
-  locally built wheel. An index name is not a distribution channel.
+  locally built wheel. An index name is not a distribution channel.~~ **True on
+  2026-10-02 and false since.** `elohim 0.3.0` was published that evening and
+  `0.4.0` on 2026-10-04, and both were installed back from the index into a clean
+  environment to `verdict PASS` from outside this checkout. The sentences about
+  *not being discoverable* below are still open; the sentence about the index
+  holding nothing is not. The 0.4.0 figures are under `E3` in `docs/ROADMAP.md`.
 - **No install has been performed by anyone but this machine.** There is no
   download count, no first-install report, and no independent confirmation that
   a stranger's `pip install .` works. One machine's clean venv is the whole of
