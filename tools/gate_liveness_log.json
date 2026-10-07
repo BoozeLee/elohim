@@ -2196,6 +2196,14 @@
       "via": "ci.yml:core:the unit suite is green",
       "workflow": "Publish to PyPI"
     },
+    "tests/test_verify_repo_state.py::test_a_pyproject_with_no_parseable_version_is_unverified": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
     "tests/test_verify_repo_state.py::test_a_required_claim_is_not_turned_off_by_being_required_twice": {
       "at": "2026-10-04T21:00:00Z",
       "note": "completed/success; slot check, artifact gate and upload all success",
@@ -2212,6 +2220,14 @@
       "via": "ci.yml:core:the unit suite is green",
       "workflow": "Publish to PyPI"
     },
+    "tests/test_verify_repo_state.py::test_an_index_serving_another_version_is_reported_with_both": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
     "tests/test_verify_repo_state.py::test_an_unknown_claim_in_require_is_refused_rather_than_ignored": {
       "at": "2026-10-04T21:00:00Z",
       "note": "completed/success; slot check, artifact gate and upload all success",
@@ -2219,6 +2235,30 @@
       "status": "success",
       "via": "ci.yml:core:the unit suite is green",
       "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_an_unreachable_index_is_unverified_and_never_a_pass": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_an_unrecognised_argument_is_refused_rather_than_ignored": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_both_required_claims_are_required_by_one_invocation": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
     },
     "tests/test_verify_repo_state.py::test_divergence_is_quiet_when_the_two_tips_agree": {
       "at": "2026-10-04T21:00:00Z",
@@ -2244,6 +2284,14 @@
       "via": "ci.yml:core:the unit suite is green",
       "workflow": "Publish to PyPI"
     },
+    "tests/test_verify_repo_state.py::test_the_failure_summary_counts_findings_and_unverified_separately": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
     "tests/test_verify_repo_state.py::test_the_hardening_files_are_present_right_now": {
       "at": "2026-10-04T21:00:00Z",
       "note": "completed/success; slot check, artifact gate and upload all success",
@@ -2251,6 +2299,14 @@
       "status": "success",
       "via": "ci.yml:core:the unit suite is green",
       "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_the_index_is_quiet_when_it_serves_the_declared_version": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
     },
     "tests/test_verify_repo_state.py::test_the_tool_exits_non_zero_when_a_check_reports": {
       "at": "2026-10-04T21:00:00Z",
