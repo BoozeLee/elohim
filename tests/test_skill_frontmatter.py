@@ -199,3 +199,52 @@ def test_a_missing_root_is_bad_input_not_a_pass(tmp_path):
     assert frontmatter.run([str(tmp_path / "absent")], expect_findings=False) == (
         frontmatter.EXIT_BAD_INPUT
     )
+
+
+def test_an_empty_skills_dir_is_bad_input_not_a_pass(tmp_path):
+    """Zero skills is zero subjects, and reporting 0 about them is a false green.
+
+    This is the same failure as the missing root above, reached the other way
+    round: there the root was absent, here it is present and holds nothing.
+    Measured before the floor was added, this returned EXIT_OK, so a rename or a
+    moved submodule that emptied the directory would have left this gate
+    permanently green -- and a gate that cannot enumerate its subjects must not
+    report 0.
+    """
+    (tmp_path / "skills").mkdir()
+    assert frontmatter.run([str(tmp_path)], expect_findings=False) == (
+        frontmatter.EXIT_BAD_INPUT
+    )
+
+
+def test_a_root_with_no_skills_subdirectory_is_bad_input_not_a_pass(tmp_path):
+    """A tree that simply has no skills/ in it is the same empty case."""
+    (tmp_path / "src").mkdir()
+    assert frontmatter.run([str(tmp_path)], expect_findings=False) == (
+        frontmatter.EXIT_BAD_INPUT
+    )
+
+
+def test_the_floor_does_not_override_expect_findings_into_a_silent_pass(tmp_path):
+    """--expect-findings on an empty tree is an inconclusive, not a finding.
+
+    Its own message for 'the fixture stopped reproducing the defect' already
+    calls this a failure rather than a defect in the tree, so the floor has to
+    agree with it rather than letting a zero-subject run be reported as a
+    caught defect.
+    """
+    (tmp_path / "skills").mkdir()
+    assert frontmatter.run([str(tmp_path)], expect_findings=True) == (
+        frontmatter.EXIT_BAD_INPUT
+    )
+
+
+def test_the_real_tree_is_not_empty_and_so_still_reports_ok():
+    """The floor must not fire on this repository: it has nine skills.
+
+    Without this, a floor with an off-by-one or a wrong root name would make
+    every one of the controls above pass and this gate useless.
+    """
+    assert frontmatter.run([str(REPO_ROOT)], expect_findings=False) == (
+        frontmatter.EXIT_OK
+    )

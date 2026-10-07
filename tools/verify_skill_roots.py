@@ -63,6 +63,22 @@ EXIT_OK, EXIT_FINDING, EXIT_BAD_INPUT = 0, 1, 2
 # the roots it checks does not notice one added later. That failure has shipped in
 # this repository once already -- the census enumerated a population it did not
 # cover and reported the smaller number as the rate.
+# The roots a loader can independently reach, and only those. `skills/` is the
+# canonical source and `plugins/elohim/skills/` is a derived, byte-identical
+# distribution copy -- AGENTS.md, CONSTRAINTS.md, CONTRIBUTING.md and README.md
+# all say so, and `tools/sync_adapters.py --check` is the gate that keeps them
+# equal. Naming the mirror here as a second root made this gate report all nine
+# skill names as duplicated, which is a true statement about two directories
+# and a false statement about what a loader sees: the second copy is not an
+# independent place a name is reachable from, it is the same skill shipped
+# twice through one source, and the sync gate already owns that.
+#
+# Which leaves the real problem, which the zero-subject floor below now says out
+# loud: none of these three roots exists in this repository, so this gate has no
+# subject here. It is not registered in .gate-manifest for that reason. A gate
+# that cannot see anything is not a gate, and the honest fix is to stop calling
+# it one rather than to widen its subject until it has something to complain
+# about.
 PROJECT_ROOTS = (
     ".opencode/skills",
     ".claude/skills",
@@ -184,8 +200,32 @@ def run(repo_roots, *, expect_findings: bool, include_global: bool = False) -> i
         return EXIT_BAD_INPUT
 
     duplicates = []
+    inspected_roots = []
     for base in paths:
-        duplicates.extend(duplicate_names(reachable_roots(base, include_global=include_global)))
+        found = reachable_roots(base, include_global=include_global)
+        inspected_roots.extend(found)
+        duplicates.extend(duplicate_names(found))
+    reachable = sum(1 for _, root in inspected_roots for _ in root.rglob("SKILL.md"))
+
+    # The floor, checked before --expect-findings for the same reason as in
+    # verify_skill_frontmatter.py. The question this gate asks is whether one
+    # skill name can be reached from two roots; where no root holds a skill there
+    # is no name, so the question has no subject and the answer is not "no
+    # duplicates". This was unreachable while PROJECT_ROOTS named only
+    # directories this repository does not have, which is precisely why the
+    # no-op went unnoticed: the gate could not distinguish "clean" from "blind".
+    if reachable == 0:
+        absent = ", ".join(r for r in PROJECT_ROOTS if not (paths[0] / r).is_dir())
+        print(
+            f"verify_skill_roots: none of the {len(PROJECT_ROOTS)} project roots "
+            f"exists here"
+            + (f" ({absent})" if absent else "")
+            + ", so no skill name could be reachable from two roots. That is an "
+            "unverified tree, not a clean one, and the difference is what exit 2 "
+            "is for.",
+            file=sys.stderr,
+        )
+        return EXIT_BAD_INPUT
 
     if expect_findings:
         if not duplicates:
@@ -223,7 +263,7 @@ def run(repo_roots, *, expect_findings: bool, include_global: bool = False) -> i
         )
         return EXIT_FINDING
 
-    inspected = sum(1 for label, _ in reachable_roots(paths[0], include_global=include_global))
+    inspected = len(inspected_roots)
     scope = "project-local roots" + (f" and {inspected} global" if include_global else "")
     print(f"verify_skill_roots: OK  no duplicated name across {inspected} {scope}")
     if not include_global:
