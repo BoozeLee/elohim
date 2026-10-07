@@ -178,8 +178,30 @@ def run(repo_roots, *, expect_findings: bool, extra_roots=()) -> int:
         return EXIT_BAD_INPUT
 
     findings = []
+    roots = []
     for base in bases:
-        findings.extend(check_roots(skill_roots(base, extra=extra_roots)))
+        found = skill_roots(base, extra=extra_roots)
+        roots.extend(found)
+        findings.extend(check_roots(found))
+    counted = sum(1 for _, root in roots for _ in root.rglob("SKILL.md"))
+
+    # The floor, and it is checked before anything else including
+    # --expect-findings. The subject of this gate is the skills in this tree; a
+    # tree with no skills in it is a tree this gate could not look at, and
+    # reporting 0 for it asserts something about a subject that does not exist.
+    # Measured before this was added: an empty skills/ and an absent skills/ both
+    # returned 0, so a rename that emptied the directory turned this gate into a
+    # permanent green. --expect-findings wants the same answer, and the message
+    # it already carries for "the fixture stopped reproducing the defect" is an
+    # inconclusive rather than a finding.
+    if counted == 0:
+        print(
+            f"verify_skill_frontmatter: no SKILL.md under "
+            f"{', '.join(label for label, _ in roots) or 'any root'}, so there was "
+            f"nothing to check. This is not a clean tree; it is an empty one.",
+            file=sys.stderr,
+        )
+        return EXIT_BAD_INPUT
 
     if expect_findings:
         if not findings:
@@ -201,8 +223,6 @@ def run(repo_roots, *, expect_findings: bool, extra_roots=()) -> int:
         print(f"verify_skill_frontmatter: FAIL  {len(findings)} finding(s).", file=sys.stderr)
         return EXIT_FINDING
 
-    roots = skill_roots(bases[0], extra=extra_roots)
-    counted = sum(1 for _, root in roots for _ in root.rglob("SKILL.md"))
     print(f"verify_skill_frontmatter: OK  {counted} skill(s) well-formed across "
           f"{len(roots)} root(s): {', '.join(label for label, _ in roots)}")
     return EXIT_OK
