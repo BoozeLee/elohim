@@ -672,6 +672,15 @@ the API cannot do it. Then `FUNDING.yml` becomes live and the claim in
 **Decided by:** `users/BoozeLee/sponsors/sponsors_listing` returns 200.
 **Owner:** user. **This is the only item in the roadmap blocked on a human.**
 
+**Status: not met, re-measured 2026-10-04.** `https://api.github.com/users/
+BoozeLee/sponsors/sponsors_listing` still returns **HTTP 404**, so the criterion
+above is false as of that date and the Sponsor button remains a dead link while
+`docs/MONETIZATION.md:5` claims "GitHub Sponsors from launch". The **Why** above
+already called this the one blocking inconsistency; re-running the check
+confirms it has not been fixed rather than merely going stale, which is the
+distinction a reader needs. Nothing here can be done from this repository: the
+listing is created in a browser and needs the owner's 2FA.
+
 ### D3. Release the tree that is public
 **Why:** `CHANGELOG.md` links `[0.1.0]` to a releases/tag URL that 404s.
 **Status: shipped.** The release is published at
@@ -845,9 +854,18 @@ wrong order intuitively.
 > asked for, which is the one substitution `skills_root` was written to refuse.
 
 ### E1. The measurement core, callable rather than runnable
-**Status: both slices shipped 2026-10-02 (`1c7c6c6`, `90f02a8`, and the
-relocation that moved all three into the package); every entry point is done and
-installed, and nothing outside this repository calls them yet.**
+**Status: all three clauses hold. The first two shipped 2026-10-02 (`1c7c6c6`,
+`90f02a8`, and the relocation that moved all three into the package), every entry
+point done and installed. The third — a caller outside this repository — is
+closed 2026-10-04 by decision rather than by measurement: `elohim 0.4.0`,
+installed from the index into a clean environment, runs `elohim --all` to
+`verdict PASS` from outside the checkout. **That the run counts is a reading,
+not a measurement.** It was made by this project's author, minutes after the
+release, and the owner has ruled that "outside this repository" means
+installed-from-the-index and executed-outside-the-checkout rather than
+written-by-someone-else. The paragraph under **Decided by** records the standard
+that argued the other way, because a reader who inherits only the ruling loses
+the caveat that produced it.**
 
 **Why:** `census.py`'s `main()` parsed arguments, measured, and printed, so a
 caller who wanted a measurement had only a report file and a transcript to
@@ -888,9 +906,13 @@ count.
 
 **Decided by:** `run_census` and `gate_verdict` are called, not parsed for, by
 something that did not write them; `mutation.py` has the same three shapes; the
-wheel exposes both. **The second and third hold; the first still does not**, and
-`E4` did not close it. There are now two callers rather than one — `tests/` and
-this repository's own `action.yml` — and the standard this file already set for
+wheel exposes both. **The second and third held from the start. The first did
+not, and stayed that way until 2026-10-04.** What follows is the record of why,
+kept because it was the position when this paragraph was written and because the
+ruling that replaced it is a reading rather than a measurement.
+
+There are two callers rather than one — `tests/` and this repository's own
+`action.yml` — and the standard this file already set for
 `E2` says a caller written by the same author in the same repository is
 "self-authored whatever the entry point is called". By that standard the Action
 is not the external caller either, so the clause stays open. What `E4` did change
@@ -900,6 +922,16 @@ call the API. The measurement that a census now runs from a workspace holding no
 checkout of this repository is the precondition for the clause, and it is
 recorded under `E4`. Only `E3`, or a real external caller actually running it,
 closes the clause.
+
+**And `E3` ran, on 2026-10-04.** `elohim 0.4.0`, installed from PyPI into a
+fresh virtual environment and executed from `/tmp`, reports `verdict PASS` with
+every skill, fact and trap accounted for; the figures are under `E3`. The owner
+has ruled that a caller which installed from the index and ran outside the
+checkout satisfies "something that did not write them", and recorded that
+reading as a decision rather than letting it be inferred. The standard quoted
+above is not withdrawn — a caller written by the same author in the same
+repository is still self-authored — it is read as being about *where the code
+came from and where it ran*, not *who typed the command*.
 
 The third clause was false until `0647cee`, and this paragraph was wrong about
 which one had failed. `pyproject.toml` claimed the installed copy ran anywhere
@@ -992,6 +1024,14 @@ Recorded here rather than at `E2`'s start, because a reader who takes `E2` for
 the external adjudication has no reason to come back and check.
 
 ### E3. PyPI
+**Status: shipped. The deciding condition was first run for `0.3.0` on
+2026-10-03, and re-run for `0.4.0` on 2026-10-04** — installed from the index
+into a fresh virtual environment, `elohim --all` executed from outside the
+checkout, `verdict PASS` at exit 0. Both runs are recorded below. The second is
+a re-confirmation on the current release, not the first time the condition held,
+and this entry says so because a status line that claims novelty it does not
+have is the same defect as one that claims less than it does.
+
 **Why:** mechanical, and the wheel is already verified byte-identical. Last of
 the four because publishing an API that E1 has not finished stabilising is a
 version promise made twice.
@@ -1019,12 +1059,31 @@ at token exchange, twice, because the trusted publisher held
 uploaded by either. The full measurement, and the eleven conditions it rests on,
 are under **The definition of done for 0.3.0** at the end of this document.
 
+**Re-run for 0.4.0, 2026-10-04.** A fresh virtual environment, `pip install
+elohim==0.4.0` from the index, `elohim --all` run from `/tmp`: `verdict PASS`,
+exit 0, 8/8 skills, 103/103 facts verified, 53/53 traps holding, 0 hygiene
+findings, 0 unbound claims, 12.376s. The first two versions of this measurement
+are not being counted as two items: it is the same criterion, run twice, and the
+2026-10-04 run is what `E1`'s third clause rests on. That it was run by this
+project's author, minutes after publishing, is the reason the reading behind
+that closure is recorded as a decision under `E1` rather than treated as a
+measurement.
+
 ### E4. A GitHub Action
 **Why:** the same product on a different surface. Read-only with respect to the
 committed tree — mutations happen in a temporary copy.
 
 **Decided by:** the Action runs the census on a repository with no checkout of
 this one, and a red run names the survivors the way `MUTATION_SURVIVAL.md` does.
+
+**Status: the seam is built and the criterion has never been observed, 2026-10-04.**
+`tools/gate_liveness.py`, run against this tree, classifies the workflow step
+`action.yml:runs-the-action:…` as `NEVER_PASSED` — the step is enumerated and
+wired, and no record of it passing exists in `tools/gate_liveness_log.json`. That
+is the gate reporting rather than this entry asserting: the two earlier claims
+under **Built second** record what the seam made possible, and neither is a
+dispatched run of the Action. `action.yml` is `workflow_dispatch`-only, so the
+criterion is met by dispatching it, not by a push.
 
 **Built second, ahead of `E2`,** for the reason recorded at the top of this
 track. The work splits into the seam and the surface, and the seam is the part
@@ -1627,14 +1686,23 @@ unsigned commits stay unsigned — signing them would mean rewriting published
 history. `v0.2.0`'s tag **is** signed, and GitHub reports that tag object
 `verified: true, reason: valid`.
 
-**The account is an explicit bypass actor on the only branch ruleset.** Ruleset
+~~**The account is an explicit bypass actor on the only branch ruleset.** Ruleset
 `24365691`, "protect-all-branches", target `branch`, enforcement `active`, applies
 to `~ALL`, with rules `deletion`, `non_fast_forward` and `pull_request`. It has
 exactly one `bypass_actor`: actor id `96494827`, type `User`, **`bypass_mode:
 "always"`** — the account owner. That is why two direct pushes to `main` succeeded
 while the remote reported `Changes must be made through a pull request.` No audit
 log is reachable from this account (`repos/…/audits` and `orgs/…/audit-log` both
-404), so those bypass events cannot be independently audited.
+404), so those bypass events cannot be independently audited.~~ **True when
+written on 2026-10-04, and superseded the same day.** The bypass actor has been
+removed: the live ruleset reports `bypass_actors: []` against the same id, target,
+enforcement and `~ALL` scope, with the same three rules. The open decision
+immediately below was therefore made and acted on, and this record was not
+updated when it was. The consequence is concrete rather than theoretical: a push
+to any **existing** branch is now refused with `GH013`, including a feature
+branch that already has an open pull request against it. Creating the branch and
+opening the pull request still work, so a change gets exactly one push — which
+means all of its verification has to happen before that push, not after it.
 
 **This is left as an open decision on purpose.** Removing the bypass actor would
 make the pull-request rule mandatory, and with one person on the account that

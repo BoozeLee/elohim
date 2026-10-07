@@ -56,19 +56,36 @@ jobs:
         run: python3 skills/elohim-harness/scripts/claim_binding.py --root .
 
       # The repository's own state, and the only gate here that asks the
-      # network a question. `--require-visibility` is the point of running it
+      # network a question. `--require visibility` is the point of running it
       # here and not in the unit suite: on a runner GITHUB_TOKEN exists, so
       # "I could not check whether the repository is public" is a failure
       # rather than a shrug. Locally the same command without the flag reports
       # it as UNVERIFIED and still refuses to call that a pass.
       #
-      # `--require visibility`, and only that one. On a `pull_request` checkout
-      # there is no `refs/remotes/origin/main` to compare `main` against, so
-      # demanding the divergence claim here would fail every pull request over
-      # a fact that cannot exist in that context -- the same defect as a check
-      # that can never fail. The divergence check earns its keep locally, where
-      # a real clone can actually diverge, which is the state
-      # `docs/DISTRIBUTION.md` described.
+      # Two claims are required and one is deliberately not. `index` is
+      # required for the opposite reason to `visibility`: the index's JSON
+      # endpoint answers unauthenticated, so it needs no credential and has no
+      # `GITHUB_TOKEN`-shaped failure mode -- which is also why it is the right
+      # one to require of a check that must not grow a secret. It asserts a
+      # disagreement rather than a presence: that the version `pyproject.toml`
+      # declares is the version PyPI serves, naming both when they differ.
+      #
+      # `divergence` stays out, and that is a fact about the checkout rather
+      # than about caution. On a `pull_request` checkout there is no
+      # `refs/remotes/origin/main` to compare `main` against, so demanding it
+      # here would fail every pull request over a fact that cannot exist in
+      # that context -- the same defect as a check that can never fail. The
+      # divergence check earns its keep locally, where a real clone can
+      # actually diverge, which is the state `docs/DISTRIBUTION.md` described.
+      #
+      # The consequence of requiring `index`, stated here so nobody discovers
+      # it as a surprise red: `publish.yml` does not choose the version, it
+      # publishes the one `pyproject.toml` already names. So the window between
+      # merging a version bump and dispatching the publish is a window where
+      # `main` is honestly red -- the declared version is genuinely not on the
+      # index yet. That red is the gate working. Widening it to "the index has
+      # a release" instead of "the declared version is released" would go green
+      # through the whole window and stop noticing the version it claims.
       #
       # This step exists because `docs/DISTRIBUTION.md` once carried a blocking
       # claim that main and origin/main had diverged, and nothing re-measured
@@ -76,7 +93,7 @@ jobs:
       # had existed would have said so on the first push after it stopped
       # being true.
       - name: the repository's own state is re-measured
-        run: python3 tools/verify_repo_state.py --require visibility
+        run: python3 tools/verify_repo_state.py --require visibility index
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

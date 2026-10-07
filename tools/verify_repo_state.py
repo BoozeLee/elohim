@@ -36,6 +36,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import urllib.error
@@ -54,6 +55,18 @@ HARDENING_FILES = (
 )
 
 API = "https://api.github.com/repos/{owner}/{repo}"
+
+#: The index's JSON endpoint. Unauthenticated, unlike `API`, and the only one of
+#: the two availability probes that can be trusted: the project page answers
+#: HTTP 200 for names that do not exist, because it serves an anti-scraping
+#: challenge page with a 200 status.
+PYPI_API = "https://pypi.org/pypi/{name}/json"
+
+#: `pyproject.toml`'s own version, by regex rather than `tomllib` because the
+#: floor is 3.10 and `tomllib` is a 3.11 addition -- the same reason, and the
+#: same expression, as `tools/verify_wheel.py`. Anchored to the start of a line
+#: so a `version` key under some other table cannot be read as the project's own.
+DECLARED_VERSION = re.compile(r'^version = "([^"]+)"', re.MULTILINE)
 
 
 class Unverified(RuntimeError):
@@ -142,11 +155,63 @@ def check_visibility(repo: str = "BoozeLee/elohim") -> list[str]:
     return []
 
 
+def _declared_version() -> str:
+    """The version `pyproject.toml` declares, or `Unverified`.
+
+    A version the tree cannot read is a version it cannot claim about, so a
+    missing or unparseable key refuses here rather than agreeing with nothing
+    downstream.
+    """
+    text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
+    match = DECLARED_VERSION.search(text)
+    if match is None:
+        raise Unverified(
+            "pyproject.toml declares no version this tool can read, so the "
+            "index claim is not verified rather than agreed with"
+        )
+    return match.group(1)
+
+
+def check_index(name: str = "elohim") -> list[str]:
+    """Does the index serve the version this tree declares?  Needs no token.
+
+    `check_visibility` has no public source and says so; this one does.
+    `PYPI_API` answers unauthenticated, and `docs/ROADMAP.md` already names it
+    as the only trustworthy availability probe, for the reason in the constant.
+
+    The claim is a disagreement, not a presence. "The package is on PyPI" stops
+    being interesting the moment any release exists; "the index serves the
+    version this tree declares" stays checkable forever, and it is the one that
+    goes stale when a release ships and the tree moves on. `docs/DISTRIBUTION.md`
+    carried `on PyPI | no | never published` for a day after 0.4.0 was on the
+    index, with every gate in this repository green.
+
+    A disagreement reports both numbers, because a reader shown only "mismatch"
+    has to go and look up which of the two is the odd one out.
+    """
+    declared = _declared_version()
+    url = PYPI_API.format(name=name)
+    request = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            payload = json.load(response)
+    except urllib.error.URLError as exc:
+        raise Unverified("the index at %s is not verified: %s" % (url, exc)) from exc
+    served = (payload.get("info") or {}).get("version")
+    if served != declared:
+        return [
+            "the index serves %s but this tree declares %s, so every document "
+            "describing what is published describes a version that is not the "
+            "one being published" % (served, declared)
+        ]
+    return []
+
+
 #: The claims this tool re-measures. Resolved by name rather than held as
 #: direct references, so a test can replace one check and be exercising the
 #: code path it thinks it is. A registry of bound function objects would make
 #: every override a no-op and the whole suite quietly vacuous.
-CHECK_NAMES = ("hardening", "divergence", "visibility")
+CHECK_NAMES = ("hardening", "divergence", "visibility", "index")
 
 
 def _resolve(name: str):
@@ -193,16 +258,45 @@ def verify(*, require: frozenset[str] = frozenset()) -> dict[str, list[str]]:
 
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
-    if "--help" in argv or "-h" in argv:
-        print(__doc__)
-        return 0
-    require = frozenset(
-        argv[index + 1] for index, arg in enumerate(argv) if arg == "--require" and index + 1 < len(argv)
-    )
+    # `--require` takes one or more claims, up to the next `--`-prefixed token.
+    #
+    # It used to read `argv[index + 1]` and take exactly one per occurrence, so
+    # `--require a b` silently kept `a` and dropped `b` -- and the `unknown`
+    # check below passed, because `a` *was* a known claim. A second token with
+    # no error anywhere is a check quietly not running, inside the tool merged
+    # to stop claims quietly not running. Anything left over is refused rather
+    # than ignored, for the same reason: an argument a gate does not understand
+    # is either a typo or a claim someone thought they had asked for.
+    require: set[str] = set()
+    unconsumed: list[str] = []
+    empty_require = False
+    cursor = 0
+    while cursor < len(argv):
+        arg = argv[cursor]
+        if arg in ("--help", "-h"):
+            print(__doc__)
+            return 0
+        if arg == "--require":
+            cursor += 1
+            claimed = 0
+            while cursor < len(argv) and not argv[cursor].startswith("--"):
+                require.add(argv[cursor])
+                claimed += 1
+                cursor += 1
+            empty_require = empty_require or claimed == 0
+            continue
+        unconsumed.append(arg)
+        cursor += 1
+    if empty_require:
+        print("verify_repo_state: --require was given no claim to require")
+        return 2
     unknown = require - set(CHECK_NAMES)
     if unknown:
         print("verify_repo_state: unknown claim(s) in --require: %s" % ", ".join(sorted(unknown)))
         print("verify_repo_state: known claims are: %s" % ", ".join(CHECK_NAMES))
+        return 2
+    if unconsumed:
+        print("verify_repo_state: unrecognised argument(s): %s" % ", ".join(unconsumed))
         return 2
     results = verify(require=require)
 
@@ -234,9 +328,16 @@ def main(argv: list[str] | None = None) -> int:
     if findings:
         for finding in findings:
             print("verify_repo_state: %s" % finding)
+        # Counted from the findings themselves, not by subtracting the unverified
+        # total from their length. That subtraction is only right when every
+        # unverified entry is in `require`, and with a narrower `require` it
+        # absorbed a real finding and printed "0 finding(s)" directly beneath
+        # one. A summary that contradicts the line above it is worse than no
+        # summary, because it is the line a reader stops at.
+        real = sum(1 for one in findings if not one.startswith("UNVERIFIED"))
         print(
             "verify_repo_state: FAIL  %d finding(s), %d unverified"
-            % (len(findings) - unverified_count, unverified_count)
+            % (real, unverified_count)
         )
         return 1
 

@@ -26,6 +26,8 @@ python3 tools/sync_adapters.py --check # derived mirrors are byte-identical
 python3 tests/test_all.py              # every gated skill is green
 python3 skills/elohim-harness/scripts/claim_binding.py --root .  # claim sentences are bound to pinned values
 python3 tools/verify_repo_state.py       # the repository's own state is re-measured (needs GITHUB_TOKEN for the visibility claim)
+python3 tools/gate_liveness.py --check      # every gate has passed, or has a written reason
+python3 tools/gate_liveness_record.py --job ci.yml:core  # CI-only: appends what a runner just proved to the liveness log
 python3 -m pytest -q                   # the unit suite is green
 ```
 

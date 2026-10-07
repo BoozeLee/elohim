@@ -1,0 +1,15 @@
+name: Fixture
+on:
+  workflow_dispatch:
+jobs:
+  fixture:
+    runs-on: ubuntu-latest
+    steps:
+      - name: gate that was never dispatched
+        run: python3 tools/fixture_gate.py --case 1
+      - name: another gate never dispatched
+        run: python3 tools/fixture_gate.py --case 2
+      - name: a third gate never dispatched
+        run: python3 tools/fixture_gate.py --case 3
+      - name: the fourth gate never dispatched
+        run: python3 tools/fixture_gate.py --case 4

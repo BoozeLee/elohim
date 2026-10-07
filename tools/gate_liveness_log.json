@@ -1,0 +1,2680 @@
+{
+  "_comment": [
+    "Observed pass records, and the only evidence gate_liveness.py accepts.",
+    "Written by tools/gate_liveness_record.py at the END of a job that",
+    "reached it -- reachable only when that job's steps passed. The liveness",
+    "tool READS this and never writes it: a gate asserting it works is the",
+    "mistake the tool exists to catch, so the two must not be the same file.",
+    "A test's record carries `via` naming the job that ran the suite. The",
+    "suite passing is evidence for each test it collected; the field says so",
+    "rather than implying the test was invoked on its own.",
+    "Records whose run is `local` were verified on a machine, not a runner, and say so. They are replaced by a real run id the first time CI collects the suite, which is the mechanism keeping this log honest -- and a record that claimed a runner it did not have would be the defect this tool exists to catch.",
+    "This file is a SNAPSHOT. The recorder writes it inside a runner's checkout, which is discarded when the job ends, so nothing commits it and no run refreshes it for you. Each CI run appends the delta it produced to the job's step summary instead, and a person commits those records when they want the snapshot to move. A gate with no record here is reported NEVER_PASSED, which is the honest answer: nothing has been observed."
+  ],
+  "gates": {
+    "ci.yml:core:claim sentences are bound to pinned values": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:core",
+      "workflow": "Core CI"
+    },
+    "ci.yml:core:derived mirrors are byte-identical": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:core",
+      "workflow": "Core CI"
+    },
+    "ci.yml:core:every gate has either passed or a written reason": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "ran on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "ci.yml:core:every gate has either passed or a written reason",
+      "workflow": "local verification"
+    },
+    "ci.yml:core:every gated skill is green": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:core",
+      "workflow": "Core CI"
+    },
+    "ci.yml:core:record what this job proved": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "ran on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "ci.yml:core:record what this job proved",
+      "workflow": "local verification"
+    },
+    "ci.yml:core:shipped text is clean": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:core",
+      "workflow": "Core CI"
+    },
+    "ci.yml:core:the repository's own state is re-measured": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:core",
+      "workflow": "Core CI"
+    },
+    "ci.yml:core:the unit suite is green": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:core",
+      "workflow": "Core CI"
+    },
+    "ci.yml:published-shard:the published shard matches its manifest": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:published-shard",
+      "workflow": "Core CI"
+    },
+    "ci.yml:unit-stress:the unit suite is green six times in a row": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:unit-stress",
+      "workflow": "Core CI"
+    },
+    "ci.yml:wheel:the artifact in dist/ installs and its API runs": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:wheel",
+      "workflow": "Core CI"
+    },
+    "ci.yml:wheel:the installed distribution runs the API": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; core 3.10/3.12/3.14, published-shard, wheel and unit-stress all SUCCESS",
+      "run": "37228141819",
+      "status": "success",
+      "via": "ci.yml:wheel",
+      "workflow": "Core CI"
+    },
+    "matrix.yml:matrix:every shipped SKILL.md is one a loader can read": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success",
+      "run": "37228141760",
+      "status": "success",
+      "via": "matrix.yml:matrix",
+      "workflow": "Interpreter Matrix"
+    },
+    "matrix.yml:matrix:one skill name is reachable from one place": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success",
+      "run": "37228141760",
+      "status": "success",
+      "via": "matrix.yml:matrix",
+      "workflow": "Interpreter Matrix"
+    },
+    "matrix.yml:matrix:the documented gates are the gates CI runs": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success",
+      "run": "37228141760",
+      "status": "success",
+      "via": "matrix.yml:matrix",
+      "workflow": "Interpreter Matrix"
+    },
+    "matrix.yml:matrix:the documented range is the range that ran": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success",
+      "run": "37228141760",
+      "status": "success",
+      "via": "matrix.yml:matrix",
+      "workflow": "Interpreter Matrix"
+    },
+    "publish.yml:publish:the artifacts about to be uploaded install and their API runs": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "publish.yml:publish",
+      "workflow": "Publish to PyPI"
+    },
+    "publish.yml:publish:the version being offered is not already released": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "publish.yml:publish",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_action_outputs.py::test_every_declared_output_has_a_value": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_action_outputs.py::test_every_output_value_names_a_real_step": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_action_outputs.py::test_the_consuming_workflow_refuses_an_empty_value": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_action_outputs.py::test_the_extractor_discriminates": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_action_outputs.py::test_the_pre_fix_manifest_is_red": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_action_outputs.py::test_the_writing_step_has_an_id": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_action_outputs.py::test_the_writing_step_writes_all_six": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_document_naming_every_command_is_clean": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_fence_is_closed_by_the_next_fence": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_fenced_comment_is_not_a_command": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_folded_run_block_is_matched_whole": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_gate_named_twice_is_still_one_gate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_job_block_stops_at_the_next_job": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_job_with_no_recognisable_gate_is_a_finding_not_a_pass": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_missing_document_is_a_finding_not_a_pass": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_missing_root_is_bad_input_not_a_clean_tree": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_missing_workflow_is_a_finding_not_a_pass": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_python_module_is_a_gate_too": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_a_python_path_in_a_run_block_is_a_gate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_an_absent_job_is_reported_rather_than_treated_as_clean": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_comments_naming_a_path_are_not_steps": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_every_documented_file_is_checked": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_expect_findings_fails_when_nothing_is_wrong": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_only_a_fenced_block_is_a_command_list": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_only_the_named_job_is_read": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_pip_is_not_a_gate_because_nothing_runs_it": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_the_committed_fixture_still_reproduces_the_drift": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_the_documented_scope_is_narrower_than_the_claims_it_prevents": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_the_drift_is_found": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_the_fixture_document_names_the_missing_gate_only_in_prose": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_agents_drift.py::test_the_real_documents_are_in_step_with_ci": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_census_discriminator.py::test_a_descriptive_leaf_is_not_decisive": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_census_discriminator.py::test_a_leaf_the_gate_decides_on_is_decisive": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_census_discriminator.py::test_a_type_change_is_one_delta_at_that_path": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_census_discriminator.py::test_an_unchanged_shard_moves_nothing": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_census_discriminator.py::test_leaf_deltas_finds_a_list_length_change": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_census_discriminator.py::test_the_discriminator_is_not_vacuous_in_either_direction": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_census_discriminator.py::test_the_seal_is_never_decisive": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_a_bare_home_prefix_does_not_fire": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_a_benign_username_prefix_does_not_excuse_a_real_one": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_a_real_home_directory_is_a_finding": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_a_tilde_home_does_not_fire": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_benign_usernames_do_not_fire": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_every_offending_line_is_reported_not_just_the_first": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_macos_home_directories_fire": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_shell_home_variables_do_not_fire": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_the_finding_carries_the_column_of_the_path": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_the_pattern_does_not_match_its_own_source": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_the_rule_reports_the_same_dict_shape_as_the_other_scanners": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_the_two_bare_occurrences_in_this_tree_do_not_fire": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_the_word_users_on_its_own_does_not_fire": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_this_test_file_does_not_contain_a_path_it_would_report": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_this_tree_has_no_home_directory_findings": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_check_text.py::test_two_home_paths_on_one_line_are_both_reported": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_gate_liveness.py::test_a_ci_step_is_identified_by_workflow_job_and_step_name": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_control_is_recognised_only_in_the_same_module": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_gate_with_no_recorded_pass_is_never_passed": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_module_wide_declaration_covers_every_gate_in_that_module": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_non_empty_observed_set_is_accepted": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_passing_assertion_with_no_control_is_no_control": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_record_that_is_not_success_does_not_count_as_a_pass": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_step_below_a_job_is_filed_under_that_job_and_not_the_next": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_step_that_only_installs_something_is_not_a_gate": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_a_step_that_runs_the_suite_is_a_gate_even_though_it_names_no_path": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_an_empty_observed_set_raises_rather_than_reporting_a_pass": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_an_unparseable_log_is_unverified_rather_than_empty": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_both_facts_are_reported_rather_than_one_shadowing_the_other": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_every_gate_in_this_repository_is_enumerated": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_corpus_carries_four_vacuous_and_four_never_executed": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_corpus_classifies_exactly_as_documented": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_corpus_would_be_red_before_this_tool_existed": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_fixture_corpus_does_not_enumerate_itself": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_gate_fails_on_a_classification_with_no_written_reason": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_printed_delta_is_the_delta_and_not_the_whole_log": {
+      "at": "2026-10-04T22:05:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_recorder_appends_its_delta_to_the_step_summary": {
+      "at": "2026-10-04T23:30:00Z",
+      "note": "verified on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_recorder_prints_its_delta_so_the_step_log_can_recover_it": {
+      "at": "2026-10-04T22:05:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_recorder_writes_no_summary_file_when_the_variable_is_unset": {
+      "at": "2026-10-04T23:30:00Z",
+      "note": "verified on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_summary_write_does_not_replace_the_committed_log": {
+      "at": "2026-10-04T23:30:00Z",
+      "note": "verified on this machine; the first CI run of this branch replaces this record",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_tool_lists_its_own_gates_as_enumerated": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_tool_reads_the_log_and_never_writes_it": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_the_tool_runs_against_its_own_repository_and_is_green": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_this_repository_declares_every_debt_it_reports": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_liveness.py::test_zero_gates_enumerated_also_raises": {
+      "at": "2026-10-04T22:00:00Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_gate_liveness.py",
+      "workflow": "local verification"
+    },
+    "tests/test_gate_suite.py::test_case_passes": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_gate_suite.py::test_the_script_has_a_case_for_every_name_it_names": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_gitignore_build_output.py::test_the_build_output_is_ignored": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_gitignore_build_output.py::test_the_tracked_wheel_fixtures_are_still_not_ignored": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_harness_failure_reporting.py::test_a_fast_failure_is_not_reported_as_a_timeout": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_harness_failure_reporting.py::test_a_fast_failure_still_records_how_long_it_took": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_harness_failure_reporting.py::test_a_fast_failure_still_records_why_it_failed": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_harness_failure_reporting.py::test_a_real_timeout_is_still_reported_as_a_timeout": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_harness_failure_reporting.py::test_a_successful_run_is_untouched": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_harness_failure_reporting.py::test_the_misreport_does_not_reach_the_mutation_classifier": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_a_short_run_is_caught_rather_than_treated_as_agreement": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_a_subset_that_reaches_outside_the_range_is_a_finding": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_bounds_compare_versions_numerically_not_as_text": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_bounds_must_match_the_range_endpoints": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_majority_does_not_win": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_measurements_may_be_skipped_entirely": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_no_range_claim_at_all_is_a_finding_not_a_pass": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_the_extractors_actually_discriminate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_the_gate_fails_when_a_surface_drifts": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_the_gate_fails_when_the_run_disagrees_with_the_documents": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_the_real_surfaces_are_readable_and_agree": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_interpreter_claim.py::test_the_surfaces_agree_when_they_agree": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_ledger_init.py::test_a_skill_with_no_discovery_script_gets_a_ledger_not_a_backlog": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_an_initialised_skill_is_locatable_by_the_gate": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_claim_binding_binds_nothing_from_it_until_promoted": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_is_exclusive_of_the_verbs_that_read_a_ledger": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_pins_nothing": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_refuses_to_overwrite_a_ledger": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_refuses_to_pin_an_env_override_outside_the_skill": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_it_refuses_to_pin_the_legacy_home_instrument": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_promotion_still_works_afterwards": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_the_committed_fixtures_ship_no_ledger": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_ledger_init.py::test_the_pin_it_writes_is_one_the_gate_accepts": {
+      "at": "2026-10-04T22:17:51Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_ledger_init.py",
+      "workflow": "local verification"
+    },
+    "tests/test_matrix_interpreters.py::test_an_unreadable_candidate_is_skipped_not_refused": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_differing_patch_versions_under_one_minor_refuse": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_distinct_minors_are_all_kept": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_explicit_interpreters_bypass_discovery": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_refuse_short_run_accepts_a_met_count": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_refuse_short_run_is_quiet_when_no_expectation_is_stated": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_refuse_short_run_names_the_versions_it_actually_exercised": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_the_fakes_are_only_distinguishable_by_full_path": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_the_same_patch_version_twice_is_deduplicated_not_refused": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_matrix_interpreters.py::test_the_two_refusals_are_independent": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_an_accepted_survivor_run_explains_itself": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_an_empty_arm_reports_none_not_zero": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_apply_at_returns_none_for_an_absent_site_index": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_apply_at_returns_none_for_syntax_error_source": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_artefact_causes_are_named_and_never_folded_into_survivors": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_both_entry_points_apply_one_policy": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_accepts_fail_over_and_has_no_default": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_can_fail_a_clean_run_when_the_threshold_says_so": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_does_not_shadow_stdlib_inspect": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_excludes_the_inert_class_from_the_gated_rate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_gated_rate_matches_mutate_rate_excluding_inert": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_publishes_the_threshold_it_was_given": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_reports_coverage_against_a_named_population": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_census_treats_an_empty_run_as_a_failure_not_a_pass": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_each_operator_changes_the_source_or_declines_specifically": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_every_operator_declares_a_name_a_predicate_an_edit_and_a_expectation": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_fail_over_is_absent_by_default_because_the_roadmap_names_no_rate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_gate_verdict_is_pure": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_list_operators_exits_zero_and_names_all_eight": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_mutator_is_idempotent_on_its_own_output": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_mutators_is_derived_from_sites_and_keeps_one_row_per_operator": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_plan_records_a_real_site_count_and_respects_the_stale_cap": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_population_is_derived_and_counts_are_not_structurally_zero": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_population_report_says_which_population_it_drew_from": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_run_census_returns_a_report_and_prints_nothing": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_site_rows_point_at_lines_in_the_pristine_source": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_survivors_and_inert_survivors_are_reported_separately": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_mutate.py::test_the_repo_path_is_derived_not_hardcoded": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_a_pinned_build_backend_is_the_one_that_builds": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_a_standalone_run_does_not_claim_a_version": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_every_supported_minor_is_declared_as_a_classifier": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_keywords_stay_within_pypis_limit_of_five": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_project_urls_are_present": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_artifact_is_verified_before_it_is_uploaded": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_author_entry_is_not_empty": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_console_script_is_declared": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_declared_minors_are_contiguous": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_dry_run_input_is_declared": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_dry_run_input_is_typed_boolean": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_dry_run_still_builds_and_verifies": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_harness_does_not_import_the_package": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_installed_command_can_report_its_version": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_installed_command_is_told_its_own_name": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_package_declares_itself_python_3_only": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_package_names_an_author": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_range_stops_at_what_the_matrix_runs": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_readme_and_license_are_declared": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_runner_no_longer_rewrites_argv": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_runner_reads_the_name_it_is_given": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_upload_is_told_the_directory_the_gate_reads": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_upload_step_is_gated_on_the_dry_run": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_version_arrives_through_init_globals": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_version_says_so_when_it_does_not_know": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_wheel_gate_reads_the_directory_the_upload_sends": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_the_workflows_that_build_pin_the_same_backend": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_package_metadata.py::test_these_assertions_can_fail": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_pins.py::test_the_ci_runner_and_the_dev_group_pin_the_same_pytest": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_pins.py::test_the_extractor_actually_discriminates": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_404_means_the_name_has_never_been_used": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_fixture_directory_exists_for_every_index_under_test": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_name_the_index_has_never_heard_of_is_allowed": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_page_rather_than_a_project_is_refused_rather_than_read": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_release_with_no_files_still_occupies_its_slot": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_released_version_is_refused": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_trailing_slash_on_the_index_does_not_double_up": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_a_yanked_release_still_occupies_its_slot": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_an_index_that_does_not_hold_it_reads_as_a_release_map_without_it": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_an_index_that_holds_the_version_reads_as_a_release": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_an_unreachable_index_is_not_an_answer": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_an_unreleased_version_is_allowed": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_any_other_status_is_not_an_answer": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_json_without_a_releases_map_survives_fetch_and_is_caught_by_check": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_no_version_at_all_is_an_error_too": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_pep503_normalisation_is_not_the_identity": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_that_moving_the_gate_after_the_upload_is_caught": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_that_the_wiring_assertions_can_fail": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_comparison_is_exact_and_does_not_invent_equivalence": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_declared_version_is_read_from_pyproject": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_fixtures_describe_the_project_the_directory_is_named_for": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_gate_is_not_conditional_on_a_dry_run": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_gate_runs_before_the_upload": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_process_exits_one_when_the_slot_is_taken": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_process_exits_two_when_the_index_cannot_be_read": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_process_exits_two_when_the_pyproject_declares_nothing": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_process_exits_zero_when_the_slot_is_free": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_release_message_names_the_files_and_bounds_its_length": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_request_identifies_itself": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_step_splitter_can_see_a_step_it_has_never_seen": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_the_workflow_calls_the_gate_in_a_step_of_its_own": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_release_slot.py::test_two_versions_is_an_error_rather_than_the_first_one": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_replay_negative_controls.py::test_baseline_unmutated_labels_are_green": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_replay_negative_controls.py::test_flipped_label_must_go_red": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_replay_negative_controls.py::test_planted_contradiction_must_go_red": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_replay_negative_controls.py::test_removed_binding_must_go_red": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_shard_determinism.py::test_every_instrument_writes_a_shard": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_shard_determinism.py::test_shards_are_byte_identical_across_two_runs": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_shard_determinism.py::test_the_comparison_cannot_be_satisfied_by_the_seal_alone": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_colon_in_a_later_field_is_not_the_description_s_field": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_colon_with_no_space_after_it_is_fine": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_file_with_no_frontmatter_is_a_finding": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_horizontal_rule_in_the_body_is_not_a_closing_fence": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_matching_name_is_not_a_finding": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_mismatched_name_is_a_finding": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_missing_root_is_bad_input_not_a_pass": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_quoted_colon_space_is_fine": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_a_quoted_name_still_has_to_match": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_an_unquoted_colon_space_is_a_finding": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_an_unterminated_frontmatter_block_is_a_finding": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_every_shipped_skill_is_well_formed": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_expect_findings_inverts_the_verdict": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_missing_required_fields_are_each_reported": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_frontmatter.py::test_the_shipped_fixture_is_still_caught": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_a_clean_tree_passes_the_normal_verdict_and_fails_the_fixture_verdict": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_a_directory_without_a_skill_md_is_not_a_skill": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_a_missing_root_is_not_a_root": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_a_shallower_skill_shadows_a_nested_one": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_a_symlink_and_a_real_copy_in_separate_roots_are_one_skill_too": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_a_symlink_to_a_different_place_is_still_a_duplicate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_distinct_names_in_distinct_roots_are_not_duplicates": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_expect_findings_inverts_the_verdict": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_names_differing_only_in_case_are_different_names": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_one_name_in_two_roots_is_a_duplicate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_the_shipped_fixture_is_still_caught": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_the_walk_stops_at_three_levels": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_this_repository_has_no_duplicate_reachable_name": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_two_copies_inside_one_root_are_reported": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_skill_roots.py::test_two_symlinked_roots_are_one_skill": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_a_missing_hardening_file_is_reported_by_name": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_a_private_repository_is_reported": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_a_pyproject_with_no_parseable_version_is_unverified": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_a_required_claim_is_not_turned_off_by_being_required_twice": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_a_required_claim_that_cannot_be_observed_fails": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_an_index_serving_another_version_is_reported_with_both": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_an_unknown_claim_in_require_is_refused_rather_than_ignored": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_an_unreachable_index_is_unverified_and_never_a_pass": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_an_unrecognised_argument_is_refused_rather_than_ignored": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_both_required_claims_are_required_by_one_invocation": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_divergence_is_quiet_when_the_two_tips_agree": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_divergence_is_reported_with_both_counts_and_the_ref": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_divergence_refuses_rather_than_passing_when_the_ref_is_absent": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_the_failure_summary_counts_findings_and_unverified_separately": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_the_hardening_files_are_present_right_now": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_the_index_is_quiet_when_it_serves_the_declared_version": {
+      "at": "2026-10-04T21:20:48Z",
+      "note": "verified locally before this branch's first CI run; the first runner to collect the suite replaces this record with its own",
+      "run": "local",
+      "status": "success",
+      "via": "python3 -m pytest tests/test_verify_repo_state.py",
+      "workflow": "local verification"
+    },
+    "tests/test_verify_repo_state.py::test_the_tool_exits_non_zero_when_a_check_reports": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_the_tool_exits_zero_when_everything_checks_out": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_these_assertions_can_fail_by_making_a_check_vacuous": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_verify_reports_an_unobservable_check_as_a_finding_not_as_absence": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_visibility_is_quiet_when_the_repository_is_public": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_verify_repo_state.py::test_visibility_without_a_token_is_unverified_and_never_a_pass": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_version_agreement.py::test_every_declared_version_matches_the_newest_changelog_section": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_version_agreement.py::test_the_extractors_actually_discriminate": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_directory_holding_no_wheel_is_refused_and_says_so": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_directory_holding_one_wheel_yields_it": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_directory_holding_two_wheels_is_refused_and_names_both": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_directory_named_like_a_wheel_is_refused_rather_than_announced": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_directory_that_is_not_there_is_refused_at_the_command_line": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_directory_that_is_not_there_is_refused_differently": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_dist_holding_no_sdist_is_refused_rather_than_passed_over_in_silence": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_dist_holding_two_sdists_is_refused_and_names_both": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_file_named_like_a_wheel_that_is_not_a_zip_is_refused_by_name": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_regular_file_still_passes_the_type_check": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_sdist_that_is_not_a_readable_file_is_refused_before_it_is_extracted": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_sdist_whose_rebuild_yields_no_wheel_is_refused": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_symlink_loop_named_like_a_wheel_is_refused": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_symlink_to_a_wheel_that_is_gone_is_refused": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_wheel_nobody_can_read_is_refused": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_wheel_that_is_a_named_pipe_is_refused_rather_than_waited_on": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_a_wheel_that_is_a_real_zip_is_not_refused_by_the_readability_check": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_ci_asks_the_publish_gate_question_too": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_dist_accepts_a_relative_path_the_way_publish_yml_passes_it": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_dist_on_two_wheels_refuses_from_the_command_line_too": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_dist_pointed_at_a_directory_with_no_wheel_refuses_and_never_builds": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_dist_pointed_at_an_unreadable_wheel_gets_past_the_selection": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_entries_returns_the_names_of_a_zip_that_is_one": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_no_wheel_exists_because_git_cannot_track_an_empty_directory": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_no_workflow_passes_a_dist_path_this_file_does_not_test": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_one_wheel_is_selected_however_many_other_names_the_directory_holds": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_the_entries_oserror_arm_has_a_control": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_the_fixture_directories_are_the_shapes_their_names_claim": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_the_fixture_readme_declares_them_synthetic": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_the_flag_is_offered_and_documented": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_the_report_names_the_sdist_beside_the_wheel_so_it_cannot_read_as_covering_both": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_the_sdist_is_rebuilt_and_the_rebuilt_wheel_is_what_the_gate_verifies": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_the_selection_does_not_depend_on_the_order_the_directory_lists": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_these_assertions_can_fail_by_ignoring_the_flag": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_these_ci_assertions_can_fail_by_deleting_the_dist_step": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_wheel_dist.py::test_these_ci_assertions_can_fail_by_running_the_gate_before_the_build": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_workflow_pins.py::test_every_third_party_action_is_pinned_to_a_named_commit": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    },
+    "tests/test_workflow_pins.py::test_the_extractor_actually_discriminates": {
+      "at": "2026-10-04T21:00:00Z",
+      "note": "completed/success; slot check, artifact gate and upload all success",
+      "run": "37227517192",
+      "status": "success",
+      "via": "ci.yml:core:the unit suite is green",
+      "workflow": "Publish to PyPI"
+    }
+  }
+}
