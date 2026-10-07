@@ -131,9 +131,24 @@ jobs:
       # are never mistaken for shipped skills -- and they sit five or more levels
       # deep, past the three-level container walk `npx skills add` performs, so it
       # never discovers them either.
+      # `verify_skill_roots.py` is deliberately NOT run against this tree, and that
+      # is the tool's own contract rather than a gap in it. Its subject is the three
+      # project-local roots (.opencode/skills, .claude/skills, .agents/skills) and
+      # none of them exists here. Where no root holds a skill there is no name, so
+      # the question has no subject and the answer is not "no duplicates" -- the
+      # tool exits 2, on the grounds that an unverified tree is not a clean one.
+      #
+      # Demanding exit 0 from it here asked precisely the question it refuses to
+      # answer, and that is what turned this step red on all three interpreters. The
+      # direction that still has a subject is the fixture below, and it is the one
+      # that carries the meaning: it proves the gate can still catch a known
+      # duplicate, so a gate weakened until it can see nothing cannot pass.
+      #
+      # `verify_skill_frontmatter.py` is the opposite case and does keep its bare
+      # invocation: its subject is derived from `plugins/`, which exists, so exit 0
+      # there is a real verdict about a real tree.
       - name: one skill name is reachable from one place
         run: |
-          python3 tools/verify_skill_roots.py
           python3 tools/verify_skill_roots.py \
             --root tests/fixtures/skill_roots --expect-findings
 
