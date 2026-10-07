@@ -238,3 +238,18 @@ jobs:
           echo "decided:          ${decided}"
           echo "survivors:"
           printf '%s\n' "${survivors}"
+
+      # The last step, for the reason ci.yml's is: reaching it means every gate
+      # above passed. The one `continue-on-error` step in this job is a `uses:`
+      # step that the liveness tool does not enumerate, and the step after it
+      # asserts that the refusal was a refusal -- so reaching here does not step
+      # over a failure. No step in this job carries `if: always()`.
+      #
+      # This step is why the exemption above it can go away. Nothing in this job
+      # called the recorder, so `assemble a caller tree that holds no checkout of
+      # this repository` was NEVER_PASSED no matter how many times the Action was
+      # dispatched. The declared reason was `workflow_dispatch-only`, which was
+      # half of it: the other half is that no dispatch could ever have moved it.
+      - name: record what this job proved
+        run: >-
+          python3 tools/gate_liveness_record.py --job action.yml:runs-the-action

@@ -1,0 +1,20 @@
+{
+  "project": "elohim",
+  "spine_version": 1,
+  "claims": [
+    {
+      "id": "every-skill-passes",
+      "statement": "Every elohim skill passes its own checks: `tests/test_all.py` reports ALL_SKILLS_PASS.",
+      "verify": "python3 tests/test_all.py",
+      "expect": "exit 0",
+      "adrs": ["0001"]
+    },
+    {
+      "id": "the-residual-gate-binds",
+      "statement": "A numerical claim is only a finding after its residual is measured; the gate refuses a claim whose residual is unproven.",
+      "verify": "python3 tests/test_all.py",
+      "expect": "exit 0",
+      "adrs": ["0002"]
+    }
+  ]
+}

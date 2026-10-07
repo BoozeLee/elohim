@@ -33,6 +33,7 @@ python3 scripts/harness_run.py --all --json --fail-under 81
 | `--skill-dir PATH` | the skill whose instrument is being verified; required unless `--all` |
 | `--all` | gate every skill that owns an instrument under the skills root |
 | `--json` | machine-readable payload on stdout |
+| `--init` | write a `ledger.json` for a skill that has none: the instrument pin and an empty `facts`, promoting nothing |
 | `--discover` | measure unrecorded structures into the skill's `backlog.json` |
 | `--list-backlog` | print unpromoted measurements |
 | `--promote ID:PATH[:TOL]` | pin a backlog measurement as a ledger fact |

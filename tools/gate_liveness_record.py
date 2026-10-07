@@ -18,6 +18,27 @@ Writes into `tools/gate_liveness_log.json`, preserving every other record. A
 record is only ever added or refreshed, never removed: the question this
 answers is "has this *ever* passed", and a later pass does not un-do an earlier
 absence. That is why an entry carries the run that produced it.
+
+**The committed log is a snapshot, and this script does not make it a feed.** A
+runner's working tree is discarded when the job ends, so the write above is
+thrown away with the checkout and nothing commits it. Refreshing the file in the
+repository is a person's job. What this script does instead is publish the
+*delta* -- the records this run added or refreshed -- to two surfaces, so a
+person has the exact records to commit rather than re-running anything to
+recover them.
+
+The first is stdout, which is the one that actually delivers that promise: the
+step log is retained and is readable with `gh run view --log <run>`. Every
+recorded gate is named there. The second is `$GITHUB_STEP_SUMMARY`, which GitHub
+renders as a table on the run page. That one is decoration -- no REST API
+exposes a job summary and the served run page does not carry the text -- so it
+is the surface a reader cannot reach from a terminal, and it is not what makes
+the delta recoverable. Both are written; only one is load-bearing. The summary
+is bounded on purpose: the file is per-step, capped at 1 MiB, and at most 20
+step summaries are shown per job, so the whole log never goes there.
+
+Before this, stdout carried the count and not the names, so run 37236817476 is
+unrecoverable: it says "8 gate(s) in ci.yml:core" and never says which eight.
 """
 
 from __future__ import annotations
@@ -73,7 +94,42 @@ def record(root: Path, job: str, run_id: str, at: str, suite: bool = False) -> l
         )
 
     log_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+    _write_step_summary(touched, gates, job, run_id, at)
     return touched
+
+
+def _write_step_summary(touched, gates, job, run_id, at) -> None:
+    """Append this run's delta to `$GITHUB_STEP_SUMMARY`, when there is one.
+
+    Absent the variable -- every local invocation -- this writes nothing and
+    creates no file. That absence is a tested property, not an accident: a
+    recorder that invented a summary path would leave litter behind the one
+    place it is run most often.
+
+    Appended, never truncated: GitHub groups every step's summary into the job
+    summary, and `>>` is the documented way to add to it.
+    """
+    target = os.environ.get("GITHUB_STEP_SUMMARY")
+    if not target:
+        return
+    rows = ["| gate | status | run | at |", "|---|---|---|---|"]
+    for gate in touched:
+        record = gates.get(gate, {})
+        rows.append(
+            "| `%s` | %s | %s | %s |"
+            % (gate, record.get("status", "?"), record.get("run", run_id), record.get("at", at))
+        )
+    with open(target, "a", encoding="utf-8") as handle:
+        handle.write(
+            "\n### Gate liveness recorded by this job\n\n"
+            "%d gate(s) observed passing in `%s` (run `%s`, at `%s`).\n\n"
+            "This is the **delta**, not the log: the committed "
+            "`tools/%s` is a snapshot and this run's write to it is discarded "
+            "with the runner's checkout. Committing these records is a person's "
+            "job; they are here so nobody has to re-run anything to recover "
+            "them.\n\n%s\n"
+            % (len(touched), job, run_id, at, gl.LOG_NAME, "\n".join(rows))
+        )
 
 
 def main(argv=None) -> int:
@@ -94,6 +150,15 @@ def main(argv=None) -> int:
         "gate_liveness_record: %d gate(s) in %s recorded as passing in run %s"
         % (len(touched), args.job, args.run)
     )
+    # The names go to stdout as well as to the step summary, because the
+    # summary is not readable from a terminal and the docstring promises the
+    # delta is recoverable without re-running anything. `gh run view --log` is
+    # greppable and retained; the Summary tab is neither greppable nor exposed
+    # by any API. Printed in full even under --suite, where that is a few
+    # hundred lines: truncating would put the tail back behind the re-run this
+    # exists to avoid, and a CI log is not a UI.
+    for gate in touched:
+        print("  recorded: %s" % gate)
     return 0
 
 
