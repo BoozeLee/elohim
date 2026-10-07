@@ -85,7 +85,23 @@ def _newest_section() -> str:
 
 
 def test_every_declared_version_matches_the_newest_changelog_section():
-    """The wheel, the installed package, the lockfile and the tag say one number.
+    """The wheel, the installed package, the lockfile and the changelog say one
+    number. **Not** the tag — nothing here reads one.
+
+    This docstring used to say "the wheel, the installed package, the lockfile
+    and the tag say one number", which was an overclaim rather than a
+    description. The `declared` dict below has three entries and
+    `_newest_section()` is the fourth declarer; there is no fourth-from-git, no
+    `git tag`, no `ls-remote` anywhere in this module, and adding one would need
+    a repository to run against. A test whose docstring names a check it does
+    not perform is the same defect this repository exists to catch, wearing the
+    costume of the fix for it.
+
+    It is worth being precise about what the tag would have added, because the
+    omission is not costless: `publish.yml` uploads to PyPI and never creates a
+    tag, so `0.3.0` and `0.4.0` are both untagged and there is no git-side
+    artifact for a fifth declarer to disagree with. The gap is real and it is
+    named here rather than papered over with a claim.
 
     Checked as one set rather than pairwise so a failure names every declarer
     that disagrees, not just the first pair noticed. Comparing only

@@ -10,8 +10,23 @@ version, and no version is covered by a stability guarantee.
 
 `elohim 0.3.0` is on PyPI, so this release is the first one that can be
 published at all: a released version is never replaced, and the previous tree
-could not have shipped without a bump. Nothing here has been uploaded — the
-release is prepared, and `publish.yml` is the only thing that uploads.
+could not have shipped without a bump.
+
+**This section said nothing here had been uploaded. It had been, and the sentence
+was false the whole time it stood.** Measured against the index rather than from
+memory, 2026-10-05: `https://pypi.org/pypi/elohim/json` returns HTTP 200 with
+releases `0.3.0` and `0.4.0`, and `0.4.0` is
+`elohim-0.4.0-py3-none-any.whl` uploaded at **19:15:15Z** and
+`elohim-0.4.0.tar.gz` at **19:15:17Z on 2026-10-04**, both by `publish.yml`.
+
+Two things in this file already said so and the sentence never noticed: the
+`Not claimed` section below refers to running `elohim --all` "minutes after the
+upload", and `docs/ROADMAP.md:1062` records `pip install elohim==0.4.0` from the
+index into a fresh virtual environment. **A changelog that denies its own
+release is worse than one that is silent about it**, because the rest of the file
+is written to be believed — and it survived here precisely because nothing in
+this repository can observe PyPI. That gap is named under `Not claimed` rather
+than left for the next reader to rediscover.
 
 The range is measured, not asserted, and it needs a different command from the
 one below it. `0.3.0` was published at **09:23:35Z on 2026-10-03** and was
@@ -115,6 +130,17 @@ changed, not one per commit, for the reason `[0.3.0]` gives.
   loses the caveat that produced it. See `docs/ROADMAP.md` under `E1`.
 - That any number in this section was measured on a runner *before* 18:05Z on
   2026-10-04. It was not, because no runner was executing.
+- **That anything in this file observes PyPI. Nothing does.** The sentence this
+  section used to open with — "Nothing here has been uploaded" — was false for
+  as long as it stood, and it stood for a day, because *no gate in this
+  repository can see the index*. `tools/verify_release_slot.py` runs against a
+  declared version and is the closest thing to a check, but it is not run
+  automatically and it cannot tell an author that the changelog now lies. This
+  is the same class of gap as the population that used to live in three files:
+  the claim was real, it was duplicated, and nothing disagreed with it. A check
+  would mean a network call in CI, which is a decision with its own costs and
+  is **not** taken here; what is taken is that the gap is written down in the
+  file whose whole job is being believed.
 
 ## [0.3.0] — 2026-10-03
 
@@ -265,11 +291,23 @@ one of the twelve commits sitting unpushed.
   working: a released version is never replaced, so the next upload needs a
   version bump in `pyproject.toml` rather than a retry.
 - **`v0.1.0`'s tag is orphaned** into the history rewritten for commit signing
-  and cannot be moved through the API. `v0.3.0` describes the range
-  `v0.2.0..v0.3.0`, which is resolvable.
-- **The account is an explicit always-bypass actor on the only branch ruleset.**
-  Left deliberately: with one person on the account, removing it produces
-  self-approved pull requests, a control that cannot fail. See `docs/ROADMAP.md`.
+  and cannot be moved through the API. **`v0.3.0` is not a ref at all**, and this
+  entry used to say `v0.3.0` "describes the range `v0.2.0..v0.3.0`, which is
+  resolvable". Only `v0.1.0` and `v0.2.0` exist —
+  `git ls-remote --tags origin` returns those two and nothing else — and
+  `compare/v0.2.0...v0.3.0` returns **404**. Publishing to PyPI never creates a
+  git tag, so both `0.3.0` and `0.4.0` are untagged releases. Their ranges are
+  now bounded by the commit each was published from, derived from the upload
+  timestamp rather than from a tag: `2b0a077` for `0.3.0` and `ff4f9a7` for
+  `0.4.0`. **A link that 404s is worse than no link**, because it looks checked.
+- **The account is not a bypass actor on the ruleset, and this entry said it
+  was.** `protect-all-branches` is the only ruleset, it covers `~ALL`, and its
+  `bypass_actors` list is **empty** — verified by reading the ruleset over the
+  API, not inferred. The observable consequence is concrete: on 2026-10-05 a
+  second commit to an existing branch was declined by exactly this rule while
+  creating a new branch succeeded, and this account is a repository admin. So
+  the control is real, it is just not the one described: an admin gets no
+  bypass, and `non_fast_forward` means a branch cannot be amended either.
 
 ### How to check this section is complete
 
@@ -875,7 +913,8 @@ pinned facts and 31 independently re-derived traps.
   unpinned and reported as noise instead.
 - `main` is not branch-protected. Review the diff.
 
-[Unreleased]: https://github.com/BoozeLee/elohim/compare/v0.2.0...HEAD
-[0.3.0]: https://github.com/BoozeLee/elohim/compare/v0.2.0...v0.3.0
+[Unreleased]: https://github.com/BoozeLee/elohim/compare/ff4f9a7...HEAD
+[0.4.0]: https://github.com/BoozeLee/elohim/compare/2b0a077...ff4f9a7
+[0.3.0]: https://github.com/BoozeLee/elohim/compare/v0.2.0...2b0a077
 [0.2.0]: https://github.com/BoozeLee/elohim/compare/afb61a3...v0.2.0
 [0.1.0]: https://github.com/BoozeLee/elohim/releases/tag/v0.1.0
