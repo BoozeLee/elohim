@@ -40,9 +40,9 @@ classifiers = [
 elohim = "elohim_gate.cli:main"
 
 [project.urls]
-Homepage = "https://github.com/BoozeLee/elohim"
-Source = "https://github.com/BoozeLee/elohim"
-Issues = "https://github.com/BoozeLee/elohim/issues"
+Homepage = "https://github.com/Quattro-Commas/elohim"
+Source = "https://github.com/Quattro-Commas/elohim"
+Issues = "https://github.com/Quattro-Commas/elohim/issues"
 
 # Pinned, not ranged. A ranged pin is a measurement that changes when someone
 # else pushes, which is the failure this repository exists to catch. These are
@@ -67,3 +67,11 @@ packages = ["elohim_gate"]
 "skills" = "elohim_gate/_skills"
 "adapters" = "elohim_gate/_adapters"
 "plugins" = "elohim_gate/_plugins"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.mypy]
+python_version = "3.10"
+check_untyped_defs = true
