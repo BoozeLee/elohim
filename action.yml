@@ -140,7 +140,7 @@ runs:
           exit 2
         fi
         python3 -m pip install --disable-pip-version-check --quiet \
-          "elohim @ git+https://github.com/BoozeLee/elohim@${ELOHIM_REF}"
+          "elohim @ git+https://github.com/Quattro-Commas/elohim@${ELOHIM_REF}"
         # Report what actually got installed rather than what was asked for. A
         # ref that resolves to something else is a fact the log must carry.
         python3 -c 'import elohim_gate, pathlib; print("elohim_gate from", pathlib.Path(elohim_gate.__file__).resolve())'
