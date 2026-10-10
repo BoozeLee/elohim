@@ -26,6 +26,7 @@ _probe_scratch.py
 # environment
 .env
 .env.*
+!.env.example
 
 # build artifacts
 *.egg-info/
