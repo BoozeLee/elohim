@@ -6,6 +6,11 @@
 
 # ELOHIM
 
+[![Core CI](https://github.com/Quattro-Commas/elohim/actions/workflows/ci.yml/badge.svg)](https://github.com/Quattro-Commas/elohim/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/elohim)](https://pypi.org/project/elohim/)
+[![Python](https://img.shields.io/pypi/pyversions/elohim)](https://pypi.org/project/elohim/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 > A number is a finding only after its residual was measured.
 
 ELOHIM is a gate for numerical claims. Eight instruments measure hard mathematics and
@@ -116,6 +121,30 @@ instrument and no ledger of its own, so it is not one of the eight.
   sanitizer can rewrite. The published wheel declares no runtime dependencies
   either, so `pip install` moves code and never resolves a package the gate could
   have been tampered with.
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Claim["Numerical claim"] --> Gate["elohim gate"]
+    Gate --> I1["precision-budget"]
+    Gate --> I2["reproducibility"]
+    Gate --> I3["invariant-hunter"]
+    Gate --> I4["tolerance-prover"]
+    Gate --> I5["estimator-bias"]
+    Gate --> I6["elohim"]
+    I1 --> Pin["Checksum pin"]
+    I2 --> Pin
+    I3 --> Pin
+    I4 --> Pin
+    I5 --> Pin
+    I6 --> Pin
+    Pin --> Residual{"Residual = 0?"}
+    Residual -->|yes| Pass["PASS"]
+    Residual -->|no| Fail["FAIL — refuse to pass"]
+```
+
+Six instruments measure, pin every result, and the gate refuses to pass if anything moved — including the instrument itself.
 
 ## Install
 
