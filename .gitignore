@@ -22,3 +22,13 @@ node_modules/
 
 # scratch used by the test harness
 _probe_scratch.py
+
+# environment
+.env
+.env.*
+!.env.example
+
+# build artifacts
+*.egg-info/
+.mypy_cache/
+ruff_cache/
