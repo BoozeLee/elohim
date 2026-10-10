@@ -1,3 +1,9 @@
+[![CI](https://github.com/Quattro-Commas/elohim/actions/workflows/ci.yml/badge.svg)](https://github.com/Quattro-Commas/elohim/actions/workflows/ci.yml)
+[![CodeQL](https://github.com/Quattro-Commas/elohim/actions/workflows/codeql.yml/badge.svg)](https://github.com/Quattro-Commas/elohim/actions/workflows/codeql.yml)
+[![PyPI](https://img.shields.io/pypi/v/elohim-gate)](https://pypi.org/project/elohim-gate/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+
 # ELOHIM
 
 > A number is a finding only after its residual was measured.
